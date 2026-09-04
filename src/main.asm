@@ -35,14 +35,11 @@ main_exit_before_jump:     ds 1
         .code
 
 bare_main:
-        ; Use the library's complete 7MHz/224-line setup, then narrow the
-        ; horizontal timing from 352 to 320 pixels.
         call    init_352x224
         call    init_c64_video
 
         call    upload_room00_patterns
 
-        ; Base room and room-$00 decor share one compact BG-palette set.
         stz     <_al
         lda     #13
         sta     <_ah
@@ -53,7 +50,7 @@ bare_main:
         ldy     #^room00_bg_palettes
         call    load_palettes
 
-        ; Rooms $01/$02 need C64 purple and blue in the two remaining slots.
+        ; Rooms $01-$03 use C64 purple and blue in the two remaining slots.
         lda     #13
         sta     <_al
         lda     #2
@@ -65,8 +62,6 @@ bare_main:
         ldy     #^room01_extra_palettes
         call    load_palettes
 
-        ; PCE sprite palettes are indices 16..31. Monty is C64 colour 1
-        ; (white), so plane-0 pixel index 1 must be visible in SPR palette 0.
         lda     #16
         sta     <_al
         lda     #1
@@ -98,14 +93,15 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Loaded horizontal chain is now $02 <-> $01 <-> $00.
-        ; During a jump, cancel only exits whose destination is still unloaded:
-        ; Room $00 right is $ff, and Room $02 left would enter Room $03.
+        ; Loaded horizontal chain is now $03 <-> $02 <-> $01 <-> $00.
+        ; collision_actual_room preserves the true room while Room $03 shadows
+        ; as $02 inside the unchanged physics code. Only exits into unloaded
+        ; rooms are cancelled during a jump: Room $00 right and Room $03 left.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
-        lda     <monty_room
+        lda     <collision_actual_room
         beq     .guard_room00_right
-        cmp     #2
+        cmp     #3
         bne     .after_unsupported_jump_edge
         lda     <monty_room_exit
         cmp     #1
