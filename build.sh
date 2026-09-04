@@ -23,10 +23,6 @@ else
 fi
 echo "Using pceas: $PCEAS"
 
-# Current pce-devel/huc deliberately has a split include layout:
-# bare-startup.asm/font.asm are in the Elmer example include directory, while
-# common.asm/vdc.asm/joypad.asm (and pceas.inc/pcengine.inc) are in include/hucc.
-# PCEAS searches PCE_INCLUDE after the current directory, so include both.
 ELMER_INC="$HUC_HOME/examples/asm/elmer/include"
 HUCC_INC="$HUC_HOME/include/hucc"
 for f in \
@@ -52,7 +48,10 @@ cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 cd "$BUILD"
-"$PCEAS" -S -gA -l 3 main.asm
+# Match the flags used by current pce-devel/huc Elmer HuCard examples.
+# --newproc is required by the current proc/procgroup/phase library layout;
+# --raw avoids legacy post-processing assumptions.
+"$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
 if [ -s main.sym ]; then mv -f main.sym monty.sym; fi
 if [ -s main.lst ]; then mv -f main.lst monty.lst; fi
