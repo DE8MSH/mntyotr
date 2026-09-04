@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18a
+Stand: 2026-09-04 — Phase 18b
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Der Toolchain-Fix in Phase 18a erhoeht den Gameplay-Prozentsatz bewusst nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Die Toolchain-Fixes in Phase 18a/18b erhoehen den Gameplay-Prozentsatz bewusst nicht.
 
 ## Ziel
 
@@ -29,17 +29,15 @@ Die vier originalen C64-Climbframes (Pointer $58-$5B, $5600-$56ff) sind jetzt in
 
 `build.sh` erzeugt nun zusaetzlich `monty-climb.dat`. `src/monty_sprite.asm` bindet alle vier Frames ein und besitzt mit `monty_upload_climb_frame` einen eigenen VRAM-Uploadpfad. Der C64-Code verwendet fuer Climb `(movement_ticker & 3) + $58` und eine Vier-Tick-Animationskadenz; diese Vier-Frame-Struktur ist damit auf PCE-Seite vorbereitet.
 
-Die Regressionstests pruefen nun Walk-left, Walk-right und Climb: insgesamt 12 authentische C64-Frames. Zusaetzlich wird die im Original vorhandene Gleichheit von Climbframe 0 und 2 abgesichert.
+## Phase 18a/18b — Linux-Mint-Toolchain korrigiert
 
-## Phase 18a — Linux-Mint-Toolchain korrigiert
+Echte Nutzer-Builds zeigten, dass das aktuelle HuC-Buildsystem `pceas` unter `$HUC_DIR/src/mkit/as/pceas` erzeugt. Der erste Installer-Fix fand diesen Assembler und verlinkte `~/.local/bin/pceas`, aber ein unmittelbar danach gestartetes `build.sh` konnte den Link in einer Shell mit altem/ungewoehnlichem PATH weiterhin nicht ueber `command -v` finden.
 
-Ein echter Nutzer-Build zeigte, dass das aktuelle HuC-Buildsystem `pceas` erfolgreich erzeugt und aus `src/mkit/as` nach `src/bin` kopiert, waehrend `install.sh` nur `$HUC_DIR/bin/pceas` akzeptierte. Dadurch meldete der Installer faelschlich `expected pceas`, obwohl der Assembler bereits gebaut war.
-
-`install.sh` erkennt jetzt zuerst `$HUC_DIR/src/bin/pceas`, danach die aelteren bekannten Pfade und als letzte Absicherung ein ausfuehrbares `pceas` innerhalb des HuC-Trees. Anschliessend wird wie bisher `~/.local/bin/pceas` verlinkt. Die Compiler-Warnungen aus `map.c` sind nicht die Ursache des Abbruchs; entscheidend war ausschliesslich die falsche Pfadannahme im Installer.
+Deshalb ist `build.sh` jetzt unabhaengig vom aktualisierten Shell-PATH: es akzeptiert zuerst einen expliziten `$PCEAS`, dann `command -v pceas`, danach direkt `$HUC_HOME/src/mkit/as/pceas`, `$HUC_HOME/src/bin/pceas` und `$HUC_HOME/bin/pceas`. Der vom Nutzer bestaetigte Pfad `/home/coderius/.local/opt/huc/src/mkit/as/pceas` wird damit direkt erkannt. Beim Start gibt das Script den tatsaechlich verwendeten Assembler aus.
 
 ## Verifikationsstatus
 
-Der HuC/pceas-Compile aus dem Nutzerlog war erfolgreich bis zum Kopieren des Assemblers; der anschliessende Installer-Pfadcheck war der Fehler und ist nun korrigiert. Der eigentliche Monty-ROM-Build muss danach noch mit `./build.sh` ausgefuehrt werden. GitHub Actions bleibt auf Wunsch entfernt.
+Der HuC/pceas-Hosttool-Build ist im Nutzerlog erfolgreich. Der Monty-ROM-Build kam bisher noch nicht bis zum Assemblieren, weil `build.sh` den vorhandenen Assembler nicht fand; dieser zweite Pfadfehler ist jetzt korrigiert. Der naechste `./build.sh`-Lauf sollte erstmals die eigentlichen PCEAS-Quellen erreichen. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
