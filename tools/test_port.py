@@ -5,6 +5,7 @@ from pathlib import Path
 from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_bat, CHR_GAME
 from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels
 
+JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN=[1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
 ROOM00_PROPS=[1,1,1,2,1,1,1,1]
@@ -54,14 +55,32 @@ def left_blocked(cells,monty_x,monty_y):
  samples=2 if (((monty_y-0x32)&0xff)&7)==0 else 3
  return any(room00_property(cells,col,row+i)==1 for i in range(samples))
 
-def below_blocked(cells,monty_x,monty_y):
+def below_result(cells,monty_x,monty_y,action=0,tile_state=0):
+ """Model the refactored C64 CheckTileBelow result: (blocked, action_counter)."""
  dy=(monty_y-0x32)&0xff
- if dy&7: return False
+ if dy&7: return False,0
  row=(dy>>3)+2
  dx=(monty_x-0x0c)&0xff
  col=dx>>2
  samples=2 if (dx&3)==0 else 3
- return any(room00_property(cells,col+i,row) in (1,2,3) for i in range(samples))
+ trap_count=2
+ for i in range(samples):
+  prop=room00_property(cells,col+i,row)
+  if prop==4:
+   trap_count-=1
+   if trap_count==0: return True,5
+  if prop==1: return True,0
+  if action or not tile_state:
+   if prop in (2,3): return True,0
+ return False,0
+
+def settle_y(cells,monty_x,monty_y,limit=32):
+ """C64 jumping_flag2 subset: descend one pixel/tick until CheckTileBelow blocks."""
+ for _ in range(limit):
+  blocked,_=below_result(cells,monty_x,monty_y)
+  if blocked: return monty_y
+  monty_y=(monty_y+1)&0xff
+ raise AssertionError('settle did not find floor')
 
 def parse_world_grid():
  text=(ROOT/'src/world.asm').read_text()
@@ -106,7 +125,7 @@ def main():
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
 
- # Original start before gravity settle.
+ # Authentic C64 start before gravity settle.
  assert c64_screen_xy(0x86,0xb0)==(244,127)
  assert pce_sat_xy(0x86,0xb0)==(276,191)
  assert sat_x_bytes(0x86,8)==(0x14,0x01)
@@ -117,14 +136,32 @@ def main():
  assert screen_to_room(37,22)==(31,19)
  assert screen_to_room(0,3) is None and screen_to_room(4,2) is None
 
- # Room-$00 doorway: C64 starts Y=$b0 but CheckTileBelow is clear until Y=$b2.
- # At doorway X=$78, Y=$b0 samples the solid wall tile above the opening;
- # post-settle Y=$b2 samples only the opening and must permit left movement.
- assert not below_blocked(cells,0x86,0xb0)
- assert not below_blocked(cells,0x86,0xb1)
- assert below_blocked(cells,0x86,0xb2)
+ # Phase 27: exact unsupported-fall subset restores the original $b0 start and
+ # naturally settles at $b2. The doorway is then clear without a hardcoded Y.
+ assert below_result(cells,0x86,0xb0)==(False,0)
+ assert below_result(cells,0x86,0xb1)==(False,0)
+ assert below_result(cells,0x86,0xb2)==(True,0)
+ assert settle_y(cells,0x86,0xb0)==0xb2
  assert left_blocked(cells,0x78,0xb0)
  assert not left_blocked(cells,0x78,0xb2)
+
+ # CheckTileBelow property semantics independent of room-$00's concrete tiles.
+ # Ground + tile_state permits property 2/3; jump action makes them blocking.
+ def props_result(props,action=0,tile_state=0):
+  trap=2
+  for prop in props:
+   if prop==4:
+    trap-=1
+    if trap==0: return True,5
+   if prop==1: return True,0
+   if action or not tile_state:
+    if prop in (2,3): return True,0
+  return False,0
+ assert props_result([2,0],0,1)==(False,0)
+ assert props_result([3,0],0,1)==(False,0)
+ assert props_result([2,0],1,0)==(True,0)
+ assert props_result([3,0],0,0)==(True,0)
+ assert props_result([4,4],0,0)==(True,5)
 
  expected_starts={
   'WALK_L': bytes.fromhex('02 00 00'),
@@ -141,6 +178,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room/world; doorway settle/collision; corrected SAT XY; 12 Monty frames')
+ print('OK: room/world; exact CheckTileBelow/fall settle; SAT XY; 12 Monty frames')
 
 if __name__=='__main__': main()
