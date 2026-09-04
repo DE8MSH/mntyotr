@@ -1,10 +1,9 @@
 ; Monty on the Run - PC Engine port
-; Phase 3: C64-width video bring-up.
+; Phase 4: 320px C64 canvas + first exact room geometry.
 ;
-; C64 active VIC-II display is 320x200. The PCE test mode uses a 320-pixel
-; horizontal active area and 224 lines; the original 200-line C64 canvas is
-; centred vertically with 12 lines above and below. This keeps all C64 X
-; coordinates 1:1 instead of scaling 320 pixels into the PCE 256px mode.
+; The PCE active area is 320x224. C64 screen coordinates remain 1:1 in X.
+; Room $00 is now drawn at the same character-grid position used by the C64:
+; 32x20 cells beginning at screen column 4, row 3.
 
         include "platform.inc"
         include "bare-startup.asm"
@@ -16,11 +15,11 @@
         include "vdc.asm"
         include "font.asm"
         include "joypad.asm"
+        include "room00.asm"
 
         .code
 
 bare_main:
-        ; CORE establishes a safe known VDC state first.
         call    init_256x224
         bsr     init_c64_video
 
@@ -40,7 +39,7 @@ bare_main:
         ldy     #^font_data
         call    dropfnt8x8_vdc
 
-        ; Bring-up palette; exact VIC-II -> VCE palette follows.
+        ; Bring-up palette. Exact VIC-II -> VCE conversion follows.
         stz     <_al
         lda     #1
         sta     <_ah
@@ -52,19 +51,23 @@ bare_main:
         call    load_palettes
         call    xfer_palettes
 
-        ; Diagnostic text deliberately spans positions beyond old 32-col mode.
-        ; If the whole 40-column ruler is visible, 320px mode is active.
-        lda     #<(10 * BAT_LINE + 4)
+        ; Row 0 identifies this as the room-geometry build.
+        lda     #<(0 * BAT_LINE + 2)
         sta     <_di + 0
-        lda     #>(10 * BAT_LINE + 4)
+        lda     #>(0 * BAT_LINE + 2)
         sta     <_di + 1
         call    vdc_di_to_mawr
         cly
         bsr     print_banner
 
-        lda     #<(13 * BAT_LINE + 0)
+        ; First real C64 room result: exact 32x20 decoded room-$00 tile IDs.
+        ; Digits are temporary glyphs for the tile IDs, not final artwork.
+        call    draw_room00_debug
+
+        ; Bottom row remains a 40-column width check.
+        lda     #<(27 * BAT_LINE)
         sta     <_di + 0
-        lda     #>(13 * BAT_LINE + 0)
+        lda     #>(27 * BAT_LINE)
         sta     <_di + 1
         call    vdc_di_to_mawr
         cly
@@ -79,22 +82,18 @@ main_loop:
 ; ---------------------------------------------------------------------------
 ; init_c64_video
 ;
-; C64 PAL VIC-II active matrix: 40x25 chars = 320x200 pixels.
+; C64 VIC-II active matrix is 40x25 chars = 320x200 pixels.
 ; PCE VDC HDR low 7 bits are HDW = active tile width - 1, so $27 selects
-; 40 tiles / 320 active pixels. VCE PCC=01 selects the 7.159 MHz dot clock
-; used by the PCE's medium-width modes.
+; 40 tiles / 320 active pixels. VCE PCC=01 selects the 7.159 MHz dot clock.
 ;
-; HSR/HDE timing is deliberately inherited from CORE for this first hardware
-; experiment. We verify centring/blanking on Geargrafx + real hardware before
-; freezing final porch values. Do not treat this routine as final timing yet.
+; HSR/HDE timing remains bring-up timing until checked in emulator/hardware.
 ; ---------------------------------------------------------------------------
 init_c64_video:
-        lda     #$01                    ; VCE PCC=01: 7.159 MHz dot clock
+        lda     #$01
         sta     VCE_CR
-
-        st0     #$0b                    ; VDC HDR
-        st1     #$27                    ; HDW = 39 => 40 tiles = 320 pixels
-        st2     #$00                    ; retain simple HDE for bring-up
+        st0     #$0b
+        st1     #$27
+        st2     #$00
         rts
 
 print_char_loop:
@@ -124,9 +123,8 @@ print_ruler:
         rts
 
 banner_text:
-        db      "MONTY PCE  C64 320x200 CANVAS", 0
+        db      "MONTY PCE ROOM 00 - C64 TILE IDS", 0
 
-; Exactly 40 printable cells. The final 9 must be visible in the new mode.
 ruler_text:
         db      "1234567890123456789012345678901234567890", 0
 
