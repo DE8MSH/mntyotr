@@ -48,12 +48,13 @@ def main():
     # Room03 reuses the proven Room02 RAM cache without changing physics.
     assert 'collision_actual_room' in banking
     assert 'cmp     #3' in banking
+    assert 'bcc     .select_room' in banking
     assert 'lda     #2' in banking and 'sta     <monty_room' in banking
     assert 'lda     <collision_actual_room' in main_asm
-    assert 'cmp     #3' in main_asm
-    assert 'cmp     #4' in world
+    assert 'cmp     #4' in main_asm
+    assert 'cmp     #5' in world
 
-    print('OK: exact Room 03 assets active with shared RAM collision cache + world wiring')
+    print('OK: exact Room 03 assets active; left neighbor Room 04 now enabled')
 
 
 if __name__ == '__main__':
