@@ -40,6 +40,18 @@ bare_main:
         ldy     #^room00_palettes
         call    load_palettes
 
+        ; Phase 29: solid-colour room-$00 decorations use BG palettes 9..11.
+        lda     #9
+        sta     <_al
+        lda     #3
+        sta     <_ah
+        lda     #<room00_decor_palettes
+        sta     <_bp + 0
+        lda     #>room00_decor_palettes
+        sta     <_bp + 1
+        ldy     #^room00_decor_palettes
+        call    load_palettes
+
         ; PCE sprite palettes are indices 16..31. Monty is C64 colour 1
         ; (white), so plane-0 pixel index 1 must be visible in SPR palette 0.
         lda     #16
