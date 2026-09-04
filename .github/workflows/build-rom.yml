@@ -17,12 +17,18 @@ jobs:
       - name: Build current HuC/PCEAS toolchain
         run: |
           git clone --depth 1 https://github.com/pce-devel/huc.git "$HOME/huc"
-          # Upstream src/all can return non-zero from an unrelated parallel
-          # sub-target even after pceas itself was successfully linked/copied.
-          # The executable is the actual prerequisite for this pure-ASM port.
-          make -C "$HOME/huc/src" -j"$(nproc)" || true
-          test -x "$HOME/huc/bin/pceas"
-          "$HOME/huc/bin/pceas" -? >/dev/null 2>&1 || true
+          # Upstream src/all currently exits non-zero after producing pceas.
+          # Run it outside the step's implicit `bash -e`, then gate on the
+          # executable that this pure-ASM port actually needs.
+          set +e
+          make -C "$HOME/huc/src" -j"$(nproc)"
+          MAKE_RC=$?
+          set -e
+          echo "HuC src make exit: $MAKE_RC"
+          if [ ! -x "$HOME/huc/bin/pceas" ]; then
+            echo "ERROR: pceas was not produced" >&2
+            exit 1
+          fi
           echo "$HOME/huc/bin" >> "$GITHUB_PATH"
 
       - name: Build MOTR HuCard
@@ -33,12 +39,12 @@ jobs:
           cp build/monty.pce build/motr.pce
           sha256sum build/motr.pce
 
-      - name: Upload ROM and symbols
+      - name: Upload ROM and diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: motr-pce
           path: |
             build/motr.pce
-            build/monty.sym
-            build/monty.lst
+            build/*.sym
+            build/*.lst
           if-no-files-found: error
