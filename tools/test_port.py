@@ -7,6 +7,7 @@ from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pi
 
 JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN=[1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
+ROOM00_PROPS=[1,1,1,2,1,1,1,1]
 ROOT=Path(__file__).resolve().parents[1]
 
 def pal_ticks(vblanks):
@@ -36,6 +37,31 @@ def screen_to_room(col,row):
  if 4 <= col < 36: return col-4,row-3
  if col in (36,37): return 31,row-3
  return None
+
+def room00_property(cells,col,row):
+ pos=screen_to_room(col,row)
+ if pos is None: return 0
+ x,y=pos
+ code=cells[y*32+x]
+ if code==0 or code>=9: return 0
+ return ROOM00_PROPS[code-1]
+
+def left_blocked(cells,monty_x,monty_y):
+ dx=(monty_x-0x0c)&0xff
+ if dx&3: return False
+ col=(dx>>2)-1
+ row=((monty_y-0x32)&0xff)>>3
+ samples=2 if (((monty_y-0x32)&0xff)&7)==0 else 3
+ return any(room00_property(cells,col,row+i)==1 for i in range(samples))
+
+def below_blocked(cells,monty_x,monty_y):
+ dy=(monty_y-0x32)&0xff
+ if dy&7: return False
+ row=(dy>>3)+2
+ dx=(monty_x-0x0c)&0xff
+ col=dx>>2
+ samples=2 if (dx&3)==0 else 3
+ return any(room00_property(cells,col+i,row) in (1,2,3) for i in range(samples))
 
 def parse_world_grid():
  text=(ROOT/'src/world.asm').read_text()
@@ -80,7 +106,7 @@ def main():
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
 
- # Original start: C64 visible (244,127), PCE SAT origin adds (32,64).
+ # Original start before gravity settle.
  assert c64_screen_xy(0x86,0xb0)==(244,127)
  assert pce_sat_xy(0x86,0xb0)==(276,191)
  assert sat_x_bytes(0x86,8)==(0x14,0x01)
@@ -90,6 +116,15 @@ def main():
  assert screen_to_room(2,3)==(0,0)
  assert screen_to_room(37,22)==(31,19)
  assert screen_to_room(0,3) is None and screen_to_room(4,2) is None
+
+ # Room-$00 doorway: C64 starts Y=$b0 but CheckTileBelow is clear until Y=$b2.
+ # At doorway X=$78, Y=$b0 samples the solid wall tile above the opening;
+ # post-settle Y=$b2 samples only the opening and must permit left movement.
+ assert not below_blocked(cells,0x86,0xb0)
+ assert not below_blocked(cells,0x86,0xb1)
+ assert below_blocked(cells,0x86,0xb2)
+ assert left_blocked(cells,0x78,0xb0)
+ assert not left_blocked(cells,0x78,0xb2)
 
  expected_starts={
   'WALK_L': bytes.fromhex('02 00 00'),
@@ -106,6 +141,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room/world; corrected Monty SAT XY; collision; 12 Monty frames')
+ print('OK: room/world; doorway settle/collision; corrected SAT XY; 12 Monty frames')
 
 if __name__=='__main__': main()
