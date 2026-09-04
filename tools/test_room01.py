@@ -21,6 +21,12 @@ def main():
     assert ROOM01_COLOURS == (0x04,0x03,0x03,0x05,0x01,0x0a,0x06,0x05)
     assert ROOM01_PROPERTIES == (1,0,1,1,2,1,4,0)
 
+    # The exact room-$01 RLE does not use every custom slot. In particular
+    # screen code 2 is absent even though SetupTileGraphics still installs all
+    # eight room-custom characters from room_defs. Keep that distinction exact.
+    used_codes = set(cells)
+    assert used_codes == {0,1,3,4,5,6,7,8}
+
     patterns = build_patterns()
     assert len(patterns) == 9*32
     assert patterns[:32] == bytes(32)  # screen code 0 remains blank
@@ -31,12 +37,17 @@ def main():
         row = bat[y*SCREEN_W:(y+1)*SCREEN_W]
         assert row[0] == row[1] == row[2]
         assert row[-1] == row[-2] == row[-3]
-    # Every custom screen code uses the low-nibble C64 colour from room_defs.
-    for code in range(1,9):
+
+    # Verify palette selection for every custom code that actually occurs in
+    # this room. Do not require unused SetupTileGraphics slots to appear in BAT.
+    for code in sorted(used_codes - {0}):
         expected_pal = PAL_BY_C64[ROOM01_COLOURS[code-1] & 0x0f]
         samples = [w for w in bat if (w & 0x0fff) == CHR_GAME + code]
-        assert samples, f'room01 code {code} never appears'
+        assert samples, f'room01 used code {code} missing from BAT'
         assert all((w >> 12) == expected_pal for w in samples)
+
+    # Code 2 is intentionally unused by the exact rm_01 tilemap.
+    assert not [w for w in bat if (w & 0x0fff) == CHR_GAME + 2]
 
     main_asm = (ROOT/'src/main.asm').read_text()
     physics = (ROOT/'src/monty_physics.asm').read_text()
