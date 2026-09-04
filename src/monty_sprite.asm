@@ -312,6 +312,11 @@ monty_sprite_animate:
 ; Coordinate bridge from the C64 internal Monty values to PCE SAT space.
 ; C64 visible X = 2*(monty_x-$0c), visible Y = (monty_y+1)-$32.
 ; PCE SAT origin is +32 X / +64 Y, therefore SAT X=2*x+8, SAT Y=y+15.
+;
+; PCE 16x32 sprites are halves of an aligned 32x32 pattern group. The group
+; in VRAM is TL,TR,BL,BR (64 words per 16x16 cell). Left SAT entry selects
+; the left half at the group base; right SAT entry selects the right half at
+; base+64 words. The old +256-word pointer skipped beyond the uploaded frame.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
@@ -362,9 +367,9 @@ monty_sprite_update_satb:
 .right_no_add_carry:
  sta VDC_DL
  stx VDC_DH
- lda #<((MONTY_SPR_VRAM+256)>>5)
+ lda #<((MONTY_SPR_VRAM+64)>>5)
  sta VDC_DL
- lda #>((MONTY_SPR_VRAM+256)>>5)
+ lda #>((MONTY_SPR_VRAM+64)>>5)
  sta VDC_DH
  lda #$80
  sta VDC_DL
