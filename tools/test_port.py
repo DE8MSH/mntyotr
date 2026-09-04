@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fast deterministic checks for the C64->PCE port data path."""
 from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room
-from monty_sprite import WALK_L, WALK_R, FRAME_BYTES, build, c64_frame_pixels
+from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels
 
 JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN=[1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
@@ -29,12 +29,13 @@ def main():
  assert len(WORLD)==6 and all(len(row)==23 for row in WORLD)
  assert WORLD[2][0x15]==0 and WORLD[2][0x14]==1 and WORLD[2][0x16]==0xff
  assert WORLD[2][0x04]==0x33 and all(0x30 not in row for row in WORLD)
- assert len(WALK_L)==len(WALK_R)==4*FRAME_BYTES==256
- for frames in (WALK_L,WALK_R):
+ assert len(WALK_L)==len(WALK_R)==len(CLIMB)==4*FRAME_BYTES==256
+ for frames in (WALK_L,WALK_R,CLIMB):
   pixels=c64_frame_pixels(frames[:FRAME_BYTES])
   assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room00=640; jump=22/17; clock=5/6; world=6x23; Monty walk L/R=8 authentic frames')
+ assert CLIMB[:FRAME_BYTES] == CLIMB[2*FRAME_BYTES:3*FRAME_BYTES]
+ print('OK: room00=640; jump=22/17; clock=5/6; world=6x23; Monty walk/climb=12 authentic frames')
 
 if __name__=='__main__': main()
