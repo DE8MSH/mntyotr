@@ -14,6 +14,7 @@
         include "room00_assets.asm"
         include "room00_native.asm"
         include "game_clock.asm"
+        include "monty_physics.asm"
 
         .code
 
@@ -37,10 +38,8 @@ bare_main:
         ldy     #^font_data
         call    dropfnt8x8_vdc
 
-        ; Original C64 room-$00 8x8 bitmaps converted to native PCE 4bpp.
         call    upload_room00_patterns
 
-        ; One PCE BG palette per C64 room character slot.
         stz     <_al
         lda     #8
         sta     <_ah
@@ -60,21 +59,22 @@ bare_main:
         cly
         bsr     print_banner
 
-        ; Exact C64 room-$00 geometry rendered with converted C64 patterns.
+        ; Exact room-$00 geometry + original converted C64 character patterns.
         call    draw_room00_native
         call    game_clock_init
+        call    monty_physics_init
         call    set_dspon
 
 main_loop:
         call    wait_vsync
         call    game_clock_step
-        bcc     main_loop              ; no PAL game tick on this VBlank
-        ; Gameplay update chain is attached here. Keeping this gate explicit
-        ; prevents PCE display refresh from changing C64 movement physics.
+        bcc     main_loop
+        ; C64-rate gameplay chain. Jump step is inert while grounded; once pad
+        ; fire starts a jump it follows the exact original per-tick delta table.
         inc     game_tick_counter
+        call    monty_jump_step
         bra     main_loop
 
-; C64 VIC-II active matrix is 40x25 chars = 320x200 pixels.
 init_c64_video:
         lda     #$01
         sta     VCE_CR
