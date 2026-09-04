@@ -4,18 +4,19 @@
 Primary gameplay/art reference: Dave-Agent/monty-on-the-run refactored/src.
 The reference sprite labels are aligned to 256-byte animation blocks: each
 animation here has four 64-byte VIC slots. A VIC slot contains 63 visible
-bitmap bytes plus one unused/pointer padding byte. PCE 16x16 sprite cells use
-paired/interleaved bitplanes. Monty is composed from two 16x32 PCE sprites.
+bitmap bytes plus one unused/pointer padding byte.
+
+PCE 16x16 sprite cells store each 16-bit plane as a 32-byte block (16 words),
+then the next plane. This is different from the 8x8 background-character
+layout. Monty is composed from two 16x32 PCE sprites.
 """
 from pathlib import Path
 
 # Exact $5400-$56ff blocks transcribed from refactored/src/subsystems/monty_spr.asm.
-# The source listing's apparent zero runs are part of the fixed 64-byte VIC slots;
-# do not locate frames by searching for pixel markers (a marker can occur in data).
 WALK_L = bytes.fromhex(
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 06 b8 00 04 7c 00 0b fc 00 1b 7c 00 1c f8 00 0e fc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 06 b8 00 04 7c 00 0b fc 00 1b 7c 00 1c f8 00 0e fc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 36 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e0 00 0f c0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 WALK_R = bytes.fromhex(
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 84 00 1d 6e 00 34 6e 00 37 f6 00 36 f8 00 19 f8 00 3d f0 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
@@ -34,13 +35,6 @@ FRAME_BYTES = BITMAP_BYTES
 
 
 def _split_vic_slots(blob, count=4):
-    """Return 63-byte visible bitmaps from fixed 64-byte VIC sprite slots.
-
-    The final zero padding bytes were omitted in the earlier hand transcription,
-    so pad the animation block to its known 4*64 byte size. Frame boundaries are
-    positional, exactly as they are in C64 sprite RAM; never infer them from a
-    repeated bitmap prefix.
-    """
     expected = count * VIC_FRAME_BYTES
     assert len(blob) <= expected, f'C64 sprite block too large: {len(blob)} > {expected}'
     blob = blob + bytes(expected - len(blob))
@@ -65,11 +59,13 @@ def _plane_word(tile,plane,y):
 
 
 def pce_16x16(tile):
+    """Encode one 16x16 PCE sprite cell as four consecutive 32-byte planes."""
     out=bytearray()
-    for p0,p1 in ((0,1),(2,3)):
+    for plane in range(4):
         for y in range(16):
-            w0=_plane_word(tile,p0,y); w1=_plane_word(tile,p1,y)
-            out += bytes((w0&255,w0>>8,w1&255,w1>>8))
+            word=_plane_word(tile,plane,y)
+            # HuC6270 words are transferred low byte first.
+            out += bytes((word & 0xff, word >> 8))
     assert len(out)==128
     return out
 
