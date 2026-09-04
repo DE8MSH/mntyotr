@@ -11,8 +11,9 @@ WORLD=[
 [0xff,0x2f,0x2e,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x22,0xff,0xff,0xff,0xff,0xff,0xff,0x06,0x07,0x08,0x09,0xff,0xff],
 [0x2d,0x2c,0x27,0x26,0x33,0x32,0x31,0x25,0x24,0x20,0x21,0xff,0xff,0xff,0xff,0xff,0x05,0x04,0x03,0x02,0x01,0x00,0xff],
 [0x2b,0x2a,0x28,0x29,0xff,0xff,0xff,0xff,0xff,0x1f,0xff,0xff,0x1b,0xff,0xff,0x0f,0x0c,0x0d,0x0e,0x0b,0x0a,0xff,0xff],
-[0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1e,0xff,0x1a,0x19,0x18,0xff,0x10,0x11,0xff,0xff,0xff,0xff,0xff,0xff],
+[0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1e,0xff,0x1a,0x19,0x18,0xff,0x10,0x11,0xff,0xff,0xff,0xff,0xff,0xff],
 [0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1d,0x1c,0x17,0x16,0x15,0x14,0x12,0x13,0xff,0xff,0xff,0xff,0xff,0xff]]
+ROOM00_PROPERTIES=[1,1,1,2,1,1,1,1]
 
 def pal_ticks(vblanks):
  phase=ticks=0
@@ -38,6 +39,10 @@ def screen_to_room(col,row):
  if col in (36,37): return 31,row-3
  return None
 
+def tile_property(screen_code):
+ if screen_code==0 or screen_code>=9: return 0
+ return ROOM00_PROPERTIES[screen_code-1]
+
 def main():
  cells=decode_room(ROOM00_RLE)
  assert len(cells)==ROOM_CELLS==640 and all(0<=x<=15 for x in cells)
@@ -48,10 +53,14 @@ def main():
  assert WORLD[2][0x15]==0 and WORLD[2][0x14]==1 and WORLD[2][0x16]==0xff
  assert WORLD[2][0x04]==0x33 and all(0x30 not in row for row in WORLD)
 
+ # DrawRoomPlayfield RLE nibble is already the C64 screen code. Code 0 must
+ # remain blank; SetupTileGraphics separately installs custom chars 1..8.
  bat=words(make_bat(cells))
  assert len(bat)==640
- assert (bat[0]&0x0fff)==CHR_GAME+cells[0]+1
- assert (bat[0]>>12)==cells[0]+1
+ assert (bat[0]&0x0fff)==CHR_GAME+cells[0]
+ assert (bat[0]>>12)==cells[0]
+ zero_i=cells.index(0)
+ assert (bat[zero_i]&0x0fff)==CHR_GAME and (bat[zero_i]>>12)==0
  screen=words(make_screen_bat(cells))
  assert len(screen)==36*20
  for y in range(20):
@@ -59,10 +68,16 @@ def main():
   row=screen[y*36:(y+1)*36]
   assert row[0]==row[1]==row[2]
   assert row[33]==row[34]==row[35]
-  assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t+1 for t in src]
+  assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
 
- # Refactored C64 coordinate bridge: ProcessSprites doubles X while collision
- # addresses full 40-column screen coordinates.
+ # Exact GetTileFlag convention: blank/special chars are non-solid; 1..8 map
+ # to room property slot code-1. This is crucial for movement through black air.
+ assert tile_property(0)==0
+ assert tile_property(1)==1
+ assert tile_property(4)==2
+ assert tile_property(5)==1
+ assert tile_property(9)==0
+
  assert c64_screen_xy(0x86,0xb0)==(244,126)
  assert pce_sat_xy(0x86,0xb0)==(276,190)
  assert screen_to_room(4,3)==(0,0)
@@ -80,6 +95,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: C64 screen/collision/XY bridge; jump/clock/world; Monty walk/climb=12 frames')
+ print('OK: direct C64 screen codes + GetTileFlag; screen/collision/XY; jump/clock/world; 12 sprite frames')
 
 if __name__=='__main__': main()
