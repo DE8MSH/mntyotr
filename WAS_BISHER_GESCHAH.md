@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 32
+Stand: 2026-09-04 — Phase 32a
 
 ## Portierungsstand
 
 **Gesamtport: ca. 44 %**
 
-Der Nutzer hat Phase 31 visuell bestaetigt: `sad_flowers` ist sichtbar. Phase 32 beginnt jetzt den eigentlichen Mehrraum-Port und bindet Raum $01 als ersten echten Nachbarraum an.
+Der Nutzer hat Phase 31 visuell bestaetigt: `sad_flowers` ist sichtbar. Phase 32 beginnt den eigentlichen Mehrraum-Port und bindet Raum $01 als ersten echten Nachbarraum an. Phase 32a korrigiert einen zu strengen Regressionstest, bevor PCEAS ueberhaupt gestartet wurde.
 
 ## Verbindliche Referenz
 
@@ -27,10 +27,24 @@ Die C64-Weltkarte setzt Raum $00 auf Zeile 2 / Spalte $15. Links davon liegt exa
 Phase 32 fuegt nun den ersten echten zweiten Raum hinzu:
 
 - `tools/room01.py` enthaelt den exakten RLE-Stream `Room.Data.tilemap.rm_01`.
-- Die 16-Byte-Raumdefinition fuer Raum $01 wird umgesetzt: Tile-Library-IDs `$02,$63,$01,$0a,$40,$05,$55,$64` sowie C64-Farben `$04,$03,$03,$05,$01,$0a,$06,$05` (der Quellwert `$63` im Farbteil wird wie echte VIC-Colour-RAM-Daten ueber das Low-Nibble als `$03` behandelt).
+- Die 16-Byte-Raumdefinition fuer Raum $01 wird umgesetzt: Tile-Library-IDs `$02,$63,$01,$0a,$40,$05,$55,$64` sowie C64-Farben `$04,$03,$03,$05,$01,$0a,$06,$05`.
 - Die acht exakten Tile-Bitmaps kommen aus `Tiles.tile_library`.
 - `Monty.SetTileProperty` ergibt fuer diese acht Custom-Tiles exakt die Properties `1,0,1,1,2,1,4,0`.
 - `tools/room01.py` erzeugt daraus `room01-map.dat`, `room01-screen-bat.dat` und `room01-patterns.dat`.
+
+## Phase 32a — Testfix fuer unbenutzten Custom-Tile-Slot
+
+Der erste lokale Build lief durch die bestehenden Tests und stoppte dann in `tools/test_room01.py` mit:
+
+`AssertionError: room01 code 2 never appears`
+
+Die Ursache war der Test, nicht der Raumdaten-Port. Die C64-Raumdefinition installiert wie `SetupTileGraphics` immer alle acht Custom-Tile-Slots, aber der konkrete RLE-Tilemap-Stream muss nicht jeden davon benutzen. Der exakte Raum-$01-Decode benutzt die Screencodes:
+
+`0,1,3,4,5,6,7,8`
+
+Screencode `2` kommt in `rm_01` ueberhaupt nicht vor. Der alte Test verlangte trotzdem fuer alle Codes 1..8 mindestens eine BAT-Zelle und war deshalb falsch.
+
+`tools/test_room01.py` prueft jetzt explizit die exakte Used-Code-Menge und verifiziert Farben nur fuer Codes, die im Raum wirklich vorkommen. Gleichzeitig bleibt gesichert, dass trotzdem alle neun PCE-Patterns (blank + acht Custom-Slots) erzeugt werden, wie es der C64-Setup-Pfad verlangt.
 
 ## Native PCE-Seite
 
@@ -51,23 +65,19 @@ Die bisherigen Collision-Routinen sind nicht mehr fest auf die Raum-$00-Daten be
 
 Damit benutzt Raum $01 seine eigene 32x20-Geometrie und seine eigenen C64-Properties, statt versehentlich mit dem Hausgrundriss von Raum $00 zu kollidieren.
 
-Da bisher nur $00 und $01 voll geladen werden koennen, blockiert `world_resolve_exit` voruebergehend Ziele ab Raum $02. Dadurch kann Monty am linken Rand von Raum $01 noch nicht in Raum $02 wechseln und die World-Koordinaten koennen nicht in einen noch ungeladenen Raum driften. Diese Schranke wird mit jedem neu portierten Raum erweitert.
-
-## Tests
-
-Neu ist `tools/test_room01.py`. Es prueft den 640-Zellen-RLE-Decode, die exakten Tile-IDs, Farben, Properties, 9 PCE-Patterns, 36x20-Gutter-Geometrie und die Loader-/Collision-Verdrahtung. `build.sh` erzeugt die drei Raum-$01-Dateien vor PCEAS und fuehrt den Test automatisch aus.
+Da bisher nur $00 und $01 voll geladen werden koennen, blockiert `world_resolve_exit` voruebergehend Ziele ab Raum $02. Dadurch kann Monty am linken Rand von Raum $01 noch nicht in Raum $02 wechseln und die World-Koordinaten koennen nicht in einen noch ungeladenen Raum driften.
 
 ## Verifikationsstatus
 
 - Phase 31 (`sad_flower`) ist vom Nutzer visuell bestaetigt.
-- Phase 32 ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Phase 32a ist hochgeladen.
+- Der letzte Nutzerlauf kam noch nicht bis PCEAS; der Abbruch war ausschliesslich der zu strenge Python-Test fuer den in `rm_01` unbenutzten Screencode 2.
 - Als naechstes `git pull && ./build.sh`.
-- Danach aus Raum $00 ganz nach links gehen: Raum $01 sollte geladen werden. Dort etwas bewegen/springen und anschliessend nach rechts zurueck in Raum $00 gehen.
-- Raum-$01-Decor und Gegner sind noch nicht portiert; in Phase 32 geht es zunaechst um den echten Raumdaten-/Tile-/Collision-/Transition-Pfad.
+- Danach aus Raum $00 ganz nach links gehen: Raum $01 sollte geladen werden. Dort Bewegung/Sprung/Fall pruefen und anschliessend nach rechts zurueck in Raum $00 gehen.
 
 ## Naechste Portschritte
 
-1. Phase 32 lokal bauen und $00 <-> $01 visuell sowie collision-seitig pruefen.
+1. Phase 32a lokal bauen und $00 <-> $01 visuell sowie collision-seitig pruefen.
 2. Die zwei originalen Raum-$01-Decor-Records (Types `$42` und `$41`) anbinden.
 3. Danach Raum $02 in denselben Loader aufnehmen und die temporaere `room < 2`-Schranke erweitern.
 4. Den Loader schrittweise auf die restlichen `Room.Data.tilemap_ptrs`/`room_defs` verallgemeinern.
