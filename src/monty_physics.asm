@@ -26,7 +26,12 @@ jump_delta:             ds 1
 monty_physics_init:
         lda     #$86
         sta     <monty_x
-        lda     #$b0
+        ; The C64 starts at $b0, then its unsupported-fall path advances two
+        ; one-pixel ticks before CheckTileBelow sees the room-00 floor at $b2.
+        ; Until the full jumping_flag2/action state machine is ported, start at
+        ; that deterministic post-settle coordinate so side collision samples
+        ; the doorway rows rather than the solid wall tile above the opening.
+        lda     #$b2
         sta     <monty_y
         stz     <monty_jump_phase
         stz     <monty_jump_index
@@ -44,8 +49,7 @@ monty_physics_init:
 
 ; Exact C64 GetTileFlag screen-code semantics for the room custom chars:
 ; screen code 0 and codes >=9 have no room-tile property; codes 1..8 index
-; tile_property_tbl[code-1].  The previous port incorrectly treated code 0 as
-; slot 0/property 1, making blank space solid and stopping Monty almost at once.
+; tile_property_tbl[code-1].
 room00_get_tile_property:
         beq     .empty
         cmp     #9
@@ -58,9 +62,7 @@ room00_get_tile_property:
         cla
         rts
 
-; X/Y here are C64 *screen* character coordinates, not raw 32x20 map indexes.
-; DrawRoomPlayfield places the logical room at screen cols 4..35, rows 3..22;
-; CreatePlayfieldBorder mirrors col4 into 2..3 and col35 into 36..37.
+; X/Y here are C64 screen character coordinates, not raw 32x20 map indexes.
 room00_get_tile_xy:
         cpy     #3
         bcc     .outside
