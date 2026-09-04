@@ -29,7 +29,7 @@ bare_main:
         ; Use the library's complete 7MHz/224-line setup, then narrow the
         ; horizontal timing from 352 to 320 pixels.
         call    init_352x224
-        bsr     init_c64_video
+        call    init_c64_video
 
         call    upload_room00_patterns
 
