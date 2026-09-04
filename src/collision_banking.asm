@@ -1,10 +1,10 @@
-; Phase 41: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
-; $02/$03 use the same 648-byte RAM collision/property cache, refilled on room
-; entry. Physics itself still addresses the established room02_* RAM labels.
+; Phase 43: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
+; $02/$03/$04 use the same 648-byte RAM collision/property cache, refilled on
+; room entry. Physics itself still addresses the established room02_* RAM labels.
 ;
-; For Room $03 only, collision_bank_enter temporarily shadows monty_room as $02
-; while monty_update_input/monty_jump_step run. collision_actual_room preserves
-; the real room id for edge guards and is restored before world navigation.
+; For tail rooms above $02, collision_bank_enter temporarily shadows monty_room
+; as $02 while monty_update_input/monty_jump_step run. collision_actual_room
+; preserves the real room id for edge guards and is restored before navigation.
 
 .zp
 collision_saved_mpr3:   ds 1
@@ -33,9 +33,9 @@ collision_bank_enter:
         lda     <monty_room
         sta     <collision_actual_room
         cmp     #3
-        bne     .select_room
-        ; Room $03 has already copied its collision payload into the shared
-        ; room02_* RAM cache. Shadow the id only for the unchanged physics code.
+        bcc     .select_room
+        ; Rooms $03/$04 have already copied their collision payload into the
+        ; shared room02_* RAM cache. Shadow the id only for unchanged physics.
         lda     #2
         sta     <monty_room
 .select_room:
