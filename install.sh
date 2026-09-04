@@ -16,12 +16,26 @@ else
   git -C "$HUC_DIR" pull --ff-only
 fi
 
-# The upstream aggregate build can fail in unrelated examples after pceas is
-# already complete. Build host tools, then gate on the executable we need.
+# Build HuC. Current upstream mkit/as copies pceas to src/bin; older trees may
+# place it in bin. The aggregate build can fail later in unrelated examples,
+# so locate the executable that was actually produced instead of assuming one
+# fixed layout.
 make -C "$HUC_DIR/src" -j"$(nproc)" || true
-PCEAS="$HUC_DIR/bin/pceas"
-if [ ! -x "$PCEAS" ]; then
-  echo "ERROR: expected pceas at $PCEAS" >&2
+PCEAS=""
+for candidate in \
+  "$HUC_DIR/src/bin/pceas" \
+  "$HUC_DIR/bin/pceas" \
+  "$HUC_DIR/src/mkit/as/pceas"; do
+  if [ -x "$candidate" ]; then
+    PCEAS="$candidate"
+    break
+  fi
+done
+if [ -z "$PCEAS" ]; then
+  PCEAS="$(find "$HUC_DIR" -type f -name pceas -perm -u+x -print -quit 2>/dev/null || true)"
+fi
+if [ -z "$PCEAS" ] || [ ! -x "$PCEAS" ]; then
+  echo "ERROR: pceas was not produced by the HuC build" >&2
   exit 1
 fi
 ln -sf "$PCEAS" "${HOME}/.local/bin/pceas"
@@ -34,6 +48,8 @@ EOF
 chmod +x "${HOME}/.local/bin/motr-env"
 
 echo
-echo "pceas: ${HOME}/.local/bin/pceas"
+echo "pceas source: $PCEAS"
+echo "pceas command: ${HOME}/.local/bin/pceas"
+"${HOME}/.local/bin/pceas" -? >/dev/null 2>&1 || true
 echo "HuC home: $HUC_DIR"
 echo "Build with: ./build.sh"
