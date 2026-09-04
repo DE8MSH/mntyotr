@@ -45,12 +45,12 @@ echo "PCE_INCLUDE: $PCE_INCLUDE"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
-python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" >/dev/null
+python3 "$ROOT/tools/room_rle.py" \
+  --write "$BUILD/room00-map.dat" \
+  --bat "$BUILD/room00-bat.dat" \
+  --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 cd "$BUILD"
-# Match the flags used by current pce-devel/huc Elmer HuCard examples.
-# --newproc is required by the current proc/procgroup/phase library layout;
-# --raw avoids legacy post-processing assumptions.
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
 if [ -s main.sym ]; then mv -f main.sym monty.sym; fi
