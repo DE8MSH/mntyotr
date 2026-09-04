@@ -99,18 +99,18 @@ monty_upload_climb_frame:
  sta <monty_sprite_last_mode
  rts
 
-; C64 animation cadence is 4 logical ticks. Climbing has its own authentic
-; four-frame source and is selected only while UP/DOWN movement is active on a
-; property-3 tile state.
+; C64 UpdateState advances a walk frame only while Monty is moving, advances
+; climb while vertical movement is active, and also advances during a jump.
+; Standing still keeps the current walk frame instead of cycling in place.
 monty_sprite_animate:
  lda <monty_climbing
  beq .walk_mode
  lda <monty_sprite_last_mode
  cmp #1
- beq .tick
+ beq .animate_tick
  lda #1
  sta <monty_sprite_dirty
- bra .tick
+ bra .animate_tick
 .walk_mode:
  lda <monty_sprite_last_mode
  beq .check_dir
@@ -119,12 +119,18 @@ monty_sprite_animate:
 .check_dir:
  lda <monty_facing
  cmp <monty_sprite_last_facing
- beq .tick
+ beq .check_motion
  lda #1
  sta <monty_sprite_dirty
-.tick:
+.check_motion:
+ lda <monty_is_moving
+ bne .animate_tick
+ lda <monty_jump_phase
+ bne .animate_tick
+ bra .maybe_upload
+.animate_tick:
  dec <monty_anim_timer
- bne .maybe
+ bne .maybe_upload
  lda #4
  sta <monty_anim_timer
  inc <monty_anim_frame
@@ -133,7 +139,7 @@ monty_sprite_animate:
  sta <monty_anim_frame
  lda #1
  sta <monty_sprite_dirty
-.maybe:
+.maybe_upload:
  lda <monty_sprite_dirty
  beq .done
  lda <monty_climbing
