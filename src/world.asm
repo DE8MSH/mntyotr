@@ -41,9 +41,9 @@ world_get_room_xy:
         lda     #$ff
         rts
 
-; Resolve monty_room_exit against the original C64 map without committing a
-; room load yet. C=1 means a valid destination is waiting in world_pending_room.
-; This separation prevents room-$00 collision/render data being used as room $01.
+; Phase 32 has real loaders for rooms $00 and $01. Other valid world cells stay
+; blocked until their room data is ported, so map coordinates cannot drift into
+; an unloaded room while using the wrong collision map.
 world_resolve_exit:
         stz     <world_transition_ready
         lda     <monty_room_exit
@@ -67,6 +67,8 @@ world_resolve_exit:
         bsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_left
+        cmp     #2
+        bcs     .blocked_left
         dec     <world_exit_col
         bra     .valid
 .right:
@@ -78,6 +80,8 @@ world_resolve_exit:
         bsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_right
+        cmp     #2
+        bcs     .blocked_right
         inc     <world_exit_col
         bra     .valid
 .up:
@@ -90,6 +94,8 @@ world_resolve_exit:
         bsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_up
+        cmp     #2
+        bcs     .blocked_up
         dec     <world_map_row
         bra     .valid
 .down:
@@ -101,6 +107,8 @@ world_resolve_exit:
         bsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_down
+        cmp     #2
+        bcs     .blocked_down
         inc     <world_map_row
 .valid:
         sta     <world_pending_room
@@ -110,8 +118,6 @@ world_resolve_exit:
         sec
         rts
 
-; Edge probe already installed the opposite-side handoff coordinate. If the
-; world grid says wall, restore Monty to the current room edge instead.
 .blocked_left:
         lda     #$15
         sta     <monty_x
@@ -125,7 +131,6 @@ world_resolve_exit:
         sta     <monty_y
         bra     .blocked
 .blocked_down:
-        ; Down-edge handoff is not emitted by the current movement subset yet.
 .blocked:
         stz     <monty_room_exit
 .none:
