@@ -35,6 +35,7 @@ def main():
     loader = (ROOT/'src/room_loader.asm').read_text()
     banking = (ROOT/'src/collision_banking.asm').read_text()
     world = (ROOT/'src/world.asm').read_text()
+    edge = (ROOT/'src/vertical_world_edges.asm').read_text()
 
     assert 'include "room03_assets_tail.asm"' in main_asm
     assert main_asm.index('include "room03_assets_tail.asm"') > main_asm.index('include "monty_sprite.asm"')
@@ -47,14 +48,16 @@ def main():
 
     # Room03 reuses the proven Room02 RAM cache without changing physics.
     assert 'collision_actual_room' in banking
-    assert 'cmp     #3' in banking
-    assert 'bcc     .select_room' in banking
+    assert 'cmp     #3' in banking and 'bcc     .select_room' in banking
     assert 'lda     #2' in banking and 'sta     <monty_room' in banking
-    assert 'lda     <collision_actual_room' in main_asm
-    assert 'cmp     #4' in main_asm
-    assert 'cmp     #5' in world
 
-    print('OK: exact Room 03 assets active; left neighbor Room 04 now enabled')
+    # The actual route around the Room03 wall now goes DOWN into Room0E.
+    assert 'call    monty_check_down_room_edge' in main_asm
+    assert 'cmp     #$da' in edge and 'lda     #4' in edge
+    compact = ''.join(world.lower().split())
+    assert 'cmp#$0e' in compact and 'world_room_supported:' in world
+
+    print('OK: exact Room 03 active with downward route into Room 0E')
 
 
 if __name__ == '__main__':
