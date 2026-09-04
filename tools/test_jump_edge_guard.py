@@ -15,7 +15,10 @@ def main():
     assert 'lda     <main_jump_x_before_step' in text
     assert 'sta     <monty_x' in text
     assert 'stz     <monty_room_exit' in text
-    print('OK: blocked left/right jump exits are cancelled without touching collision data')
+    # main.asm has grown enough that this startup helper is outside BSR range.
+    assert 'call    init_c64_video' in text
+    assert 'bsr     init_c64_video' not in text
+    print('OK: blocked left/right jump exits are cancelled; startup call is range-safe')
 
 
 if __name__ == '__main__':
