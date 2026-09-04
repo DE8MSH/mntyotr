@@ -12,9 +12,12 @@
         include "joypad.asm"
         include "room00_assets.asm"
         include "room00_native.asm"
+        include "room01_assets.asm"
+        include "room01_native.asm"
         include "game_clock.asm"
         include "monty_physics.asm"
         include "world.asm"
+        include "room_loader.asm"
         include "monty_sprite.asm"
 
         .code
@@ -27,8 +30,7 @@ bare_main:
 
         call    upload_room00_patterns
 
-        ; Phase 30: base room and decor share one compact BG-palette set.
-        ; 0..4 are room colours, 5..12 are additional C64 decor colours.
+        ; Base room and room-$00 decor share one compact BG-palette set.
         stz     <_al
         lda     #13
         sta     <_ah
@@ -37,6 +39,18 @@ bare_main:
         lda     #>room00_bg_palettes
         sta     <_bp + 1
         ldy     #^room00_bg_palettes
+        call    load_palettes
+
+        ; Room $01 needs C64 purple and blue in the two remaining shared slots.
+        lda     #13
+        sta     <_al
+        lda     #2
+        sta     <_ah
+        lda     #<room01_extra_palettes
+        sta     <_bp + 0
+        lda     #>room01_extra_palettes
+        sta     <_bp + 1
+        ldy     #^room01_extra_palettes
         call    load_palettes
 
         ; PCE sprite palettes are indices 16..31. Monty is C64 colour 1
@@ -63,8 +77,6 @@ bare_main:
 
 main_loop:
         call    wait_vsync
-
-        ; Keep gameplay input deterministic while the port is brought up.
         call    read_joypads
 
         call    game_clock_step
@@ -75,10 +87,11 @@ main_loop:
         call    monty_update_input
         call    monty_jump_step
         call    world_resolve_exit
+        bcc     .no_room_change
+        call    room_load_pending
+.no_room_change:
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; A valid destination is left pending until the generic room loader is
-        ; present; do not run room-$00 collision data as another room.
         bra     main_loop
 
 ; Keep the proven 352x224 vertical/DMA setup, but use the library's 320-pixel
