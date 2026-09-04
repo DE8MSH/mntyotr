@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 28d
+Stand: 2026-09-04 — Phase 28e
 
 ## Portierungsstand
 
 **Gesamtport: ca. 39 %**
 
-Phase 28d ist ein reiner Regressionstest-Fix nach Phase 28c. Die Prozentzahl bleibt unveraendert, weil kein neuer Gameplayblock hinzugekommen ist.
+Phase 28e korrigiert den Datenzugriff der bereits portierten Sprunganimation. Die Prozentzahl bleibt unveraendert, bis die 12+12 Somersaultframes lokal visuell bestaetigt sind.
 
 ## Verbindliche Referenz
 
@@ -14,55 +14,68 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 
 ## Bestaetigt
 
-- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce` aus den vorigen Phasen.
-- Die Basis-Raumgrafik stimmt laut Nutzer brauchbar mit der C64-Referenz ueberein.
-- Montys Start-/SAT-Position passt inzwischen weitgehend.
-- Gehen funktioniert.
-- Springen funktioniert.
-- Unsupported Falling funktioniert.
+- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
+- Basis-Raumgrafik stimmt laut Nutzer brauchbar.
+- Montys Start-/SAT-Position passt weitgehend.
+- Gehen, Springen und unsupported Falling funktionieren.
 - Landen auf Plattformen funktioniert.
 - Die Hauswandoeffnung in Raum $00 ist passierbar.
-- Die neue Sprunganimation wird angesprochen, erschien vor Phase 28c aber grafisch defekt.
+- Nach Phase 28d wird die Jump-Animation angesprochen, ist laut Nutzer aber weiterhin grafisch defekt.
 
-## Phase 28 — echte Somersaultdaten
+## Phase 28 — Original-Somersaultdaten
 
-Die C64-Referenz benutzt beim normalen Sprung 12 Somersaultframes pro Richtung. `sault_l_spr` liegt bei `$5700-$59ff`, `sault_r_spr` bei `$5a00-$5cff`; jeder VIC-Slot ist 64 Byte gross, davon 63 sichtbare Bitmapbytes plus Padding.
+Die C64-Referenz benutzt 12 Somersaultframes pro Richtung. `sault_l_spr` liegt bei `$5700-$59ff`, `sault_r_spr` bei `$5a00-$5cff`; jeder VIC-Slot ist 64 Byte gross, davon 63 sichtbare Bitmapbytes plus Padding.
 
-`tools/monty_somersault_source.asm` enthaelt die festen Originalbloecke; `tools/monty_somersault.py` konvertiert sie in PCE-Spritedaten. `build.sh` erzeugt daraus `monty-sault-l.dat` und `monty-sault-r.dat`.
+`tools/monty_somersault_source.asm` enthaelt die festen Originalbloecke. `tools/monty_somersault.py` wandelt jeden festen 64-Byte-Slot in ein PCE-Spriteframe um.
 
-## Phase 28c — PCE-Sprite-Layout korrigiert
+## Phase 28c — PCE-Spritegruppe
 
-Der gemeinsame C64->PCE-Converter schreibt 32x32-Spritegruppen nun in der fuer die PCE benoetigten Reihenfolge `TL,TR,BL,BR` statt `TL,BL,TR,BR`. Ausserdem zeigt die rechte 16x32-Monty-Haelfte nun auf `MONTY_SPR_VRAM+64` VRAM-Woerter statt auf `+256`.
+Der C64->PCE-Converter schreibt die 32x32-Gruppe als `TL,TR,BL,BR`. Die rechte 16x32-Monty-Haelfte zeigt auf `MONTY_SPR_VRAM+64` VRAM-Woerter. Diese Geometrie bleibt aktiv.
 
-Diese Korrektur betrifft Walk, Climb und Somersault gleichermaßen.
+## Phase 28e — eigentliche Ursache des verbleibenden Jump-Grafikfehlers
 
-## Phase 28d — versehentlich gekuerzte Jump-Testdaten repariert
+Die neue Sprunganimation ist wesentlich groesser als Walk/Climb:
 
-Der erste lokale Build nach Phase 28c stoppte bereits im Python-Test mit:
+- Walk links: 2048 Byte PCE-Daten
+- Walk rechts: 2048 Byte
+- Climb: 2048 Byte
+- Somersault links: 6144 Byte
+- Somersault rechts: 6144 Byte
 
-`assert len(JUMP_UP)==22 and sum(JUMP_UP)==20`
+Damit liegen die Somersaultlabels hinter rund 6 KiB anderer Spritedaten und verteilen sich im ROM ueber mehrere 8-KiB-PCE-Banks.
 
-Die Ursache war kein neuer Fehler in der eigentlichen Sprungphysik. Beim Umbau von `tools/test_port.py` fuer den Quadranten-Test war die lokale Kopie von `JUMP_UP` versehentlich von den korrekten 22 Eintraegen auf 18 Eintraege gekuerzt worden.
+Der bisherige Dispatcher benutzte fuer jeden Jumpframe direkt `TIA monty_sault_...,VDC_DL,512`. `TIA` besitzt aber keinen Far-Pointer-/Bankwechsel. Es liest nur die CPU-Adresse aus der aktuell gemappten ROM-Bank. Dadurch kann ein Label in einer anderen Bank zwar korrekt assembliert sein, zur Laufzeit aber Daten aus der falschen gemappten Bank liefern. Das passt zum beobachteten Fehlerbild: Bewegung/Sprung funktionieren, aber die neu hinzugekommenen grossen Jump-Grafikbloecke erscheinen defekt.
 
-Die Testkonstante ist jetzt wieder identisch mit der bereits im Port verwendeten C64-Sprungkurve:
+Phase 28e entfernt deshalb alle direkten `TIA monty_sault_*`-Transfers. Fuer jeden der 12 Frames pro Richtung gibt es jetzt compile-time Tabellen mit Lowbyte, Highbyte und `BANK(label)`.
 
-`0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0`
+`monty_upload_jump_frame` waehlt daraus den echten Far-Pointer. `monty_upload_far_512` verwendet anschliessend HuCs `map_bp_to_mpr34`: die Quellbank wird in MPR3 und die Folge-Bank in MPR4 eingeblendet. Danach werden exakt 512 Byte nach `MONTY_SPR_VRAM` geschrieben. Dadurch funktioniert auch ein einzelner Frame, der eine 8-KiB-ROM-Bankgrenze kreuzt. MPR3, MPR4 und Interruptstatus werden nach dem Transfer wiederhergestellt.
 
-Damit gelten wieder exakt 22 Aufwaertsschritte mit einer Summe von 20 Pixeln. Der eigentliche Runtime-Code in `src/monty_physics.asm` wurde dabei nicht veraendert.
+Walk/Climb bleiben vorerst beim bisherigen direkten Transfer, weil der aktuelle konkrete Fehler nur bei den spaeter liegenden Jumpframes sichtbar ist. Wenn Phase 28e bestaetigt ist, kann derselbe bankfeste Pfad anschliessend vereinheitlicht werden.
+
+## Regressionstest
+
+Neu ist `tools/test_sprite_banking.py`. Der Build bricht jetzt ab, falls:
+
+- wieder ein direktes `TIA monty_sault_*` auftaucht,
+- `map_bp_to_mpr34` aus dem Jump-Transfer verschwindet,
+- nicht genau 12 `BANK(...)`-Eintraege je Richtung vorhanden sind,
+- die Phase-28c-Patternadresse `MONTY_SPR_VRAM+64` verloren geht.
+
+`build.sh` fuehrt diesen Test zusaetzlich zu `tools/test_port.py` aus.
 
 ## Verifikationsstatus
 
-- Phase 28d ist hochgeladen.
-- Lokal erneut `git pull && ./build.sh` ausfuehren.
-- Wenn der Build durchlaeuft, Walk links/rechts und besonders Sprung links/rechts visuell pruefen.
-- Bewegung, Collision und Physik wurden in Phase 28d nicht angefasst.
+- Phase 28e ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Als naechstes `git pull && ./build.sh`.
+- Danach Sprung nach links und rechts visuell pruefen.
+- Physik, Kollision, Startposition und Raumgrafik wurden in Phase 28e nicht veraendert.
 
 ## Naechste Portschritte
 
-1. Phase 28d lokal bauen und Sprite-/Somersaultgrafik visuell pruefen.
-2. Falls die Sprungframes weiterhin falsch aussehen: PCE-Patternadressierung und jede 16x16-Zelle eines Somersaultframes frameweise gegen die C64-Pixelmatrix pruefen, ohne weitere Heuristik.
-3. Walk-/Climb-Rohdaten ebenfalls auf einen festen, adressbasierten Datenpfad umstellen.
-4. Danach Room-$00-Decor und generischer Room-Loader.
+1. Phase 28e lokal bauen und Jump-L/R pruefen.
+2. Bei bestaetigter Grafik Walk/Climb ebenfalls auf feste Original-Slots plus bankfesten Loader umstellen.
+3. Danach Room-$00-Decor portieren.
+4. Generischen Room-Loader und echte Raumwechsel anbinden.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
