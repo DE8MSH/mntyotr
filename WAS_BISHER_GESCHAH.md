@@ -1,20 +1,20 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 35
+Stand: 2026-09-04 — Phase 36
 
 ## Portierungsstand
 
-**Gesamtport: ca. 45 %**
+**Gesamtport: ca. 46 %**
 
-Phase 34e ist vom Nutzer lokal im Emulator bestaetigt. Der stabile Runtime-Pfad bleibt intakt: Monty ist steuerbar, Springen und Animationen funktionieren, und die seitlichen Raumwechsel verhalten sich auch waehrend eines Sprungs korrekt.
+Phase 35 ist vom Nutzer lokal bestaetigt: der neue bankfeste Collision-MPR-Pfad veraendert das Gameplay nicht. Monty startet, laeuft, springt, landet und wechselt zwischen Raum $00 und $01 weiterhin korrekt. Damit ist der technische Unterbau fuer erneutes ROM-Wachstum jetzt erstmals praktisch bestaetigt.
 
-Phase 35 macht jetzt den direkten Collision-Map-Zugriff gegen HuCard-ROM-Wachstum bankfest, ohne die bestaetigte C64-Physik oder Collision-Semantik umzuschreiben.
+Phase 36 aktiviert deshalb den zuvor wegen der Fall-durch-Boden-Regression zurueckgerollten Room-$01-Decor-Pfad erneut — diesmal auf dem bestaetigten Phase-35-Collision-Banking.
 
 ## Verbindliche Referenz
 
 Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` dient nur als zusaetzliche Ground-Truth.
 
-## Bestaetigter Runtime-Stand vor Phase 35
+## Bestaetigter Runtime-Stand
 
 - Monty ist steuerbar.
 - Gehen, Springen, Falling und Landung funktionieren.
@@ -22,74 +22,77 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Raum $00 -> $01 nach links funktioniert beim Gehen und Springen.
 - Raum $01 -> $00 nach rechts funktioniert.
 - Rechts neben Raum $00 liegt im Original `$ff`; Heraus-Springen nach rechts ist blockiert.
-- Phase 34e ist damit der verbindliche Gameplay-Ausgangspunkt fuer Phase 35.
+- Phase 35 Collision-Banking ist lokal bestaetigt.
 
 ## Phase 35 — Collision-ROM-Banking bankfest
 
-Die schwere Fall-durch-Boden-Regression trat zuvor immer dann auf, wenn zusaetzlicher Grafik-/Decor-Content das ROM-Layout verschob. Die Physics selbst war dabei unveraendert. Der kritische Pfad sind die direkten Pointer-Lesezugriffe auf `room00_collision_map` bzw. `room01_collision_map`: ihre HuCard-Bank kann sich beim Linken verschieben.
+Die aktive Collision-Map wird waehrend des Physics-Slices explizit ueber `BANK(room00_collision_map)` bzw. `BANK(room01_collision_map)` in MPR3/MPR4 gemappt. `monty_physics.asm` selbst blieb unveraendert; die direkten C64-artigen `[collision_ptr],y`-Reads arbeiten damit unabhaengig von der spaeteren ROM-Anordnung.
 
-Phase 35 kopiert die Collision-Daten **nicht** in RAM und aendert keine Tile-Properties, Startpositionen, Sprungtabellen oder Collision-Regeln. Stattdessen wird fuer den kurzen Physics-Abschnitt des Mainloops die Bank der aktuell aktiven Collision-Map explizit in MPR3/MPR4 eingeblendet.
+Der Nutzer hat Phase 35 im Emulator bestaetigt. Damit ist jetzt belegt, dass dieser Mapping-Layer den bekannten Gameplay-Pfad nicht veraendert.
 
-Neue Datei `src/collision_banking.asm`:
+## Phase 36 — Room-$01-Decor wieder aktiv
 
-- speichert die normalen MPR3/MPR4-Werte,
-- speichert den HuC-Scratchpointer `_bp`,
-- waehlt anhand `monty_room` entweder `BANK(room00_collision_map)` oder `BANK(room01_collision_map)`,
-- benutzt denselben bewaehrten `map_bp_to_mpr34`-Mechanismus wie die bereits bankfesten Monty-Sprite- und Room-Uploads,
-- laesst die Collision-Bank waehrend `monty_update_input` und `monty_jump_step` aktiv,
-- stellt danach MPR3/MPR4 und `_bp` wieder exakt her.
+Room $01 besitzt in der Original-`Decor.room_list` zwei Eintraege:
 
-Die IRQs bleiben nur waehrend dieses kurzen temporaeren Mapping-Fensters gesperrt, damit kein Interrupt die voruebergehende MPR3/MPR4-Belegung beobachtet.
+- `$01,$03,$11,$42` -> `purple_flowers`, 4x4 Zeichen
+- `$01,$1d,$07,$41` -> `bunch_flower`, 3x3 Zeichen
 
-`src/monty_physics.asm` selbst wurde in Phase 35 bewusst **nicht** veraendert. Die bestaetigten direkten `[collision_ptr],y`-Reads und die C64-Koordinaten-/Tile-Semantik bleiben gleich.
+`tools/room01_decor.py` enthaelt die exakten C64-Bitmaps und Farbstreams. Es erzeugt 25 PCE-Hintergrundzeichen (800 Byte) und ueberlagert den generierten 36x20-BAT von Raum $01 mit den beiden Objekten.
+
+Neu/reaktiviert:
+
+- `src/room01_assets.asm` bindet `room01-decor-patterns.dat` wieder ein.
+- `src/room01_decor_loader.asm` kopiert die 800 Byte bankfest via `map_bp_to_mpr34` in die gemeinsamen Decor-VRAM-Slots ab `CHR_GAME+9`.
+- `src/main.asm` bindet den isolierten Decor-Loader ein.
+- `src/room_loader.asm` ruft bei Raum $01 `room01_upload_patterns`, `room01_upload_decor` und `room01_draw_native` per absolutem `call` auf.
+- Beim Rueckweg nach Raum $00 wird weiterhin `upload_room00_patterns` aufgerufen; diese Routine schreibt sowohl die 9 Basiszeichen als auch alle 41 Room-$00-Decorzeichen neu. Damit bleiben keine Room-$01-Decors im gemeinsam verwendeten VRAM zurueck.
+- `build.sh` fuehrt `tools/test_room01_decor.py` aus und erzeugt danach `room01-decor-patterns.dat` sowie den dekorierten `room01-screen-bat.dat`.
 
 ## Regressionstest
 
-Neu ist `tools/test_collision_banking.py`. Der Test prueft:
+`tools/test_room01_decor.py` prueft jetzt nicht nur die exakten beiden Decor-Overlays, sondern auch:
 
-- `collision_bank_enter` liegt vor `monty_update_input` und `monty_jump_step`,
-- `collision_bank_exit` liegt danach und noch vor `world_resolve_exit`,
-- beide Collision-Maps werden ueber ihre echten `BANK(...)`-Werte ausgewaehlt,
-- `map_bp_to_mpr34` wird verwendet,
-- MPR3/MPR4 sowie `_bp` werden gesichert und restauriert,
-- der verworfene `room_collision_map_ram`-Pfad kommt nicht zurueck,
-- die bestehende Physics liest weiterhin direkt ueber `collision_ptr`.
+- 25 generierte Decorzeichen,
+- exakte Type-Reihenfolge `$42` vor `$41`,
+- korrekte Palette pro Zeichen,
+- `room01_decor_patterns` ist eingebunden,
+- Decor-Upload verwendet `BANK(room01_decor_patterns)` und `map_bp_to_mpr34`,
+- der Loader verwendet `call`, nicht reichweitenempfindliches `bsr`,
+- der Rueckweg nach Raum $00 stellt dessen 41 Decorzeichen wieder her.
 
-`build.sh` fuehrt diesen Test jetzt automatisch mit aus.
+## Commits Phase 36
 
-Commits Phase 35:
-
-- `f4d1846dcdd80f15746440c570afda7eda9ecae1` — neue bankfeste Collision-Map-MPR-Schicht
-- `5e0f208cdd35d5742954ae4654932fb43f0f607d` — Physics-Slice im Mainloop mit Collision-Bank umschlossen
-- `26239449a1dc03ee4700f6b3d66e56f8da00b12f` — Regressionstest
-- `4714c084cbaa0b086785de9c7f46a53e0298c434` — Regressionstest in `build.sh`
+- `45eeae2d81c87039cb8a4bf7d5abd84ac847943c` — bankfester Room-$01-Decor-Uploader
+- `5b4dba40e6eac14fef12756cced90838522818fb` — Room-$01-Decorpatterns wieder eingebunden
+- `97f1e4add2f36f423758cfc7aecb5023d12d1273` — isolierten Decor-Loader in Main eingebunden
+- `e61b4680b8e14f3580d263466d1a5b050312b04a` — Room-Loader aktiviert Decor und stellt Room-$00-VRAM sauber wieder her
+- `c75b5b397653363c1f57a9624e54879bb73197c2` — Build erzeugt/testet Room-$01-Decor
+- `90e023c6f718e78fecc9e9bc3657dceeccfde94d` — Regressionstest erweitert
 
 ## Erwartetes Resultat
 
-Phase 35 soll **optisch und spielerisch zunaechst nichts veraendern**. Genau das ist der Test: Startposition, Boden, Gehen, Springen, Landen, Animationen und Raum $00 <-> $01 muessen identisch zu der bestaetigten Phase 34e bleiben.
+Das ist jetzt der entscheidende Stresstest fuer Phase 35. Nach `git pull && ./build.sh` soll:
 
-Der technische Gewinn ist danach sichtbar, wenn wieder ROM-Content hinzukommt: Room-$01-Decor oder weitere Raumdaten duerfen die Collision-Map im ROM verschieben, ohne dass Monty wieder durch den Boden faellt oder falsche Tile-Collision bekommt.
+1. Monty in Raum $00 weiterhin normal auf dem Boden stehen und steuerbar sein.
+2. Springen/Landen unveraendert funktionieren; kein Fall-durch-Boden.
+3. Raum $00 -> $01 links weiter beim Gehen und Springen funktionieren.
+4. In Raum $01 `purple_flowers` und `bunch_flower` sichtbar sein.
+5. Die Collision in Raum $01 weiterhin korrekt funktionieren.
+6. Raum $01 -> $00 rechts funktionieren und Raum $00 danach seine eigenen Decors korrekt anzeigen.
+7. Raum $00 rechts weiterhin gesperrt bleiben.
 
-Nach lokaler Bestaetigung von Phase 35 wird deshalb als naechster kontrollierter Belastungstest der bereits fertige Room-$01-Decor-Pfad wieder aktiviert. Wenn Monty danach weiter korrekt auf Boden/Plattformen landet, ist der urspruengliche ROM-Wachstumsfehler praktisch beseitigt.
+Wenn genau das funktioniert, ist die fruehere Regression durch ROM-Wachstum praktisch widerlegt bzw. durch das Phase-35-Banking behoben. Danach kann Raum $02 portiert werden.
 
 ## Verifikationsstatus
 
-Phase 35 ist hochgeladen, aber noch nicht mit dem lokalen PCEAS/Mednafen des Nutzers verifiziert.
-
-Zu pruefen:
-
-1. Build muss ohne neue PCEAS-Fehler durchlaufen.
-2. Raum $00: Start, Boden, Gehen, Sprung und Landung unveraendert.
-3. Raum $00 -> $01 links: Gehen und Springen funktionieren.
-4. Raum $01 -> $00 rechts funktioniert.
-5. Raum $00 rechts bleibt gesperrt.
+Phase 36 ist hochgeladen, aber noch nicht mit dem lokalen PCEAS/Mednafen des Nutzers verifiziert.
 
 ## Naechste Portschritte
 
-1. Phase 35 lokal bestaetigen.
-2. Danach Room-$01-Decor als bewussten ROM-Wachstums-Stresstest wieder aktivieren.
-3. Wenn Collision stabil bleibt: Raum $02 und weitere Welt-Raeume portieren.
-4. Danach Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
+1. Phase 36 lokal bestaetigen.
+2. Bei Erfolg Raum $02 mit exaktem RLE, Tiles, Farben, Properties und Decors portieren.
+3. Danach den Mehrraum-Loader weiter verallgemeinern.
+4. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
 
 ## Referenzen
 
