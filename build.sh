@@ -5,8 +5,6 @@ BUILD="$ROOT/build"
 rm -rf "$BUILD"; mkdir -p "$BUILD"
 
 HUC_HOME="${HUC_HOME:-$HOME/.local/opt/huc}"
-# Do not require the install shell to have refreshed PATH. Prefer an explicit
-# PCEAS override, then PATH, then the known locations used by current/older HuC.
 if [ -n "${PCEAS:-}" ] && [ -x "$PCEAS" ]; then
   :
 elif command -v pceas >/dev/null 2>&1; then
@@ -25,19 +23,28 @@ else
 fi
 echo "Using pceas: $PCEAS"
 
-# The pure-ASM Elmer CORE used by this port lives in examples/asm/elmer/include
-# in current pce-devel/huc. Older scripts incorrectly expected font/vdc/joypad
-# under include/hucc; that directory is the HuCC compiler runtime, not Elmer.
+# Current pce-devel/huc deliberately has a split include layout:
+# bare-startup.asm/font.asm are in the Elmer example include directory, while
+# common.asm/vdc.asm/joypad.asm (and pceas.inc/pcengine.inc) are in include/hucc.
+# PCEAS searches PCE_INCLUDE after the current directory, so include both.
 ELMER_INC="$HUC_HOME/examples/asm/elmer/include"
 HUCC_INC="$HUC_HOME/include/hucc"
-for f in bare-startup.asm common.asm vdc.asm font.asm joypad.asm; do
-  test -f "$ELMER_INC/$f" || {
-    echo "ERROR: missing Elmer CORE include: $ELMER_INC/$f" >&2
+for f in \
+  "$ELMER_INC/bare-startup.asm" \
+  "$ELMER_INC/font.asm" \
+  "$HUCC_INC/common.asm" \
+  "$HUCC_INC/vdc.asm" \
+  "$HUCC_INC/joypad.asm" \
+  "$HUCC_INC/pceas.inc" \
+  "$HUCC_INC/pcengine.inc"; do
+  test -f "$f" || {
+    echo "ERROR: missing HuC include: $f" >&2
     echo "HuC checkout may be incomplete or incompatible." >&2
     exit 1
   }
 done
 export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
+echo "PCE_INCLUDE: $PCE_INCLUDE"
 
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
