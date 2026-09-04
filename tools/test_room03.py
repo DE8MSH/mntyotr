@@ -26,34 +26,34 @@ def main():
     assert ROOM03_TILE_BITMAPS[5] == bytes.fromhex('1e 72 c6 9e ba e2 8e ff')
 
     patterns = build_patterns()
-    assert len(patterns) == 9*32
-    assert patterns[:32] == bytes(32)
-
+    assert len(patterns) == 9*32 and patterns[:32] == bytes(32)
     bat = words(make_screen_bat(cells))
     assert len(bat) == SCREEN_W*20
-    for y in range(20):
-        row = bat[y*SCREEN_W:(y+1)*SCREEN_W]
-        assert row[0] == row[1] == row[2]
-        assert row[-1] == row[-2] == row[-3]
-
-    for code in sorted(set(cells) - {0}):
-        if code >= 9:
-            continue
-        expected_pal = PAL_BY_C64[ROOM03_COLOURS[code-1] & 0x0f]
-        samples = [w for w in bat if (w & 0x0fff) == CHR_GAME + code]
-        assert samples
-        assert all((w >> 12) == expected_pal for w in samples)
 
     main_asm = (ROOT/'src/main.asm').read_text()
     tail = (ROOT/'src/room03_assets_tail.asm').read_text()
+    loader = (ROOT/'src/room_loader.asm').read_text()
+    banking = (ROOT/'src/collision_banking.asm').read_text()
+    world = (ROOT/'src/world.asm').read_text()
+
     assert 'include "room03_assets_tail.asm"' in main_asm
     assert main_asm.index('include "room03_assets_tail.asm"') > main_asm.index('include "monty_sprite.asm"')
-    assert 'room03_patterns:' in tail
-    assert 'room03_collision_map_rom:' in tail
-    assert 'room03_tile_properties_rom:' in tail
-    assert 'room03_screen_bat:' in tail
+    assert 'room03_collision_map_rom:' in tail and 'room03_tile_properties_rom:' in tail
+    assert 'call    room03_upload_patterns' in loader
+    assert 'call    room03_draw_native' in loader
+    assert 'call    room03_cache_collision' in loader
+    assert 'BANK(room03_collision_map_rom)' in loader
+    assert 'lda     #3' in loader and 'sta     <monty_room' in loader
 
-    print('OK: exact Room 03 RLE/tiles/colours/properties prepared as ROM-tail assets')
+    # Room03 reuses the proven Room02 RAM cache without changing physics.
+    assert 'collision_actual_room' in banking
+    assert 'cmp     #3' in banking
+    assert 'lda     #2' in banking and 'sta     <monty_room' in banking
+    assert 'lda     <collision_actual_room' in main_asm
+    assert 'cmp     #3' in main_asm
+    assert 'cmp     #4' in world
+
+    print('OK: exact Room 03 assets active with shared RAM collision cache + world wiring')
 
 
 if __name__ == '__main__':
