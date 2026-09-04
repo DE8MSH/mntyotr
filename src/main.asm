@@ -27,6 +27,7 @@
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
+        include "room04_assets_tail.asm"
 
 .zp
 main_jump_x_before_step:   ds 1
@@ -131,7 +132,6 @@ main_loop:
         stz     <monty_room_exit
 .after_unsupported_jump_edge:
 
-        ; Preserve a real horizontal exit across the vertical jump step.
         lda     <monty_room_exit
         sta     <main_exit_before_jump
         lda     <monty_x
@@ -144,7 +144,6 @@ main_loop:
         bra     .after_jump_exit_guard
 
 .guard_jump_generated_exit:
-        ; Reject side exits synthesized only by the vertical jump edge check.
         lda     <monty_room_exit
         cmp     #1
         beq     .guard_jump_side_exit
@@ -170,8 +169,6 @@ main_loop:
         call    monty_sprite_update_satb
         bra     main_loop
 
-; Keep the proven 352x224 vertical/DMA setup, but use the library's 320-pixel
-; horizontal timing constants. 40 C64 character columns * 8 pixels = 320.
 init_c64_video:
         st0     #$0a
         st1     #<VDC_HSR_320
