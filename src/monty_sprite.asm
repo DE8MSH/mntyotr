@@ -49,7 +49,12 @@ monty_upload_walk_frame:
 .r1: tia monty_walk_r_1,VDC_DL,512
  bra .uploaded
 .r2: tia monty_walk_r_2,VDC_DL,512
- bra .uploaded
+.uploaded:
+ stz <monty_sprite_dirty
+ lda <monty_facing
+ sta <monty_sprite_last_facing
+ stz <monty_sprite_last_mode
+ rts
 .left:
  cpx #0
  beq .l0
@@ -64,12 +69,7 @@ monty_upload_walk_frame:
 .l1: tia monty_walk_l_1,VDC_DL,512
  bra .uploaded
 .l2: tia monty_walk_l_2,VDC_DL,512
-.uploaded:
- stz <monty_sprite_dirty
- lda <monty_facing
- sta <monty_sprite_last_facing
- stz <monty_sprite_last_mode
- rts
+ bra .uploaded
 
 monty_upload_climb_frame:
  lda #<MONTY_SPR_VRAM
@@ -101,6 +101,8 @@ monty_upload_climb_frame:
 
 ; C64 JumpRight/JumpLeft use movement_ticker 0..11 and clamp at frame 11.
 ; The generated .dat files contain the exact 12 raw VIC slots converted to PCE.
+; HuC6280 relative branches are limited to +/-128 bytes, so the two 12-way
+; dispatch tables deliberately use absolute JMP for long exits/side selection.
 monty_upload_jump_frame:
  lda #<MONTY_SPR_VRAM
  sta <_di
@@ -114,7 +116,9 @@ monty_upload_jump_frame:
 .index_ok:
  tax
  lda <monty_facing
- bmi .jump_left
+ bpl .jump_right
+ jmp .jump_left
+.jump_right:
  cpx #0
  beq .jr0
  cpx #1
@@ -138,29 +142,29 @@ monty_upload_jump_frame:
  cpx #10
  beq .jr10
  tia monty_sault_r_11,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr0: tia monty_sault_r_0,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr1: tia monty_sault_r_1,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr2: tia monty_sault_r_2,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr3: tia monty_sault_r_3,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr4: tia monty_sault_r_4,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr5: tia monty_sault_r_5,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr6: tia monty_sault_r_6,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr7: tia monty_sault_r_7,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr8: tia monty_sault_r_8,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr9: tia monty_sault_r_9,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jr10: tia monty_sault_r_10,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jump_left:
  cpx #0
  beq .jl0
@@ -185,27 +189,27 @@ monty_upload_jump_frame:
  cpx #10
  beq .jl10
  tia monty_sault_l_11,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl0: tia monty_sault_l_0,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl1: tia monty_sault_l_1,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl2: tia monty_sault_l_2,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl3: tia monty_sault_l_3,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl4: tia monty_sault_l_4,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl5: tia monty_sault_l_5,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl6: tia monty_sault_l_6,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl7: tia monty_sault_l_7,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl8: tia monty_sault_l_8,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl9: tia monty_sault_l_9,VDC_DL,512
- bra .jdone
+ jmp .jdone
 .jl10: tia monty_sault_l_10,VDC_DL,512
 .jdone:
  stz <monty_sprite_dirty
