@@ -1,4 +1,4 @@
-; Phase 38a room loader: rooms $00 <-> $01 <-> $02.
+; Phase 39 room loader: rooms $00 <-> $01 <-> $02 with Room-$02 decor.
 ; Room $01/$02 graphics are copied through MPR3/MPR4. Room $02 additionally
 ; caches its collision map/properties in RAM before gameplay resumes, because
 ; its far ROM-tail bank must not remain mapped across runtime physics code.
@@ -40,6 +40,7 @@ room_load_pending:
 
 .room02:
         call    room02_upload_patterns
+        call    room02_upload_decor
         call    room02_draw_native
         call    room02_cache_collision
         lda     #2
