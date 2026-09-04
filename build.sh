@@ -17,27 +17,14 @@ elif [ -x "$HUC_HOME/bin/pceas" ]; then
   PCEAS="$HUC_HOME/bin/pceas"
 else
   echo "ERROR: pceas not found." >&2
-  echo "Checked PATH and HuC under: $HUC_HOME" >&2
-  echo "Run ./install.sh, or invoke as: PCEAS=/full/path/to/pceas ./build.sh" >&2
   exit 1
 fi
 echo "Using pceas: $PCEAS"
 
 ELMER_INC="$HUC_HOME/examples/asm/elmer/include"
 HUCC_INC="$HUC_HOME/include/hucc"
-for f in \
-  "$ELMER_INC/bare-startup.asm" \
-  "$ELMER_INC/font.asm" \
-  "$HUCC_INC/common.asm" \
-  "$HUCC_INC/vdc.asm" \
-  "$HUCC_INC/joypad.asm" \
-  "$HUCC_INC/pceas.inc" \
-  "$HUCC_INC/pcengine.inc"; do
-  test -f "$f" || {
-    echo "ERROR: missing HuC include: $f" >&2
-    echo "HuC checkout may be incomplete or incompatible." >&2
-    exit 1
-  }
+for f in "$ELMER_INC/bare-startup.asm" "$ELMER_INC/font.asm" "$HUCC_INC/common.asm" "$HUCC_INC/vdc.asm" "$HUCC_INC/joypad.asm" "$HUCC_INC/pceas.inc" "$HUCC_INC/pcengine.inc"; do
+  test -f "$f" || { echo "ERROR: missing HuC include: $f" >&2; exit 1; }
 done
 export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
 echo "PCE_INCLUDE: $PCE_INCLUDE"
@@ -51,39 +38,23 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room03.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
+
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
-python3 "$ROOT/tools/room_rle.py" \
-  --write "$BUILD/room00-map.dat" \
-  --bat "$BUILD/room00-bat.dat" \
-  --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" \
-  --screen-bat "$BUILD/room00-screen-bat.dat" \
-  --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01.py" \
-  --map "$BUILD/room01-map.dat" \
-  --screen-bat "$BUILD/room01-screen-bat.dat" \
-  --patterns "$BUILD/room01-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01_decor.py" \
-  --screen-bat "$BUILD/room01-screen-bat.dat" \
-  --patterns "$BUILD/room01-decor-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02.py" \
-  --map "$BUILD/room02-map.dat" \
-  --screen-bat "$BUILD/room02-screen-bat.dat" \
-  --patterns "$BUILD/room02-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02_decor.py" \
-  --screen-bat "$BUILD/room02-screen-bat.dat" \
-  --patterns "$BUILD/room02-decor-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room03.py" \
-  --map "$BUILD/room03-map.dat" \
-  --screen-bat "$BUILD/room03-screen-bat.dat" \
-  --patterns "$BUILD/room03-patterns.dat" >/dev/null
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room04.py" \
-  --map "$BUILD/room04-map.dat" \
-  --screen-bat "$BUILD/room04-screen-bat.dat" \
-  --patterns "$BUILD/room04-patterns.dat" >/dev/null
+python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" --screen-bat "$BUILD/room00-screen-bat.dat" --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01.py" --map "$BUILD/room01-map.dat" --screen-bat "$BUILD/room01-screen-bat.dat" --patterns "$BUILD/room01-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01_decor.py" --screen-bat "$BUILD/room01-screen-bat.dat" --patterns "$BUILD/room01-decor-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02.py" --map "$BUILD/room02-map.dat" --screen-bat "$BUILD/room02-screen-bat.dat" --patterns "$BUILD/room02-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02_decor.py" --screen-bat "$BUILD/room02-screen-bat.dat" --patterns "$BUILD/room02-decor-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room03.py" --map "$BUILD/room03-map.dat" --screen-bat "$BUILD/room03-screen-bat.dat" --patterns "$BUILD/room03-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room04.py" --map "$BUILD/room04-map.dat" --screen-bat "$BUILD/room04-screen-bat.dat" --patterns "$BUILD/room04-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 cd "$BUILD"
