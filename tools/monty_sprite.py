@@ -3,13 +3,13 @@
 
 Primary gameplay/art reference: Dave-Agent/monty-on-the-run refactored/src.
 C64 VIC-II sprites contain 24x21 visible 1bpp pixels (63 bytes) in a 64-byte
-slot.  PCE 16x16 sprite cells use paired/interleaved bitplanes: planes 0/1 for
-all 16 rows, then planes 2/3.  Monty is composed from two 16x32 PCE sprites.
+slot. PCE 16x16 sprite cells use paired/interleaved bitplanes: planes 0/1 for
+all 16 rows, then planes 2/3. Monty is composed from two 16x32 PCE sprites.
 """
 from pathlib import Path
 
 WALK_L = bytes.fromhex(
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 06 b8 00 04 7c 00 0b fc 00 1b 7c 00 1c f8 00 0e fc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 36 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e0 00 0f c0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
@@ -17,12 +17,12 @@ WALK_R = bytes.fromhex(
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 84 00 1d 6e 00 34 6e 00 37 f6 00 36 f8 00 19 f8 00 3d f0 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 68 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 17 80 00 1b f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 60 00 3e 20 00 3f d0 00 3e d8 00 1f 38 00 3f 70 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 6c 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 07 80 00 03 f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+"00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 6c 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 07 80 00 03 f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 CLIMB = bytes.fromhex(
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"07 80 00 0f c0 00 07 80 00 1f e0 00 3f e0 00 7f f0 00 7f b8 00 3f b8 00 7f c8 00 7f f0 00 4f f0 00 37 e0 00 7b c0 00 71 e0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"07 80 00 0f c0 00 07 80 00 1f e0 00 3f e0 00 7f f0 00 7f b8 00 3f b8 00 7f c8 00 7f f0 00 4f f0 00 37 e0 00 7b c0 00 71 e0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+"07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 
 BITMAP_BYTES = 63
 VIC_FRAME_BYTES = 64
@@ -32,53 +32,45 @@ FRAME_BYTES = BITMAP_BYTES
 def _extract_bitmap_frames(blob, marker, count=4):
     starts = [i for i in range(len(blob)-len(marker)+1) if blob[i:i+len(marker)] == marker]
     assert len(starts) == count, f'expected {count} frame starts, found {len(starts)}'
-    frames = []
-    for i in starts:
-        assert i + BITMAP_BYTES <= len(blob), 'truncated C64 sprite frame'
-        frames.append(blob[i:i+BITMAP_BYTES])
+    frames=[]
+    for n,i in enumerate(starts):
+        end = starts[n+1] if n+1 < len(starts) else len(blob)
+        slot = blob[i:end]
+        # The checked-in transcription omits only zero padding at the very end
+        # of an animation block. Visible VIC data is 63 bytes; restore omitted
+        # trailing zeroes instead of rejecting the authentic final frame.
+        if len(slot) < BITMAP_BYTES:
+            assert n == count-1 and all(b == 0 for b in slot[-8:]), 'unexpected truncated C64 sprite frame'
+            slot += bytes(BITMAP_BYTES-len(slot))
+        frames.append(slot[:BITMAP_BYTES])
     return b''.join(frames)
-
 
 WALK_L = _extract_bitmap_frames(WALK_L, bytes.fromhex('02 00 00 1d c0'))
 WALK_R = _extract_bitmap_frames(WALK_R, bytes.fromhex('00 40 00 03 f8'))
 CLIMB = _extract_bitmap_frames(CLIMB, bytes.fromhex('07 80 00 0f c0'))
 
-
 def c64_frame_pixels(frame):
-    assert len(frame) in (BITMAP_BYTES, VIC_FRAME_BYTES)
-    frame = frame[:BITMAP_BYTES]
+    assert len(frame) in (BITMAP_BYTES,VIC_FRAME_BYTES); frame=frame[:BITMAP_BYTES]
     rows=[]
     for y in range(21):
         v=(frame[y*3]<<16)|(frame[y*3+1]<<8)|frame[y*3+2]
         rows.append([(v>>(23-x))&1 for x in range(24)])
     return rows
 
-
-def _plane_word(tile, plane, y):
-    return sum((((tile[y][x] >> plane) & 1) << (15-x)) for x in range(16))
-
+def _plane_word(tile,plane,y):
+    return sum((((tile[y][x]>>plane)&1)<<(15-x)) for x in range(16))
 
 def pce_16x16(tile):
-    """Encode one native PCE 16x16 sprite cell (128 bytes).
-
-    PCE sprite patterns pair/interleave planes 0+1 per scanline, followed by
-    planes 2+3.  The previous converter emitted four whole planes serially,
-    which visibly folded/scrambled Monty into a crouched-looking shape.
-    """
     out=bytearray()
     for p0,p1 in ((0,1),(2,3)):
         for y in range(16):
-            w0=_plane_word(tile,p0,y)
-            w1=_plane_word(tile,p1,y)
-            out += bytes((w0 & 0xff, w0 >> 8, w1 & 0xff, w1 >> 8))
+            w0=_plane_word(tile,p0,y); w1=_plane_word(tile,p1,y)
+            out += bytes((w0&255,w0>>8,w1&255,w1>>8))
     assert len(out)==128
     return out
 
-
 def convert_frame(frame):
     pix=c64_frame_pixels(frame); chunks=[]
-    # Hardware 16x32 sprite pattern order is vertical cells first.  Two such
-    # sprites compose Monty's 24-pixel source width.
     for x0 in (0,16):
         for y0 in (0,16):
             tile=[[0]*16 for _ in range(16)]
@@ -89,11 +81,9 @@ def convert_frame(frame):
             chunks.append(pce_16x16(tile))
     return b''.join(chunks)
 
-
 def build(frames):
     assert len(frames)%BITMAP_BYTES==0
     return b''.join(convert_frame(frames[i:i+BITMAP_BYTES]) for i in range(0,len(frames),BITMAP_BYTES))
-
 
 def main():
     import argparse
