@@ -17,10 +17,12 @@ jobs:
       - name: Build current HuC/PCEAS toolchain
         run: |
           git clone --depth 1 https://github.com/pce-devel/huc.git "$HOME/huc"
-          # Build host tools only. Upstream's top-level 'all' also builds every
-          # example, and a currently broken unrelated example must not block us.
-          make -C "$HOME/huc/src" -j"$(nproc)"
+          # Upstream src/all can return non-zero from an unrelated parallel
+          # sub-target even after pceas itself was successfully linked/copied.
+          # The executable is the actual prerequisite for this pure-ASM port.
+          make -C "$HOME/huc/src" -j"$(nproc)" || true
           test -x "$HOME/huc/bin/pceas"
+          "$HOME/huc/bin/pceas" -? >/dev/null 2>&1 || true
           echo "$HOME/huc/bin" >> "$GITHUB_PATH"
 
       - name: Build MOTR HuCard
