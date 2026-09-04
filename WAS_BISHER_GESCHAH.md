@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 32b
+Stand: 2026-09-04 — Phase 33
 
 ## Portierungsstand
 
-**Gesamtport: ca. 44 %**
+**Gesamtport: ca. 45 %**
 
-Der Nutzer hat Phase 31 visuell bestaetigt: `sad_flowers` ist sichtbar. Phase 32 beginnt den eigentlichen Mehrraum-Port und bindet Raum $01 als ersten echten Nachbarraum an. Phase 32a korrigierte den zu strengen Room-$01-Test. Phase 32b behebt nun zwei HuC6280-Branch-Reichweitenfehler in `world.asm`, die erst nach erfolgreich durchgelaufenen Python-Tests beim PCEAS-Lauf sichtbar wurden.
+Phase 32b ist vom Nutzer praktisch bestaetigt: Raum $00 -> $01 nach links funktioniert, und aus Raum $01 kommt Monty nach rechts wieder korrekt in Raum $00 zurueck. Dass man aus Raum $00 nicht nach rechts in einen weiteren Raum gelangt, ist kein Fehler: im originalen 6x23-Weltgitter ist rechts neben Raum $00 (`row 2, col $16`) `$ff`, also eine Wand/kein Raum.
 
 ## Verbindliche Referenz
 
@@ -15,68 +15,57 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 ## Bestaetigt
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- Raum $00 Basisgrafik und alle neun statischen Decor-Records sind sichtbar; `sad_flowers` wurde vom Nutzer bestaetigt.
-- Montys Start-/SAT-Position, Gehen, Springen, Falling, Plattform-Landung und Hauseingang funktionieren.
-- 12+12 Somersaultframes funktionieren visuell korrekt.
-- Walk links/rechts, Climb und Somersault benutzen bankfeste Far-Pointer-Uploads; der fruehere Rechtslauf-Grafikfehler ist behoben.
-- In Phase 32a laufen nun auch alle Python-Tests fuer Raum $01 erfolgreich bis zum PCEAS-Aufruf durch.
+- Raum $00 Basisgrafik und alle neun statischen Decor-Records sind sichtbar; `sad_flowers` wurde bestaetigt.
+- Gehen, Springen, Falling, Plattform-Landung und Hauseingang funktionieren.
+- 12+12 Somersaultframes sowie Walk/Climb laufen ueber bankfeste ROM-Uploads.
+- Der echte Raumwechsel $00 -> $01 nach links funktioniert.
+- Der Rueckweg $01 -> $00 nach rechts funktioniert.
+- Rechts von Raum $00 liegt laut Original-Weltkarte `$ff`; dort darf kein weiterer Raum geladen werden.
 
-## Phase 32 — erster echter Raumwechsel $00 <-> $01
+## Phase 33 — Original-Decors fuer Raum $01
 
-Die C64-Weltkarte setzt Raum $00 auf Zeile 2 / Spalte $15. Links davon liegt exakt Raum $01. Der vorhandene World-Code konnte dieses Ziel bereits bestimmen, hat bisher aber absichtlich keinen Raum geladen.
+Die C64-`Decor.room_list` enthaelt fuer Raum $01 exakt zwei statische Records:
 
-Phase 32 fuegt nun den ersten echten zweiten Raum hinzu:
+- `$01,$03,$11,$42` — Type 66 `purple_flowers`, 4x4 Zeichen
+- `$01,$1d,$07,$41` — Type 65 `bunch_flower`, 3x3 Zeichen
 
-- `tools/room01.py` enthaelt den exakten RLE-Stream `Room.Data.tilemap.rm_01`.
-- Die 16-Byte-Raumdefinition fuer Raum $01 wird umgesetzt: Tile-Library-IDs `$02,$63,$01,$0a,$40,$05,$55,$64` sowie C64-Farben `$04,$03,$03,$05,$01,$0a,$06,$05`.
-- Die acht exakten Tile-Bitmaps kommen aus `Tiles.tile_library`.
-- `Monty.SetTileProperty` ergibt fuer diese acht Custom-Tiles exakt die Properties `1,0,1,1,2,1,4,0`.
-- `tools/room01.py` erzeugt daraus `room01-map.dat`, `room01-screen-bat.dat` und `room01-patterns.dat`.
+`tools/room01_decor.py` portiert beide direkt aus `refactored/src/subsystems/decor_data.asm`.
 
-## Phase 32a — Testfix fuer unbenutzten Custom-Tile-Slot
+### Type $42 `purple_flowers`
 
-Der erste lokale Build stoppte in `tools/test_room01.py` mit `AssertionError: room01 code 2 never appears`. Die Ursache war der Test, nicht der Raumdaten-Port: die Raumdefinition installiert alle acht Custom-Tile-Slots, aber der echte Raum-$01-RLE-Stream benutzt Screencode 2 nicht. Der exakte Decode benutzt `0,1,3,4,5,6,7,8`. Der Test prueft deshalb jetzt die echte Used-Code-Menge und nur fuer sichtbare Codes die BAT-Paletten, waehrend weiterhin alle neun PCE-Patterns erzeugt werden.
+- 4x4 = 16 C64-Zeichen
+- exaktes 128-Byte-Bitmap aus `chr_data.purple_flowers`
+- Farbstrom: `$04,$04,$04,$04,$04,$05,$05,$04,$05,$05,$05,$05,$08,$08,$08,$08`
 
-## Phase 32b — PCEAS Branch-Reichweite in `world.asm`
+### Type $41 `bunch_flower`
 
-Nach Phase 32a liefen beim Nutzer alle Python-Tests erfolgreich durch. PCEAS meldete danach zwei echte Assemblerfehler:
+- 3x3 = 9 C64-Zeichen
+- exaktes 72-Byte-Bitmap aus `chr_data.bunch_flower`
+- Farbstrom: `$07,$08,$03,$0a,$05,$04,$08,$02,$00`
 
-- `beq .none` war relativ zu weit entfernt.
-- der letzte `bsr world_get_room_xy` im Down-Exit-Pfad war fuer den relativen Subroutine-Branch zu weit rueckwaerts.
+Zusammen erzeugt Phase 33 25 PCE-Decor-Zeichen = 800 Byte. Sie beginnen wie die Raum-$00-Decors bei `CHR_GAME+9`; ein Raumwechsel darf diese gemeinsamen Decor-Slots bewusst ueberschreiben.
 
-Phase 32b veraendert keine World-/Room-Semantik. Der Null-Exit-Pfad benutzt jetzt einen kurzen lokalen Branch plus absolutes `jmp .none`, und alle vier Aufrufe von `world_get_room_xy` benutzen `jsr` statt `bsr`. Damit ist die Routine nicht mehr von der ±128-Byte-Reichweite relativer Branches abhaengig, waehrend Zielraumpruefung und Weltkoordinaten identisch bleiben.
+Die vorhandenen PCE-Paletten reichen aus. Purple `$04` verwendet Room-$01-Slot 13; die restlichen Farben sind bereits durch Raum $00 bzw. die Basisraumfarben vorhanden.
 
-## Native PCE-Seite
+## Loader/Build
 
-Neu seit Phase 32 sind `src/room01_assets.asm`, `src/room01_native.asm` und `src/room_loader.asm`.
+`src/room01_assets.asm` bindet `room01-decor-patterns.dat` ein. `src/room_loader.asm` laedt beim Eintritt in Raum $01 zuerst die neun Custom-Tiles und danach die 25 Decor-Zeichen bankfest ueber `map_bp_to_mpr34`. Der von `tools/room01.py` erzeugte 36x20-BAT wird vor dem Assemblieren durch `tools/room01_decor.py` mit den beiden Original-Records ueberlagert.
 
-Raum $01 ueberschreibt beim Eintritt die gemeinsamen Custom-Character-Slots 0..8 in VRAM, genauso wie die C64-`SetupTileGraphics`-Routine pro Raum neue Zeichen 1..8 installiert. Der Upload benutzt `map_bp_to_mpr34`, damit das bekannte HuCard-ROM-Banking-Problem nicht erneut bei wachsenden Datenbloecken auftritt.
-
-Der 36x20-BAT von Raum $01 wird ebenfalls bankfest aus ROM gelesen und zeilenweise in die 64x32-PCE-BAT geschrieben. Die zwei fuer Raum $01 zusaetzlich benoetigten C64-Farben Purple `$04` und Blue `$06` liegen in den noch freien BG-Palettenslots 13 und 14.
-
-`src/main.asm` ruft nach einem erfolgreichen `world_resolve_exit` `room_load_pending` auf. Damit soll links aus Raum $00 erstmals wirklich Raum $01 erscheinen; rechts aus Raum $01 wird Raum $00 inklusive dessen Decor wiederhergestellt.
-
-## Collision
-
-Die Collision-Routinen waehlen anhand `monty_room` zwischen `room00_collision_map`/`room00_tile_properties` und `room01_collision_map`/`room01_tile_properties`. Raum $01 benutzt damit seine eigene 32x20-Geometrie und seine eigenen C64-Properties.
-
-Da bisher nur $00 und $01 voll geladen werden koennen, blockiert `world_resolve_exit` voruebergehend Ziele ab Raum $02. Dadurch kann Monty am linken Rand von Raum $01 noch nicht in Raum $02 wechseln und die World-Koordinaten koennen nicht in einen noch ungeladenen Raum driften.
+`tools/test_room01_decor.py` prueft beide Originalpositionen, die komplette Zeichenreihenfolge und jeden Eintrag der beiden C64-Farbstroeme. `build.sh` fuehrt den Test aus und erzeugt die Decor-Patterns vor PCEAS.
 
 ## Verifikationsstatus
 
-- Phase 31 (`sad_flower`) ist vom Nutzer visuell bestaetigt.
-- Phase 32a Python-Tests laufen beim Nutzer komplett durch.
-- Der letzte Lauf erreichte PCEAS und stoppte nur an zwei Branch-Reichweitenfehlern in `world.asm`; diese sind in Phase 32b korrigiert.
-- Phase 32b ist hochgeladen, aber noch nicht lokal assembliert/verifiziert.
-- Als naechstes `git pull && ./build.sh`.
-- Danach aus Raum $00 ganz nach links gehen: Raum $01 sollte geladen werden. Dort Bewegung/Sprung/Fall pruefen und anschliessend nach rechts zurueck in Raum $00 gehen.
+- Phase 32b Raumwechsel $00 <-> $01 ist vom Nutzer bestaetigt.
+- Phase 33 ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Nach `git pull && ./build.sh` in Raum $01 besonders links unten/seitlich nach `purple_flowers` und rechts oben nach `bunch_flower` schauen.
+- Physik, Weltkoordinaten und Monty-Animation wurden in Phase 33 nicht geaendert.
 
 ## Naechste Portschritte
 
-1. Phase 32b lokal bauen und $00 <-> $01 visuell sowie collision-seitig pruefen.
-2. Die originalen Raum-$01-Decors anbinden.
-3. Danach Raum $02 in denselben Loader aufnehmen und die temporaere `room < 2`-Schranke erweitern.
-4. Den Loader schrittweise auf die restlichen `Room.Data.tilemap_ptrs`/`room_defs` verallgemeinern.
+1. Phase 33 visuell bestaetigen.
+2. Raum $02 mit seinem exakten RLE, room_defs-Tileset, Farben und Collision in den Loader aufnehmen.
+3. Danach Room-$02-Decors anbinden und die temporaere Loader-Schranke auf `$00..$02` erweitern.
+4. Den Room-Loader weiter verallgemeinern.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen auf dem Mehrraum-Unterbau.
 
 ## Referenzen
