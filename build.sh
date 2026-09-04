@@ -10,10 +10,17 @@ if [ -z "$PCEAS" ]; then
   exit 1
 fi
 
+HUC_HOME="${HUC_HOME:-$HOME/.local/opt/huc}"
+ELMER_INC="$HUC_HOME/examples/asm/elmer/include"
+HUCC_INC="$HUC_HOME/include/hucc"
+for f in "$ELMER_INC/bare-startup.asm" "$HUCC_INC/common.asm" "$HUCC_INC/vdc.asm" "$HUCC_INC/font.asm" "$HUCC_INC/joypad.asm"; do
+  test -f "$f" || { echo "ERROR: missing CORE include: $f" >&2; exit 1; }
+done
+export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
+
 # Fail before assembly if authoritative room/physics/timing fingerprints drift.
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 
-# Stage the complete assembly unit. CORE files are resolved through PCE_INCLUDE.
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 
