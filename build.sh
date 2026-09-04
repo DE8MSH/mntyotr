@@ -13,7 +13,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" >/dev/null
-python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" >/dev/null
+python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 cd "$BUILD"
 "$PCEAS" -S -gA -l 3 main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
