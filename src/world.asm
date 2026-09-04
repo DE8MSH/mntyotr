@@ -47,7 +47,9 @@ world_get_room_xy:
 world_resolve_exit:
         stz     <world_transition_ready
         lda     <monty_room_exit
-        beq     .none
+        bne     .have_exit
+        jmp     .none
+.have_exit:
         cmp     #1
         beq     .left
         cmp     #2
@@ -64,7 +66,7 @@ world_resolve_exit:
         sbc     #1
         tax
         ldy     <world_map_row
-        bsr     world_get_room_xy
+        jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_left
         cmp     #2
@@ -77,7 +79,7 @@ world_resolve_exit:
         adc     #1
         tax
         ldy     <world_map_row
-        bsr     world_get_room_xy
+        jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_right
         cmp     #2
@@ -91,7 +93,7 @@ world_resolve_exit:
         sbc     #1
         tay
         ldx     <world_exit_col
-        bsr     world_get_room_xy
+        jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_up
         cmp     #2
@@ -104,7 +106,7 @@ world_resolve_exit:
         adc     #1
         tay
         ldx     <world_exit_col
-        bsr     world_get_room_xy
+        jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_down
         cmp     #2
