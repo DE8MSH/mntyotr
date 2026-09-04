@@ -1,10 +1,14 @@
-; Phase 33a room loader: real C64 world transition, rooms $00 <-> $01.
-; Room $01 graphics are copied through MPR3/MPR4 so ROM-bank placement cannot
-; corrupt the room as the ROM grows.
+; Phase 33b room loader: real C64 world transition, rooms $00 <-> $01.
+; Room graphics and collision data are copied through MPR3/MPR4 so ROM-bank
+; placement cannot corrupt gameplay as the HuCard grows.
 
 .zp
 room_copy_rows:  ds 1
 room_copy_pages: ds 1
+
+.bss
+room_collision_map_ram:  ds 640
+room_tile_properties_ram: ds 8
 
 .code
 
@@ -18,6 +22,7 @@ room_load_pending:
         rts
 
 .room00:
+        jsr     room_collision_load_pending
         call    upload_room00_patterns
         call    draw_room00_native
         stz     <monty_room
@@ -26,6 +31,7 @@ room_load_pending:
         rts
 
 .room01:
+        jsr     room_collision_load_pending
         jsr     room01_upload_patterns
         jsr     room01_upload_decor
         jsr     room01_draw_native
@@ -33,6 +39,110 @@ room_load_pending:
         sta     <monty_room
         stz     <world_transition_ready
         sec
+        rts
+
+; Copy the active room's 32x20 collision map and eight C64 tile properties into
+; work RAM. Physics then reads only RAM, so adding ROM data can never move these
+; tables out of the currently mapped HuCard bank again.
+room_collision_load_pending:
+        lda     <world_pending_room
+        beq     .room00
+        cmp     #1
+        beq     .room01
+        rts
+.room00:
+        lda     #<room00_collision_map
+        sta     <_bp
+        lda     #>room00_collision_map
+        sta     <_bp+1
+        ldy     #BANK(room00_collision_map)
+        jsr     room_collision_copy640
+        lda     #<room00_tile_properties
+        sta     <_bp
+        lda     #>room00_tile_properties
+        sta     <_bp+1
+        ldy     #BANK(room00_tile_properties)
+        jmp     room_collision_copy_props
+.room01:
+        lda     #<room01_collision_map
+        sta     <_bp
+        lda     #>room01_collision_map
+        sta     <_bp+1
+        ldy     #BANK(room01_collision_map)
+        jsr     room_collision_copy640
+        lda     #<room01_tile_properties
+        sta     <_bp
+        lda     #>room01_tile_properties
+        sta     <_bp+1
+        ldy     #BANK(room01_tile_properties)
+        jmp     room_collision_copy_props
+
+; Input: _bp=ROM source, Y=source bank. Copies 640 bytes to RAM.
+room_collision_copy640:
+        php
+        sei
+        tma3
+        pha
+        tma4
+        pha
+        jsr     map_bp_to_mpr34
+
+        lda     #<room_collision_map_ram
+        sta     <_di
+        lda     #>room_collision_map_ram
+        sta     <_di+1
+        lda     #2
+        sta     <room_copy_pages
+.page:
+        cly
+.byte:
+        lda     [_bp],y
+        sta     [_di],y
+        iny
+        bne     .byte
+        inc     <_bp+1
+        inc     <_di+1
+        dec     <room_copy_pages
+        bne     .page
+
+        cly
+.tail:
+        lda     [_bp],y
+        sta     [_di],y
+        iny
+        cpy     #128
+        bne     .tail
+
+        pla
+        tam4
+        pla
+        tam3
+        plp
+        rts
+
+; Input: _bp=ROM source, Y=source bank. Copies 8 property bytes to RAM.
+room_collision_copy_props:
+        php
+        sei
+        tma3
+        pha
+        tma4
+        pha
+        jsr     map_bp_to_mpr34
+        ldx     #0
+        cly
+.loop:
+        lda     [_bp],y
+        sta     room_tile_properties_ram,x
+        iny
+        inx
+        cpx     #8
+        bne     .loop
+        pla
+        tam4
+        pla
+        tam3
+        plp
         rts
 
 ; Upload 9*32 = 288 bytes to the same custom-char VRAM used by every room.
@@ -57,7 +167,6 @@ room01_upload_patterns:
         sta     <_di+1
         call    vdc_di_to_mawr
 
-        ; First 256 bytes = 128 VDC words.
         cly
         ldx     #128
 .p0:
@@ -70,7 +179,6 @@ room01_upload_patterns:
         dex
         bne     .p0
         inc     <_bp+1
-        ; Remaining 32 bytes = 16 VDC words.
         cly
         ldx     #16
 .p1:
@@ -91,8 +199,6 @@ room01_upload_patterns:
         rts
 
 ; Phase 33: 25 exact C64 decor chars = 800 bytes, beginning at CHR_GAME+9.
-; Copy three full 256-byte pages plus the final 32 bytes through the same
-; bank-safe MPR3/MPR4 window used for all growing ROM graphics blocks.
 room01_upload_decor:
         php
         sei
@@ -152,7 +258,6 @@ room01_upload_decor:
         rts
 
 ; Draw the exact 36x20 visible room window at C64 cols 2..37, rows 3..22.
-; The 1440-byte BAT source remains mapped across MPR3/MPR4 for the whole copy.
 room01_draw_native:
         php
         sei
