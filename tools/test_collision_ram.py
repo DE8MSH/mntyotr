@@ -21,6 +21,12 @@ def main():
     assert 'call    room_collision_load_pending' in main_asm
     assert loader.count('room_collision_load_pending') >= 3
 
+    # The HuC mapper helper must be reached through CALL, just like the proven
+    # sprite far-loader. A plain JSR can become invalid when ROM layout/banking
+    # changes and was the Phase-33b runtime regression.
+    assert loader.count('call    map_bp_to_mpr34') >= 5
+    assert 'jsr     map_bp_to_mpr34' not in loader
+
     print('OK: active collision map/properties are bank-safe RAM cached')
 
 
