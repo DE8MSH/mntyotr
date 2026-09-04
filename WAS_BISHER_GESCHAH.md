@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 28b
+Stand: 2026-09-04 — Phase 28c
 
 ## Portierungsstand
 
 **Gesamtport: ca. 39 %**
 
-Phase 28b ist ein reiner Assembler-/Buildfix fuer die neue Somersault-Anbindung. Die Prozentzahl bleibt unveraendert, weil kein neuer Gameplayblock hinzugekommen ist.
+Phase 28c behebt einen PCE-spezifischen Sprite-Layoutfehler, der besonders bei der neuen Somersault-Animation sichtbar wurde. Die Prozentzahl bleibt unveraendert, weil es sich um eine Korrektur des bereits portierten Animationsblocks handelt.
 
 ## Verbindliche Referenz
 
@@ -22,7 +22,7 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Unsupported Falling funktioniert.
 - Landen auf Plattformen funktioniert.
 - Die Hauswandoeffnung in Raum $00 ist passierbar.
-- Die exakte optische Richtigkeit aller Animationsframes ist noch nicht abschliessend bestaetigt.
+- Phase 28b baut bis PCEAS; die neue Sprunganimation wird angesprochen, erscheint laut Nutzer aber grafisch defekt.
 
 ## Phase 28 — echte Somersaultdaten
 
@@ -36,34 +36,45 @@ Die originalen Rohdaten wurden direkt aus `refactored/src/subsystems/monty_spr.a
 
 `tools/monty_somersault_source.asm` enthaelt diese festen Bloecke; `tools/monty_somersault.py` konvertiert sie in PCE-Spritedaten. `build.sh` erzeugt `monty-sault-l.dat` und `monty-sault-r.dat`.
 
-## Phase 28a — letzte Framegrenze im Test korrigiert
+## Phase 28a/28b — Buildfixes
 
-Der erste Phase-28-Build stoppte in `tools/test_port.py`, bevor PCEAS gestartet wurde. Die Ursache war eine falsche Testannahme ueber die Startbytes der jeweils letzten 64-Byte-VIC-Slots. Der Test wurde auf die echten adressbasierten Slotgrenzen `$59c0` und `$5cc0` korrigiert.
+Phase 28a korrigierte eine falsche Testannahme an der letzten VIC-Framegrenze. Phase 28b ersetzte zu lange relative HuC6280-Branches im 12-Wege-Dispatcher durch absolute `JMP`, damit PCEAS den Somersault-Code assemblieren kann.
 
-## Phase 28b — HuC6280 Relative-Branch-Limit
+## Phase 28c — echter PCE-16x32-Layoutfehler gefunden
 
-Der naechste lokale Build erreichte PCEAS und alle Python-Regressionstests liefen erfolgreich durch. PCEAS meldete danach 13 Fehler `Branch address out of range` in `src/monty_sprite.asm`.
+Der Nutzer bestaetigte danach, dass die Sprunganimation zwar angesprochen wird, aber grafisch falsch/defekt erscheint. Die Ursache lag nicht mehr in den C64-Somersaultdaten, sondern in unserem PCE-Sprite-Layout.
 
-Ursache: Die neue 12-Wege-Somersault-Auswahl ist deutlich laenger als die bisherigen 4-Frame-Dispatcher. HuC6280-Branchbefehle wie `BMI` und `BRA` sind relativ und koennen nur Ziele innerhalb ihres begrenzten Offsets erreichen. Der Sprung von der Richtungspruefung bis zum linken 12-Frame-Block sowie mehrere `BRA .jdone` lagen ausserhalb dieses Bereichs.
+Monty ist 24x21 Pixel gross und wird auf der PCE aus zwei 16x32-SAT-Sprites zusammengesetzt. Der PCE-VDC behandelt ein 16x32-Sprite als eine Haelfte einer ausgerichteten 32x32-Pattern-Gruppe. Eine 32x32-Gruppe besteht aus vier 16x16-Zellen in der VRAM-Reihenfolge:
 
-Die Logik wurde nicht geaendert. Nur der Kontrollfluss wurde assemblerfest gemacht:
+- TL = oben links
+- TR = oben rechts
+- BL = unten links
+- BR = unten rechts
 
-- statt eines langen `BMI .jump_left` wird lokal mit `BPL` verzweigt und fuer die entfernte linke Tabelle ein absolutes `JMP .jump_left` benutzt;
-- die langen `BRA .jdone` der 12 Framepfade wurden durch absolute `JMP .jdone` ersetzt;
-- kurze `BEQ`-Verzweigungen innerhalb der jeweiligen Dispatch-Tabelle bleiben relative Branches.
+Unser Converter hatte bisher x-major geschrieben: `TL, BL, TR, BR`. Das ist fuer den VDC falsch. Hardwareseitig holt ein 16x32-Sprite seine obere und untere Zelle entsprechend der 32x32-Gruppenstruktur, wodurch beim Animieren falsche Quadranten miteinander kombiniert wurden.
 
-Damit bleiben Frameauswahl und C64-Semantik gleich, ohne das +/-128-Byte-Limit der relativen HuC6280-Branches zu verletzen.
+`tools/monty_sprite.py` schreibt deshalb jetzt korrekt `TL, TR, BL, BR`. Diese Aenderung gilt automatisch fuer Walk, Climb und Somersault, weil alle denselben C64->PCE-Frameconverter benutzen.
+
+Zusaetzlich war der SAT-Patternpointer der rechten Monty-Haelfte falsch. Ein 16x16-PCE-Spritepattern belegt 64 VRAM-Woerter. Die rechte 16x32-Haelfte der 32x32-Gruppe beginnt deshalb bei `MONTY_SPR_VRAM + 64` Woertern. Der bisherige Code benutzte `+256` und zeigte damit auf einen Bereich hinter dem aktuell hochgeladenen 512-Byte-Frame.
+
+`src/monty_sprite.asm` verwendet fuer die rechte Haelfte jetzt `(MONTY_SPR_VRAM+64)>>5`.
+
+## Regressionstests
+
+`tools/test_port.py` besitzt jetzt einen echten Quadranten-Test: In einen synthetischen C64-Frame wird je ein Pixel in TL/TR/BL/BR gesetzt. Nach der PCE-Konvertierung muss jedes Pixel im passenden 128-Byte-16x16-Block wiederzufinden sein. Ausserdem wird statisch geprueft, dass der SAT-Code `+64` und nicht mehr `+256` verwendet.
+
+Damit pruefen wir nun nicht mehr nur Dateigroessen und Framegrenzen, sondern auch die fuer 16x32-Sprites entscheidende PCE-VRAM-Geometrie.
 
 ## Verifikationsstatus
 
-- Die Phase-28a-Python-Tests wurden vom Nutzer erfolgreich ausgefuehrt: `OK: room/world; exact collision/fall; SAT XY; walk/climb + 24 somersault frames`.
-- Der anschliessende PCEAS-Lauf scheiterte ausschliesslich an den jetzt behobenen Branch-Reichweiten.
-- Phase 28b ist hochgeladen und muss lokal erneut mit `./build.sh` gebaut werden.
-- Danach sind besonders linke und rechte Sprunganimation visuell zu pruefen.
+- Phase 28c ist hochgeladen.
+- Lokal muss erneut `git pull && ./build.sh` ausgefuehrt werden.
+- Danach besonders Walk links/rechts und Sprung links/rechts ansehen, weil derselbe Layoutfix alle Monty-Frames betrifft.
+- Bewegung, Collision und Physik wurden in Phase 28c nicht geaendert.
 
 ## Naechste Portschritte
 
-1. Phase 28b lokal bauen und Somersault links/rechts im Emulator pruefen.
+1. Phase 28c lokal bauen und Montys Walk-/Somersaultgrafik visuell pruefen.
 2. Walk-/Climb-Rohdaten ebenfalls auf einen festen, adressbasierten Datenpfad ohne Prefix-Heuristik umstellen.
 3. Room-$00-Decor aus `refactored/src/subsystems/decor.asm` und den Raumtabellen portieren.
 4. Danach generischer Room-Loader und echte Raumwechsel.
