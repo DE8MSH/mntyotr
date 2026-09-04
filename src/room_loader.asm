@@ -1,6 +1,6 @@
-; Phase 41 room loader: rooms $00 <-> $01 <-> $02 <-> $03.
-; Rooms $02/$03 keep bulk assets in the ROM tail. Their 640-byte collision map
-; plus 8 properties are copied into the shared room02_* RAM cache before
+; Phase 43 room loader: rooms $00 <-> $01 <-> $02 <-> $03 <-> $04.
+; Rooms $02/$03/$04 keep bulk assets in the ROM tail. Their 640-byte collision
+; map plus 8 properties are copied into the shared room02_* RAM cache before
 ; gameplay resumes, so the far asset bank is never left mapped during physics.
 
 .zp
@@ -18,6 +18,8 @@ room_load_pending:
         beq     .room02
         cmp     #3
         beq     .room03
+        cmp     #4
+        beq     .room04
         clc
         rts
 
@@ -60,7 +62,17 @@ room_load_pending:
         sec
         rts
 
-; Tail-room collision caches. Both payloads are exactly 648 contiguous bytes:
+.room04:
+        call    room04_upload_patterns
+        call    room04_draw_native
+        call    room04_cache_collision
+        lda     #4
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
+; Tail-room collision caches. Every payload is exactly 648 contiguous bytes:
 ; 640 collision-map bytes followed by 8 property bytes.
 room02_cache_collision:
         lda     #<room02_collision_map_rom
@@ -76,6 +88,14 @@ room03_cache_collision:
         lda     #>room03_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room03_collision_map_rom)
+        bra     room_tail_cache_collision
+
+room04_cache_collision:
+        lda     #<room04_collision_map_rom
+        sta     <_bp
+        lda     #>room04_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room04_collision_map_rom)
 
 room_tail_cache_collision:
         php
@@ -142,6 +162,14 @@ room03_upload_patterns:
         lda     #>room03_patterns
         sta     <_bp+1
         ldy     #BANK(room03_patterns)
+        bra     room_upload_9_patterns
+
+room04_upload_patterns:
+        lda     #<room04_patterns
+        sta     <_bp
+        lda     #>room04_patterns
+        sta     <_bp+1
+        ldy     #BANK(room04_patterns)
 
 room_upload_9_patterns:
         php
@@ -211,6 +239,14 @@ room03_draw_native:
         lda     #>room03_screen_bat
         sta     <_bp+1
         ldy     #BANK(room03_screen_bat)
+        bra     room_draw_native_36x20
+
+room04_draw_native:
+        lda     #<room04_screen_bat
+        sta     <_bp
+        lda     #>room04_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room04_screen_bat)
 
 ; Draw exact 36x20 visible room window at C64 cols 2..37, rows 3..22.
 room_draw_native_36x20:
