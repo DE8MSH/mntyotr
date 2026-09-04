@@ -151,24 +151,39 @@ monty_sprite_animate:
 .done:
  rts
 
-; PCE SAT coordinates use +64 for Y and +32 for X. Monty's logical coordinates
-; remain in the C64-oriented coordinate system used by the movement port.
+; Exact coordinate bridge from refactored/src:
+; Sprites.ProcessSprites writes VIC X = monty_x<<1. Collision derives screen
+; column with (monty_x-$0c)>>2 and row with (monty_y-$32)>>3. Therefore the
+; visible C64 screen position is X=2*(monty_x-$0c), Y=monty_y-$32.
+; PCE SAT hardware offsets are +32 X/+64 Y, so SAT X=2*monty_x+8 and
+; SAT Y=monty_y+14. X is 9-bit and must keep its high carry.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
  lda #>MONTY_SAT_LEFT
  sta <_di+1
  call vdc_di_to_mawr
+
  lda <monty_y
  clc
- adc #64
+ adc #14
  sta VDC_DL
  stz VDC_DH
+
  lda <monty_x
+ asl a
+ tax
+ cla
+ rol a
+ tay
+ txa
  clc
- adc #32
+ adc #8
  sta VDC_DL
- stz VDC_DH
+ tya
+ adc #0
+ sta VDC_DH
+
  lda #<(MONTY_SPR_VRAM>>5)
  sta VDC_DL
  lda #>(MONTY_SPR_VRAM>>5)
@@ -177,16 +192,27 @@ monty_sprite_update_satb:
  sta VDC_DL
  lda #$10
  sta VDC_DH
+
  lda <monty_y
  clc
- adc #64
+ adc #14
  sta VDC_DL
  stz VDC_DH
+
  lda <monty_x
+ asl a
+ tax
+ cla
+ rol a
+ tay
+ txa
  clc
- adc #48
+ adc #24
  sta VDC_DL
- stz VDC_DH
+ tya
+ adc #0
+ sta VDC_DH
+
  lda #<((MONTY_SPR_VRAM+256)>>5)
  sta VDC_DL
  lda #>((MONTY_SPR_VRAM+256)>>5)
