@@ -1,7 +1,7 @@
-; Phase 39 room loader: rooms $00 <-> $01 <-> $02 with Room-$02 decor.
-; Room $01/$02 graphics are copied through MPR3/MPR4. Room $02 additionally
-; caches its collision map/properties in RAM before gameplay resumes, because
-; its far ROM-tail bank must not remain mapped across runtime physics code.
+; Phase 41 room loader: rooms $00 <-> $01 <-> $02 <-> $03.
+; Rooms $02/$03 keep bulk assets in the ROM tail. Their 640-byte collision map
+; plus 8 properties are copied into the shared room02_* RAM cache before
+; gameplay resumes, so the far asset bank is never left mapped during physics.
 
 .zp
 room_copy_rows: ds 1
@@ -16,11 +16,12 @@ room_load_pending:
         beq     .room01
         cmp     #2
         beq     .room02
+        cmp     #3
+        beq     .room03
         clc
         rts
 
 .room00:
-        ; Restores both base Room-$00 chars and all 41 Room-$00 decor chars.
         call    upload_room00_patterns
         call    draw_room00_native
         stz     <monty_room
@@ -49,21 +50,40 @@ room_load_pending:
         sec
         rts
 
-; Copy Room-$02's 640-byte collision map plus 8 property bytes from the ROM-tail
-; payload into the RAM labels consumed by the unchanged physics code.
+.room03:
+        call    room03_upload_patterns
+        call    room03_draw_native
+        call    room03_cache_collision
+        lda     #3
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
+; Tail-room collision caches. Both payloads are exactly 648 contiguous bytes:
+; 640 collision-map bytes followed by 8 property bytes.
 room02_cache_collision:
+        lda     #<room02_collision_map_rom
+        sta     <_bp
+        lda     #>room02_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room02_collision_map_rom)
+        bra     room_tail_cache_collision
+
+room03_cache_collision:
+        lda     #<room03_collision_map_rom
+        sta     <_bp
+        lda     #>room03_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room03_collision_map_rom)
+
+room_tail_cache_collision:
         php
         sei
         tma3
         pha
         tma4
         pha
-
-        lda     #<room02_collision_map_rom
-        sta     <_bp
-        lda     #>room02_collision_map_rom
-        sta     <_bp+1
-        ldy     #BANK(room02_collision_map_rom)
         call    map_bp_to_mpr34
 
         lda     #<room02_collision_map
@@ -71,7 +91,6 @@ room02_cache_collision:
         lda     #>room02_collision_map
         sta     <_di+1
 
-        ; 648 bytes = 2 full pages + 136 bytes.
         ldx     #2
         cly
 .page:
@@ -115,6 +134,14 @@ room02_upload_patterns:
         lda     #>room02_patterns
         sta     <_bp+1
         ldy     #BANK(room02_patterns)
+        bra     room_upload_9_patterns
+
+room03_upload_patterns:
+        lda     #<room03_patterns
+        sta     <_bp
+        lda     #>room03_patterns
+        sta     <_bp+1
+        ldy     #BANK(room03_patterns)
 
 room_upload_9_patterns:
         php
@@ -176,6 +203,14 @@ room02_draw_native:
         lda     #>room02_screen_bat
         sta     <_bp+1
         ldy     #BANK(room02_screen_bat)
+        bra     room_draw_native_36x20
+
+room03_draw_native:
+        lda     #<room03_screen_bat
+        sta     <_bp
+        lda     #>room03_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room03_screen_bat)
 
 ; Draw exact 36x20 visible room window at C64 cols 2..37, rows 3..22.
 room_draw_native_36x20:
