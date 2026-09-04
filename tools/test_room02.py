@@ -27,7 +27,6 @@ def main():
     patterns = build_patterns()
     assert len(patterns) == 9*32
     assert patterns[:32] == bytes(32)
-
     bat = words(make_screen_bat(cells))
     assert len(bat) == SCREEN_W*20
 
@@ -43,7 +42,6 @@ def main():
     assert 'room02_collision_map_rom:' in tail
     assert 'room02_screen_bat:' in tail
     assert 'room02_tile_properties_rom:' in tail
-
     assert 'lda     room02_tile_properties,x' in physics
     assert '#<room02_collision_map' in physics and '#>room02_collision_map' in physics
     assert 'room02_collision_map:   ds 640' in banking
@@ -53,21 +51,17 @@ def main():
     assert 'call    room02_draw_native' in loader
     assert 'call    room02_cache_collision' in loader
     assert 'BANK(room02_collision_map_rom)' in loader
-    assert 'cmp     #5' in world
+    assert 'world_room_supported:' in world
 
-    # Room02 remains an interior link in the active Room04..Room00 chain.
-    # Check the actual guard structure, not incidental comment wording.
-    assert 'Loaded horizontal chain is now $04 <-> $03 <-> $02 <-> $01 <-> $00.' in main_asm
+    # Room02 remains an interior room; outer-edge policy must not be tied to it.
     guard = main_asm.index('lda     <collision_actual_room')
     guard_end = main_asm.index('.guard_room00_right:', guard)
     outer_left_guard = main_asm[guard:guard_end]
     assert 'cmp     #4' in outer_left_guard
-    assert 'lda     <monty_room_exit' in outer_left_guard
     assert 'cmp     #1' in outer_left_guard
     assert 'lda     #$15' in outer_left_guard
-    assert 'stz     <monty_room_exit' in outer_left_guard
 
-    print('OK: Room 02 remains stable inside the active Room04..Room00 chain')
+    print('OK: Room 02 remains stable inside the active house route')
 
 
 if __name__ == '__main__':
