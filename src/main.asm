@@ -26,6 +26,7 @@
         ; adding new content cannot move the confirmed physics/collision layout.
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
+        include "room03_assets_tail.asm"
 
 .zp
 main_jump_x_before_step:   ds 1
