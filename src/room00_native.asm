@@ -1,9 +1,12 @@
-; Native room $00 renderer: exact 32x20 C64 logical map -> PCE BAT.
-; Each logical tile uses CHR_GAME+tile and BG palette=tile.
-; Generated from the reference RLE stream; collision map is kept separately.
+; Native room $00 renderer following the C64 screen geometry.
+; refactored Room.DrawRoomPlayfield copies 32x20 chars to C64 cols 4..35,
+; rows 3..22; Room.CreatePlayfieldBorder mirrors the edge chars into cols
+; 2..3 and 36..37.  We render that 36-column window directly into the PCE BAT.
 
-ROOM_X = 4
+ROOM_X = 2
 ROOM_Y = 3
+ROOM_SCREEN_W = 36
+ROOM_ROW_BYTES = ROOM_SCREEN_W * 2
 
 .code
 
@@ -13,128 +16,127 @@ draw_room00_native:
         lda #>((3)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat,VDC_DL,64
+        tia room00_screen_bat,VDC_DL,72
         lda #<((4)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((4)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+64,VDC_DL,64
+        tia room00_screen_bat+72,VDC_DL,72
         lda #<((5)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((5)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+128,VDC_DL,64
+        tia room00_screen_bat+144,VDC_DL,72
         lda #<((6)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((6)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+192,VDC_DL,64
+        tia room00_screen_bat+216,VDC_DL,72
         lda #<((7)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((7)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+256,VDC_DL,64
+        tia room00_screen_bat+288,VDC_DL,72
         lda #<((8)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((8)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+320,VDC_DL,64
+        tia room00_screen_bat+360,VDC_DL,72
         lda #<((9)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((9)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+384,VDC_DL,64
+        tia room00_screen_bat+432,VDC_DL,72
         lda #<((10)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((10)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+448,VDC_DL,64
+        tia room00_screen_bat+504,VDC_DL,72
         lda #<((11)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((11)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+512,VDC_DL,64
+        tia room00_screen_bat+576,VDC_DL,72
         lda #<((12)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((12)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+576,VDC_DL,64
+        tia room00_screen_bat+648,VDC_DL,72
         lda #<((13)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((13)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+640,VDC_DL,64
+        tia room00_screen_bat+720,VDC_DL,72
         lda #<((14)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((14)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+704,VDC_DL,64
+        tia room00_screen_bat+792,VDC_DL,72
         lda #<((15)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((15)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+768,VDC_DL,64
+        tia room00_screen_bat+864,VDC_DL,72
         lda #<((16)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((16)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+832,VDC_DL,64
+        tia room00_screen_bat+936,VDC_DL,72
         lda #<((17)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((17)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+896,VDC_DL,64
+        tia room00_screen_bat+1008,VDC_DL,72
         lda #<((18)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((18)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+960,VDC_DL,64
+        tia room00_screen_bat+1080,VDC_DL,72
         lda #<((19)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((19)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+1024,VDC_DL,64
+        tia room00_screen_bat+1152,VDC_DL,72
         lda #<((20)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((20)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+1088,VDC_DL,64
+        tia room00_screen_bat+1224,VDC_DL,72
         lda #<((21)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((21)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+1152,VDC_DL,64
+        tia room00_screen_bat+1296,VDC_DL,72
         lda #<((22)*BAT_LINE+ROOM_X)
         sta <_di+0
         lda #>((22)*BAT_LINE+ROOM_X)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_native_bat+1216,VDC_DL,64
+        tia room00_screen_bat+1368,VDC_DL,72
         rts
 
 .data
-; BAT and collision tables are generated by tools/room_rle.py during normal builds.
-; This checked-in room keeps the exact decoded tile IDs so gameplay code and
-; rendering consume the same authoritative geometry.
 room00_collision_map:
         incbin "room00-map.dat"
 room00_native_bat:
         incbin "room00-bat.dat"
+room00_screen_bat:
+        incbin "room00-screen-bat.dat"
