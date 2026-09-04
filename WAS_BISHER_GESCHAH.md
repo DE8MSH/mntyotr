@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18c
+Stand: 2026-09-04 — Phase 18d
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Die Toolchain-Fixes in Phase 18a-18c erhoehen den Gameplay-Prozentsatz bewusst nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Die Toolchain-Fixes in Phase 18a-18d erhoehen den Gameplay-Prozentsatz bewusst nicht.
 
 ## Ziel
 
@@ -29,21 +29,21 @@ Die vier originalen C64-Climbframes (Pointer $58-$5B, $5600-$56ff) sind jetzt in
 
 `build.sh` erzeugt nun zusaetzlich `monty-climb.dat`. `src/monty_sprite.asm` bindet alle vier Frames ein und besitzt mit `monty_upload_climb_frame` einen eigenen VRAM-Uploadpfad. Der C64-Code verwendet fuer Climb `(movement_ticker & 3) + $58` und eine Vier-Tick-Animationskadenz; diese Vier-Frame-Struktur ist damit auf PCE-Seite vorbereitet.
 
-## Phase 18a-18c — Linux-Mint-Toolchain korrigiert
+## Phase 18a-18d — Linux-Mint-Toolchain korrigiert
 
-Echte Nutzer-Builds bestaetigen `pceas` unter `$HUC_HOME/src/mkit/as/pceas`; Installer und `build.sh` erkennen diesen aktuellen HuC-Pfad nun direkt.
+Echte Nutzer-Builds bestaetigen `pceas` unter `$HUC_HOME/src/mkit/as/pceas`; Installer und `build.sh` erkennen diesen aktuellen HuC-Pfad direkt.
 
-Der naechste Nutzerlauf erreichte danach den CORE-Include-Check und zeigte einen zweiten Versionsannahmefehler: `build.sh` suchte `font.asm` (sowie `vdc.asm`/`joypad.asm`) unter `$HUC_HOME/include/hucc`. Im aktuellen pce-devel/huc gehoeren die von `src/main.asm` verwendeten Pure-ASM/Elmer-Dateien jedoch nach `$HUC_HOME/examples/asm/elmer/include`. `font.asm` ist dort vorhanden; `include/hucc` ist der HuCC-Compiler-Runtime-Baum und enthaelt diese Elmer-Datei nicht.
+Phase 18c enthielt noch eine falsche Annahme: nicht alle von `main.asm` benoetigten CORE-Dateien liegen im Elmer-Verzeichnis. Der aktuelle Upstream ist geteilt. `bare-startup.asm` und `font.asm` liegen unter `examples/asm/elmer/include`, waehrend `common.asm`, `vdc.asm`, `joypad.asm`, `pceas.inc` und `pcengine.inc` unter `include/hucc` liegen. Das ist direkt gegen den aktuellen pce-devel/huc-Masterbaum geprueft.
 
-Phase 18c prueft deshalb `bare-startup.asm`, `common.asm`, `vdc.asm`, `font.asm` und `joypad.asm` konsistent im Elmer-Include-Verzeichnis und setzt `PCE_INCLUDE` weiterhin auf Elmer plus HuCC. Damit wird nicht mehr vor dem eigentlichen PCEAS-Lauf wegen des falschen `include/hucc/font.asm`-Pfads abgebrochen.
+Phase 18d bildet genau dieses Split-Layout ab. `build.sh` prueft jede benoetigte Datei an ihrem tatsaechlichen Ort, setzt `PCE_INCLUDE` auf beide Verzeichnisse und gibt den resultierenden Include-Pfad vor dem Assemblieren aus. Damit ist der vom Nutzer gemeldete Fehler `missing Elmer CORE include: .../common.asm` behoben, ohne Dateien zu kopieren oder einen veralteten HuC-Baum vorauszusetzen.
 
 ## Verifikationsstatus
 
-Der HuC/pceas-Hosttool-Build ist im Nutzerlog erfolgreich. `build.sh` findet den Assembler nun ebenfalls. Der bisher letzte Abbruch war ausschliesslich der falsche CORE-Include-Pfad fuer `font.asm`; dieser ist in Phase 18c korrigiert. Ein kompletter Monty-PCEAS-Lauf und die Erzeugung von `build/monty.pce` sind weiterhin noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
+Der HuC/pceas-Hosttool-Build ist im Nutzerlog erfolgreich und `build.sh` findet den Assembler. Der letzte Abbruch entstand im von uns selbst eingebauten Include-Sanity-Check, nicht in PCEAS. Phase 18d korrigiert diesen Check anhand des aktuellen Upstream-Dateibaums. Ein kompletter Monty-PCEAS-Lauf und `build/monty.pce` sind weiterhin noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
-- Naechsten echten lokalen `./build.sh`-Lauf auswerten und PCEAS-Assemblerfehler direkt beheben.
+- Naechsten echten lokalen `./build.sh`-Lauf auswerten und dann die tatsaechlichen PCEAS-Assemblerfehler direkt beheben.
 - UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` im Zustandsdispatcher aktivieren.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
