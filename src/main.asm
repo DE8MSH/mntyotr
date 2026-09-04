@@ -50,7 +50,7 @@ bare_main:
         ldy     #^room00_bg_palettes
         call    load_palettes
 
-        ; Rooms $01-$03 use C64 purple and blue in the two remaining slots.
+        ; Rooms $01-$03 use C64 purple and blue in slots 13/14.
         lda     #13
         sta     <_al
         lda     #2
@@ -60,6 +60,18 @@ bare_main:
         lda     #>room01_extra_palettes
         sta     <_bp + 1
         ldy     #^room01_extra_palettes
+        call    load_palettes
+
+        ; Room $03 additionally uses C64 light blue $0e in BG palette slot 15.
+        lda     #15
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<room03_extra_palette
+        sta     <_bp + 0
+        lda     #>room03_extra_palette
+        sta     <_bp + 1
+        ldy     #^room03_extra_palette
         call    load_palettes
 
         lda     #16
