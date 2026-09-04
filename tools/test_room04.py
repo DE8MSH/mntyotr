@@ -46,6 +46,10 @@ def main():
 
     main_asm = (ROOT/'src/main.asm').read_text()
     tail = (ROOT/'src/room04_assets_tail.asm').read_text()
+    loader = (ROOT/'src/room_loader.asm').read_text()
+    banking = (ROOT/'src/collision_banking.asm').read_text()
+    world = (ROOT/'src/world.asm').read_text()
+
     assert 'include "room04_assets_tail.asm"' in main_asm
     assert main_asm.index('include "room04_assets_tail.asm"') > main_asm.index('include "monty_sprite.asm"')
     assert 'room04_patterns:' in tail
@@ -53,7 +57,16 @@ def main():
     assert 'room04_tile_properties_rom:' in tail
     assert 'room04_screen_bat:' in tail
 
-    print('OK: exact Room 04 RLE/tiles/colours/properties prepared as ROM-tail assets')
+    assert 'call    room04_upload_patterns' in loader
+    assert 'call    room04_draw_native' in loader
+    assert 'call    room04_cache_collision' in loader
+    assert 'BANK(room04_collision_map_rom)' in loader
+    assert 'lda     #4' in loader and 'sta     <monty_room' in loader
+    assert 'cmp     #3' in banking and 'bcc     .select_room' in banking
+    assert 'cmp     #5' in world
+    assert 'cmp     #4' in main_asm
+
+    print('OK: exact Room 04 active with shared RAM collision cache + world wiring')
 
 
 if __name__ == '__main__':
