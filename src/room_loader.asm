@@ -1,4 +1,4 @@
-; Phase 33b room loader: real C64 world transition, rooms $00 <-> $01.
+; Phase 33c room loader: real C64 world transition, rooms $00 <-> $01.
 ; Room graphics and collision data are copied through MPR3/MPR4 so ROM-bank
 ; placement cannot corrupt gameplay as the HuCard grows.
 
@@ -78,6 +78,9 @@ room_collision_load_pending:
         jmp     room_collision_copy_props
 
 ; Input: _bp=ROM source, Y=source bank. Copies 640 bytes to RAM.
+; IMPORTANT: use CALL for map_bp_to_mpr34, matching the proven sprite upload
+; path. The helper is supplied by HuC and may live outside the caller's bank;
+; plain JSR is not a safe substitute once the ROM layout grows.
 room_collision_copy640:
         php
         sei
@@ -85,7 +88,7 @@ room_collision_copy640:
         pha
         tma4
         pha
-        jsr     map_bp_to_mpr34
+        call    map_bp_to_mpr34
 
         lda     #<room_collision_map_ram
         sta     <_di
@@ -128,7 +131,7 @@ room_collision_copy_props:
         pha
         tma4
         pha
-        jsr     map_bp_to_mpr34
+        call    map_bp_to_mpr34
         ldx     #0
         cly
 .loop:
