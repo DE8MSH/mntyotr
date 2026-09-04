@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 34b
+Stand: 2026-09-04 — Phase 34c
 
 ## Portierungsstand
 
@@ -38,7 +38,7 @@ Die Ursache des neuen Randfehlers liegt im aktuellen Ablauf: `monty_update_input
 
 Phase 34b aendert die bestaetigte Collision-Logik selbst nicht. In `src/main.asm` wird direkt vor `monty_jump_step` die X-Position gesichert. Falls der Jump-Step anschliessend einen linken/rechten Exit meldet, obwohl `monty_is_moving` fuer diesen Tick nicht gesetzt wurde, wird dieser synthetische Side-Exit verworfen und die X-Position wiederhergestellt. Ein echter horizontaler Raumwechsel bleibt unangetastet, weil bei tatsaechlicher horizontaler Bewegung `monty_is_moving` gesetzt ist.
 
-Neu ist `tools/test_jump_edge_guard.py`; `build.sh` fuehrt ihn automatisch aus. Der Test stellt sicher, dass der Schutzblock vorhanden bleibt und keine Collision-Map-/Tile-Property-Daten veraendert werden.
+Neu ist `tools/test_jump_edge_guard.py`; `build.sh` fuehrt ihn automatisch aus.
 
 Commits Phase 34b:
 
@@ -46,9 +46,22 @@ Commits Phase 34b:
 - `f29cd1b2d51b9799db550b86041eb7f8ab23c9bb` — Regressionstest
 - `de3da59c6d7d5f33a577dad3f354aea185830143` — Test in `build.sh`
 
+## Phase 34c — PCEAS Branch-Reichweite im Startup
+
+Der erste lokale Build von Phase 34b kam durch alle Python-Tests, stoppte aber in PCEAS an `bsr init_c64_video`: durch das Wachstum von `main.asm` lag die Routine jetzt ausserhalb der relativen BSR-Reichweite.
+
+Der Aufruf ist deshalb auf den bereits im Projekt verwendeten bank-/reichweitensicheren `call init_c64_video` umgestellt. Die Video-Initialisierung selbst wurde nicht veraendert. Der bestehende Jump-Edge-Test prueft jetzt zusaetzlich, dass `bsr init_c64_video` nicht wieder eingefuehrt wird.
+
+Commits Phase 34c:
+
+- `e2c77ec0157fec992067a87f302071727fbb1f1e` — `init_c64_video` von BSR auf CALL
+- `6b91e508cafc2078a5e1d118da7bf8bd102d6323` — Regressionstest fuer den Startup-Aufruf
+
 ## Verifikationsstatus
 
-Phase 34a ist vom Nutzer bestaetigt. Phase 34b ist hochgeladen, aber noch nicht lokal mit PCEAS/Mednafen verifiziert. Als naechstes `git pull && ./build.sh` und pruefen:
+Phase 34a ist vom Nutzer bestaetigt. Phase 34b ist inhaltlich noch nicht im Emulator verifiziert, weil der erste Build an der BSR-Reichweite stoppte. Phase 34c behebt nur diesen Assemblerfehler und ist noch lokal zu bauen.
+
+Als naechstes `git pull && ./build.sh` und danach pruefen:
 
 1. normaler Start/Boden/Sprung unveraendert,
 2. an einer seitlich blockierten Wand springen: kein Raumwechsel,
@@ -56,7 +69,7 @@ Phase 34a ist vom Nutzer bestaetigt. Phase 34b ist hochgeladen, aber noch nicht 
 
 ## Naechste Portschritte
 
-1. Phase 34b lokal bestaetigen.
+1. Phase 34c lokal bestaetigen.
 2. Danach Collision-ROM-Banking des bestaetigten Phase-32b/34b-Pfads exakt analysieren und bankfest machen, ohne Sprung-/Start-/Collision-Semantik umzuschreiben.
 3. Erst danach Room-$01-Decor wieder aktivieren.
 4. Danach Raum $02 und weitere Welt-Raeume portieren.
