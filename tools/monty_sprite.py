@@ -9,7 +9,8 @@ The text transcription below omits runs of trailing zero bytes at some frame
 ends. Therefore its total byte count is shorter than 4*63. Frame boundaries are
 recovered from the authentic repeated frame prefixes visible at $5400/$5440/
 $5480/$54c0 etc., and only the omitted trailing zero bytes of each individual
-frame are restored. This avoids the previous broken whole-block padding/slicing.
+frame are restored. Prefix bytes may also occur inside a bitmap (notably climb),
+so only candidates separated by a plausible frame-length interval are accepted.
 """
 from pathlib import Path
 
@@ -37,27 +38,39 @@ FRAME_BYTES = BITMAP_BYTES
 def _recover_frames(blob: bytes, prefix: bytes, count: int = 4) -> bytes:
     """Recover four visible 63-byte VIC frames from the source transcription.
 
-    The upstream listing proves each frame begins at a 64-byte boundary. In our
-    transcription the omitted bytes are trailing zeroes, so the next authentic
-    frame prefix is the reliable delimiter. Each recovered segment is padded to
-    63 visible bytes; no data is inserted before non-zero sprite bytes.
+    A prefix can occur inside a frame as ordinary bitmap data.  The authentic
+    frame starts in this transcription are roughly 60 bytes apart because only
+    trailing zero runs were omitted.  Select the first prefix, then only prefix
+    candidates at least 48 bytes after the previous accepted start.  This keeps
+    the real $5600/$5640/$5680/$56c0 climb starts and rejects the identical
+    07 80 00 sequence that appears six bytes into each climb bitmap.
     """
-    starts=[]
+    candidates=[]
     pos=0
     while True:
         i=blob.find(prefix,pos)
         if i < 0:
             break
-        starts.append(i)
+        candidates.append(i)
         pos=i+1
-    if starts != sorted(starts) or len(starts) != count or starts[0] != 0:
-        raise AssertionError(f'expected {count} frame prefixes {prefix.hex()}, got {starts}')
+    if not candidates or candidates[0] != 0:
+        raise AssertionError(f'missing first frame prefix {prefix.hex()}: {candidates}')
+
+    starts=[0]
+    for i in candidates[1:]:
+        if i - starts[-1] >= 48:
+            starts.append(i)
+            if len(starts) == count:
+                break
+    if len(starts) != count:
+        raise AssertionError(f'could not recover {count} frame starts for {prefix.hex()}: candidates={candidates}, selected={starts}')
+
     out=[]
     for n,start in enumerate(starts):
         end=starts[n+1] if n+1<count else len(blob)
         frame=blob[start:end]
-        if len(frame) > BITMAP_BYTES:
-            raise AssertionError(f'frame {n} too long: {len(frame)}')
+        if not 48 <= len(frame) <= BITMAP_BYTES:
+            raise AssertionError(f'frame {n} implausible length: {len(frame)}; starts={starts}')
         frame += bytes(BITMAP_BYTES-len(frame))
         out.append(frame)
     return b''.join(out)
