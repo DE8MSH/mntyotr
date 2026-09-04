@@ -21,35 +21,22 @@
 
 bare_main:
         ; Use the library's complete 7MHz/224-line setup, then narrow the
-        ; horizontal timing from 352 to 320 pixels.  The old init_256x224 plus
-        ; hand-written HDR=$27 mixed incompatible timing tables and visibly
-        ; squeezed the 40-column C64 screen model.
+        ; horizontal timing from 352 to 320 pixels.
         call    init_352x224
         bsr     init_c64_video
 
         call    upload_room00_patterns
 
-        ; C64 screen codes 0..8 each select the matching PCE BG palette.
+        ; Phase 30: base room and decor share one compact BG-palette set.
+        ; 0..4 are room colours, 5..12 are additional C64 decor colours.
         stz     <_al
-        lda     #9
+        lda     #13
         sta     <_ah
-        lda     #<room00_palettes
+        lda     #<room00_bg_palettes
         sta     <_bp + 0
-        lda     #>room00_palettes
+        lda     #>room00_bg_palettes
         sta     <_bp + 1
-        ldy     #^room00_palettes
-        call    load_palettes
-
-        ; Phase 29: solid-colour room-$00 decorations use BG palettes 9..11.
-        lda     #9
-        sta     <_al
-        lda     #3
-        sta     <_ah
-        lda     #<room00_decor_palettes
-        sta     <_bp + 0
-        lda     #>room00_decor_palettes
-        sta     <_bp + 1
-        ldy     #^room00_decor_palettes
+        ldy     #^room00_bg_palettes
         call    load_palettes
 
         ; PCE sprite palettes are indices 16..31. Monty is C64 colour 1
@@ -78,8 +65,6 @@ main_loop:
         call    wait_vsync
 
         ; Keep gameplay input deterministic while the port is brought up.
-        ; bare-startup also polls during VBLANK, but an explicit poll here makes
-        ; joynow current immediately before the PAL-rate C64 gameplay tick.
         call    read_joypads
 
         call    game_clock_step
@@ -97,7 +82,7 @@ main_loop:
         bra     main_loop
 
 ; Keep the proven 352x224 vertical/DMA setup, but use the library's 320-pixel
-; horizontal timing constants.  40 C64 character columns * 8 pixels = 320.
+; horizontal timing constants. 40 C64 character columns * 8 pixels = 320.
 init_c64_video:
         st0     #$0a
         st1     #<VDC_HSR_320
