@@ -20,7 +20,11 @@
         .code
 
 bare_main:
-        call    init_256x224
+        ; Use the library's complete 7MHz/224-line setup, then narrow the
+        ; horizontal timing from 352 to 320 pixels.  The old init_256x224 plus
+        ; hand-written HDR=$27 mixed incompatible timing tables and visibly
+        ; squeezed the 40-column C64 screen model.
+        call    init_352x224
         bsr     init_c64_video
 
         call    upload_room00_patterns
@@ -80,10 +84,13 @@ main_loop:
         ; present; do not run room-$00 collision data as another room.
         bra     main_loop
 
+; Keep the proven 352x224 vertical/DMA setup, but use the library's 320-pixel
+; horizontal timing constants.  40 C64 character columns * 8 pixels = 320.
 init_c64_video:
-        lda     #$01
-        sta     VCE_CR
+        st0     #$0a
+        st1     #<VDC_HSR_320
+        st2     #>VDC_HSR_320
         st0     #$0b
-        st1     #$27
-        st2     #$00
+        st1     #<VDC_HDR_320
+        st2     #>VDC_HDR_320
         rts
