@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast deterministic checks for the C64->PCE port data path."""
-from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room
+import struct
+from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_bat, CHR_GAME
 from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels
 
 JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
@@ -20,6 +21,9 @@ def pal_ticks(vblanks):
   if phase>=6: phase-=6; ticks+=1
  return ticks
 
+def words(blob):
+ return list(struct.unpack('<'+'H'*(len(blob)//2),blob))
+
 def main():
  cells=decode_room(ROOM00_RLE)
  assert len(cells)==ROOM_CELLS==640 and all(0<=x<=15 for x in cells)
@@ -29,6 +33,22 @@ def main():
  assert len(WORLD)==6 and all(len(row)==23 for row in WORLD)
  assert WORLD[2][0x15]==0 and WORLD[2][0x14]==1 and WORLD[2][0x16]==0xff
  assert WORLD[2][0x04]==0x33 and all(0x30 not in row for row in WORLD)
+
+ # Refactored C64 SetupTileGraphics installs room slot 0 as screen code 1.
+ bat=words(make_bat(cells))
+ assert len(bat)==640
+ assert (bat[0]&0x0fff)==CHR_GAME+cells[0]+1
+ assert (bat[0]>>12)==cells[0]+1
+ # CreatePlayfieldBorder geometry: each 36-char row is edge,edge,32 cells,edge,edge.
+ screen=words(make_screen_bat(cells))
+ assert len(screen)==36*20
+ for y in range(20):
+  src=cells[y*32:(y+1)*32]
+  row=screen[y*36:(y+1)*36]
+  assert row[0]==row[1]==row[2]
+  assert row[33]==row[34]==row[35]
+  assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t+1 for t in src]
+
  for name,frames in (("WALK_L",WALK_L),("WALK_R",WALK_R),("CLIMB",CLIMB)):
   assert len(frames) % FRAME_BYTES == 0, f'{name}: {len(frames)} bytes is not a multiple of FRAME_BYTES={FRAME_BYTES}'
   assert len(frames)//FRAME_BYTES == 4, f'{name}: expected 4 frames, got {len(frames)//FRAME_BYTES}'
@@ -38,8 +58,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- # Do not assert that climb frames 0 and 2 are byte-identical: the refactored
- # source is authoritative, and animation-frame equality is not a format invariant.
- print('OK: room00=640; jump=22/17; clock=5/6; world=6x23; Monty walk/climb=12 authentic frames')
+ print('OK: room00=640 + C64 36x20 screen; jump=22/17; clock=5/6; world=6x23; Monty walk/climb=12 frames')
 
 if __name__=='__main__': main()
