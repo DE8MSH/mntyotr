@@ -1,5 +1,5 @@
 ; Monty on the Run - PC Engine port
-; Native room graphics + PAL-rate gameplay + C64 movement/world path.
+; Native room graphics + PAL-rate gameplay + C64 movement/world/sprite path.
 
         include "platform.inc"
         include "bare-startup.asm"
@@ -16,6 +16,7 @@
         include "game_clock.asm"
         include "monty_physics.asm"
         include "world.asm"
+        include "monty_sprite.asm"
 
         .code
 
@@ -63,6 +64,8 @@ bare_main:
         call    game_clock_init
         call    monty_physics_init
         call    world_init
+        call    monty_sprite_init
+        call    monty_sprite_update_satb
         call    set_dspon
 
 main_loop:
@@ -75,6 +78,8 @@ main_loop:
         call    monty_update_input
         call    monty_jump_step
         call    world_resolve_exit
+        call    monty_sprite_animate
+        call    monty_sprite_update_satb
         ; A valid destination is left pending until the generic room loader is
         ; present; do not run room-$00 collision data as another room.
         bra     main_loop
