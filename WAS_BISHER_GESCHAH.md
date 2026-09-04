@@ -1,10 +1,10 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 14
+Stand: 2026-09-04 — Phase 15
 
 ## Portierungsstand
 
-**Gesamtport: ca. 25 %**
+**Gesamtport: ca. 29 %**
 
 Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Sie steigt nur fuer konkret portierte bzw. verifizierte Subsysteme.
 
@@ -16,52 +16,50 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 
 - Linux-Mint-22-Toolchain-, Build- und Run-Grundgeruest; kein GitHub-Actions-ROM-Build mehr.
 - PCE VDC/VCE Bring-up, Palette, Font, BAT und VSync.
-- 320-Pixel-Ausgabe fuer die 320x200-C64-Spielmatrix vorbereitet.
-- Raum `$00` auf 640 logische Zellen = 32x20 dekodiert und als native PCE-BAT-Daten erzeugt.
-- Acht raumspezifische C64-Character-Bitmaps nach PCE-4bpp konvertiert und Paletten angelegt.
-- PAL-orientierter Gameplay-Scheduler mit getrenntem VBlank/Gameplay-Takt.
-- Montys originale Sprungkurve, PCE-Pad Links/Rechts + Button I/Fire, gespeicherte Sprungrichtung, C64-`ToggleStepGate` und erste Tile-Kollision.
-- 16-Bit-Zugriff auf die komplette 640-Byte-Kollisionsmap.
-- C64-Raumkanten/Hand-off-Koordinaten und Room-Exit-Signal.
-- Vollstaendiges statisches C64-Weltgrid 6x23 plus Lookup/Exit-Resolver.
-- Automatische Regressionstests fuer Raum, Jump-Arc, Scheduler und Weltgrid.
+- Raum `$00` als native PCE-BAT plus echte konvertierte C64-Hintergrundtiles.
+- PAL-orientierter Gameplay-Scheduler.
+- Montys originale Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
+- C64-Raumkanten und vollstaendiges statisches 6x23-Weltgrid mit Exit-Resolver.
+- Automatische Regressionstests fuer Raum, Jump-Arc, Scheduler, Weltgrid und jetzt Monty-Spritedaten.
 
-## Neu in Phase 14
+## Neu in Phase 15
 
-### C64-Weltgrid nach HuC6280 portiert
+### Echte Monty-Grafik portiert
 
-`src/world.asm` enthaelt jetzt die 6x23-Navigationstabelle der C64-Rekonstruktion. `$ff` bleibt Wand/kein Raum. Die sechs Row-Offets `$00,$17,$2e,$45,$5c,$73` und der initiale C5-Rueckkehrwert `$33` an row 2/col 4 sind erhalten. Completion-Raum `$30` bleibt absichtlich ausserhalb der statischen Karte.
+Die ersten vier originalen Walk-left-Frames aus `Monty.sprites.walk_l_spr` (C64-Pointer `$50-$53`, Quellbereich `$5400-$54ff`) sind jetzt Teil der PCE-Asset-Pipeline. `tools/monty_sprite.py` interpretiert jeden C64-Frame als 24x21 1bpp und wandelt ihn ohne Skalierung in native PCE-SPR-Daten um.
 
-Der originale Startzustand ist jetzt ebenfalls uebernommen: Weltposition row 2 / col `$15`, Raum `$00`; Monty startet bei X=`$86`, Y=`$b0` und blickt links.
+Da ein einzelner PCE-Hardware-Sprite die originale 24-Pixel-Breite nicht exakt abbildet, wird Monty aus zwei nebeneinanderliegenden 16x32-Sprites zusammengesetzt. Transparente Padding-Pixel erhalten die originale 24x21-Silhouette.
 
-### Exit-Aufloesung angeschlossen
+### Sprite-Pfad im HuC6280-Code
 
-`world_resolve_exit` konsumiert `monty_room_exit`, verschiebt je nach Richtung Weltzeile/-spalte und prueft den Zielwert. Ein gueltiger Nachbar wird in `world_pending_room` abgelegt und mit `world_transition_ready=1` markiert. Ein `$ff`-Ziel blockiert den Uebergang und stellt Montys Kantenkoordinate wieder her.
+`src/monty_sprite.asm` fuegt VRAM-Upload, Vier-Frame-Animation und SATB-Eintraege hinzu. Die SATB-X/Y-Werte folgen direkt `monty_x`/`monty_y`, sodass die bereits portierte Pad-, Kollisions- und Sprungphysik nun einen sichtbaren Hardware-Sprite treiben kann.
 
-Der Mainloop ruft den Resolver bereits nach Bewegung/Sprung auf. Der Zielraum wird jedoch noch **nicht** als aktiv committed: Solange nur Raum `$00` dekodiert/gerendert werden kann, darf dessen Kollisionsmap nicht faelschlich fuer Raum `$01` verwendet werden.
+Der Build erzeugt `monty-walk-l.dat` automatisch und assembliert mit `-gA`, damit Symbole fuer lokale Emulator-Debugginglaeufe entstehen koennen.
 
 ### Regression
 
-`tools/test_port.py` prueft jetzt zusaetzlich 6x23-Geometrie, Startzelle `$00`, links davon Raum `$01`, rechts davon `$ff`, C5-Slot `$33` und dass `$30` nicht im statischen Grid vorkommt.
+`tools/test_port.py` prueft jetzt, dass genau vier 64-Byte-C64-Walkframes vorliegen, jedes Bild 24x21 dekodiert wird und daraus exakt 2048 Bytes PCE-Sprite-Daten entstehen.
+
+## Wichtig: Verifikationsstatus
+
+Der Sprite-Pfad ist portiert und im Quellcode angeschlossen, aber **noch nicht durch einen lokalen PCEAS-Lauf oder Emulator/Echthardware verifiziert**. Die GitHub Action bleibt auf Wunsch entfernt. Deshalb wird noch nicht behauptet, dass SATB-Attribute/Patternadressierung auf Hardware bereits fehlerfrei sichtbar sind.
 
 ## Aktuell offen
 
-- Generischer Raumdecoder/Room-State fuer alle Raum-IDs fehlt; bisher ist nur `$00` nativ vorhanden.
-- Deshalb ist `world_pending_room` noch kein vollstaendig sichtbarer Raumwechsel.
-- Monty ist noch nicht als PCE-Sprite sichtbar.
-- DOWN/UP, Leiter-/Seil-Semantik und exakte Tile-State-Logik fehlen.
-- Property-4/Piledriver-Nebenwirkung fehlt.
-- 320px-Horizontalporches muessen im Emulator/Echthardware verifiziert werden.
-- 5/6 ist weiterhin eine Bring-up-Approximation fuer PAL-Timing.
-- Echte PCEAS-Verifikation erfolgt lokal, da die GitHub Action auf Wunsch entfernt wurde.
+- PCEAS-/Emulatortest des neuen Monty-Spritepfads und ggf. Korrektur der SATB-Bitfelder/Patternadressierung.
+- Walk-right, Climb und 12+12 Somersault/Jump-Frames noch in die PCE-Pipeline uebernehmen.
+- Raum `$01` und generischer Room-State/Renderer fuer echte Raumwechsel.
+- DOWN/UP, Leiter-/Seil-Semantik und vollstaendige Tile-State-Logik.
+- Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
+- 320px-Horizontalporches und PAL-Timing weiter kalibrieren.
 
 ## Naechste harte Schritte
 
-1. Raum `$01` und danach generischen C64-RLE-Raumdecoder/Room-State portieren.
-2. `world_pending_room` an echten Raumdatenwechsel und Renderer anschliessen.
-3. Montys C64-Spritedaten in PCE-SPR-4bpp konvertieren und SATB anschliessen.
-4. Vollstaendige C64-Tile-State-/Leiter-/Seil-Logik portieren.
-5. Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
+1. Spritepfad assemblerfest machen und SATB/VRAM-Layout gegen HuC/PCE-Dokumentation pruefen.
+2. Walk-right und Somersault-Frames portieren; Animation an Bewegung/Jump-State koppeln.
+3. Raum `$01` + generischen Raumloader anschliessen.
+4. Leiter/Seil/Tile-State portieren.
+5. Gegner/Mechanismen/HUD/Gameflow/Audio.
 
 ## Referenzen
 
