@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 28a
+Stand: 2026-09-04 — Phase 28b
 
 ## Portierungsstand
 
 **Gesamtport: ca. 39 %**
 
-Phase 28a ist ein Build-/Regressionstest-Fix fuer Phase 28. Die Prozentzahl bleibt unveraendert, weil kein neuer Gameplayblock hinzukommt.
+Phase 28b ist ein reiner Assembler-/Buildfix fuer die neue Somersault-Anbindung. Die Prozentzahl bleibt unveraendert, weil kein neuer Gameplayblock hinzugekommen ist.
 
 ## Verbindliche Referenz
 
@@ -14,7 +14,7 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 
 ## Bestaetigt
 
-- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
+- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce` aus den vorigen Phasen.
 - Die Basis-Raumgrafik stimmt laut Nutzer brauchbar mit der C64-Referenz ueberein.
 - Montys Start-/SAT-Position passt inzwischen weitgehend.
 - Gehen funktioniert.
@@ -36,29 +36,34 @@ Die originalen Rohdaten wurden direkt aus `refactored/src/subsystems/monty_spr.a
 
 `tools/monty_somersault_source.asm` enthaelt diese festen Bloecke; `tools/monty_somersault.py` konvertiert sie in PCE-Spritedaten. `build.sh` erzeugt `monty-sault-l.dat` und `monty-sault-r.dat`.
 
-## Phase 28a — falsche letzte Frame-Prefix-Erwartung korrigiert
+## Phase 28a — letzte Framegrenze im Test korrigiert
 
-Der erste lokale Phase-28-Build stoppte in `tools/test_port.py`, bevor PCEAS gestartet wurde. Ursache war nicht der Somersault-Datenblock, sondern eine falsche Testannahme ueber den Beginn des jeweils letzten 64-Byte-VIC-Slots.
+Der erste Phase-28-Build stoppte in `tools/test_port.py`, bevor PCEAS gestartet wurde. Die Ursache war eine falsche Testannahme ueber die Startbytes der jeweils letzten 64-Byte-VIC-Slots. Der Test wurde auf die echten adressbasierten Slotgrenzen `$59c0` und `$5cc0` korrigiert.
 
-Bei festen VIC-Slots ist die Slotgrenze die Adresse selbst. Der letzte linke Frame beginnt bei `$59c0`, der letzte rechte bei `$5cc0`. Beide beginnen im Original mit mehreren Nullbytes. Der Test hatte stattdessen spaeter folgende erste Nicht-Null-Muster als vermeintlichen Frameanfang erwartet (`02 00 00` bzw. `00 80 00`). Dadurch schlug der Test trotz korrekt 768 Byte langer Rohbloecke fehl.
+## Phase 28b — HuC6280 Relative-Branch-Limit
 
-Der Regressionstest prueft jetzt die echten adressbasierten Slotstarts:
+Der naechste lokale Build erreichte PCEAS und alle Python-Regressionstests liefen erfolgreich durch. PCEAS meldete danach 13 Fehler `Branch address out of range` in `src/monty_sprite.asm`.
 
-- `$59c0`: `00 00 00 02 00 00 ...`
-- `$5cc0`: `00 00 00 00 80 ...`
+Ursache: Die neue 12-Wege-Somersault-Auswahl ist deutlich laenger als die bisherigen 4-Frame-Dispatcher. HuC6280-Branchbefehle wie `BMI` und `BRA` sind relativ und koennen nur Ziele innerhalb ihres begrenzten Offsets erreichen. Der Sprung von der Richtungspruefung bis zum linken 12-Frame-Block sowie mehrere `BRA .jdone` lagen ausserhalb dieses Bereichs.
 
-Damit wird nicht mehr ein Grafikmuster mit einer Framegrenze verwechselt. Die eigentliche Phase-28-Somersaultanbindung bleibt unveraendert.
+Die Logik wurde nicht geaendert. Nur der Kontrollfluss wurde assemblerfest gemacht:
+
+- statt eines langen `BMI .jump_left` wird lokal mit `BPL` verzweigt und fuer die entfernte linke Tabelle ein absolutes `JMP .jump_left` benutzt;
+- die langen `BRA .jdone` der 12 Framepfade wurden durch absolute `JMP .jdone` ersetzt;
+- kurze `BEQ`-Verzweigungen innerhalb der jeweiligen Dispatch-Tabelle bleiben relative Branches.
+
+Damit bleiben Frameauswahl und C64-Semantik gleich, ohne das +/-128-Byte-Limit der relativen HuC6280-Branches zu verletzen.
 
 ## Verifikationsstatus
 
-- Phase 28a ist hochgeladen.
-- Der Nutzer muss `git pull && ./build.sh` erneut ausfuehren.
-- Der vorherige Lauf erreichte PCEAS nicht; die neue Somersault-ROM wurde deshalb noch nicht lokal getestet.
-- Nach erfolgreichem Build sind besonders linke und rechte Sprunganimation visuell zu pruefen.
+- Die Phase-28a-Python-Tests wurden vom Nutzer erfolgreich ausgefuehrt: `OK: room/world; exact collision/fall; SAT XY; walk/climb + 24 somersault frames`.
+- Der anschliessende PCEAS-Lauf scheiterte ausschliesslich an den jetzt behobenen Branch-Reichweiten.
+- Phase 28b ist hochgeladen und muss lokal erneut mit `./build.sh` gebaut werden.
+- Danach sind besonders linke und rechte Sprunganimation visuell zu pruefen.
 
 ## Naechste Portschritte
 
-1. Phase 28a lokal bauen und die 12-Frame-Somersaulte links/rechts im Emulator pruefen.
+1. Phase 28b lokal bauen und Somersault links/rechts im Emulator pruefen.
 2. Walk-/Climb-Rohdaten ebenfalls auf einen festen, adressbasierten Datenpfad ohne Prefix-Heuristik umstellen.
 3. Room-$00-Decor aus `refactored/src/subsystems/decor.asm` und den Raumtabellen portieren.
 4. Danach generischer Room-Loader und echte Raumwechsel.
