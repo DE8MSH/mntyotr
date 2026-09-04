@@ -17,12 +17,13 @@ jobs:
       - name: Build current HuC/PCEAS toolchain
         run: |
           git clone --depth 1 https://github.com/pce-devel/huc.git "$HOME/huc"
-          make -C "$HOME/huc" -j"$(nproc)"
+          # Build host tools only. Upstream's top-level 'all' also builds every
+          # example, and a currently broken unrelated example must not block us.
+          make -C "$HOME/huc/src" -j"$(nproc)"
+          test -x "$HOME/huc/bin/pceas"
           echo "$HOME/huc/bin" >> "$GITHUB_PATH"
 
       - name: Build MOTR HuCard
-        env:
-          HUC_HOME: ${{ github.workspace }}/../huc
         run: |
           export HUC_HOME="$HOME/huc"
           export PATH="$HUC_HOME/bin:$PATH"
