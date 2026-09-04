@@ -20,11 +20,15 @@ def words(blob):
  return list(struct.unpack('<'+'H'*(len(blob)//2),blob))
 
 def c64_screen_xy(monty_x,monty_y):
- return 2*(monty_x-0x0c), monty_y-0x32
+ return 2*(monty_x-0x0c), (monty_y+1)-0x32
 
 def pce_sat_xy(monty_x,monty_y):
  x,y=c64_screen_xy(monty_x,monty_y)
  return x+32,y+64
+
+def sat_x_bytes(monty_x,offset):
+ value=2*monty_x+offset
+ return value&0xff,(value>>8)&0x03
 
 def screen_to_room(col,row):
  if not 3 <= row < 23: return None
@@ -76,16 +80,17 @@ def main():
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
 
- assert c64_screen_xy(0x86,0xb0)==(244,126)
- assert pce_sat_xy(0x86,0xb0)==(276,190)
+ # Original start: C64 visible (244,127), PCE SAT origin adds (32,64).
+ assert c64_screen_xy(0x86,0xb0)==(244,127)
+ assert pce_sat_xy(0x86,0xb0)==(276,191)
+ assert sat_x_bytes(0x86,8)==(0x14,0x01)
+ assert sat_x_bytes(0x86,24)==(0x24,0x01)
  assert screen_to_room(4,3)==(0,0)
  assert screen_to_room(35,22)==(31,19)
  assert screen_to_room(2,3)==(0,0)
  assert screen_to_room(37,22)==(31,19)
  assert screen_to_room(0,3) is None and screen_to_room(4,2) is None
 
- # Exact refactored/source frame starts. These catch accidental 64-byte slicing
- # of our 63-byte-per-frame transcriptions, which previously shifted frames 1..3.
  expected_starts={
   'WALK_L': bytes.fromhex('02 00 00'),
   'WALK_R': bytes.fromhex('00 40 00'),
@@ -101,6 +106,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room/world; C64 XY/collision; 12 Monty frames with exact VIC boundaries')
+ print('OK: room/world; corrected Monty SAT XY; collision; 12 Monty frames')
 
 if __name__=='__main__': main()
