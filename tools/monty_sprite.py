@@ -5,9 +5,10 @@ Primary gameplay/art reference: Dave-Agent/monty-on-the-run refactored/src.
 The reference sprite labels are aligned to 256-byte animation blocks. Each VIC
 sprite frame has 63 visible bitmap bytes and one padding byte in memory.
 
-The transcribed constants below contain only the 63 visible bytes per frame,
-concatenated frame-by-frame. They therefore must NOT be re-sliced at 64-byte
-boundaries; doing so shifts frames 1..3 by one byte and corrupts animation.
+The transcribed constants below contain only the visible bytes. The upstream
+assembly listing elides some final zero bytes at the tail of these blocks, so
+_normalize_frames() restores only those trailing zeroes. It never inserts bytes
+between frames.
 
 PCE 16x16 sprite cells store each 16-bit plane as a 32-byte block (16 words),
 then the next plane. Monty is composed from two 16x32 PCE sprites.
@@ -38,20 +39,24 @@ FRAME_BYTES = BITMAP_BYTES
 
 
 def _normalize_frames(blob, count=4):
-    """Return count concatenated 63-byte bitmap frames.
+    """Return count concatenated 63-byte visible bitmap frames.
 
-    Current source constants intentionally omit each VIC slot's padding byte and
-    are therefore exactly count*63 bytes. A full raw VIC block (count*64) is
-    accepted too and has each 64th padding byte removed. Any other length is a
-    transcription error.
+    The refactored source labels prove each animation occupies a 256-byte VIC
+    block. Our transcription intentionally removes the per-frame padding bytes.
+    Some trailing all-zero bytes at the *end of the final frame* were omitted by
+    the original text extraction; those may safely be restored as zero. We do
+    not pad or re-slice between frames, which was the corruption in Phase 24a.
     """
     visible = count * BITMAP_BYTES
     raw = count * VIC_FRAME_BYTES
-    if len(blob) == visible:
-        return blob
     if len(blob) == raw:
         return b''.join(blob[n*VIC_FRAME_BYTES:n*VIC_FRAME_BYTES+BITMAP_BYTES] for n in range(count))
-    raise AssertionError(f'unexpected C64 sprite block length: {len(blob)} (expected {visible} or {raw})')
+    if len(blob) <= visible:
+        missing = visible - len(blob)
+        if missing > 8:
+            raise AssertionError(f'too many missing C64 sprite bytes: {missing}')
+        return blob + bytes(missing)
+    raise AssertionError(f'unexpected C64 sprite block length: {len(blob)} (expected <= {visible} or {raw})')
 
 WALK_L = _normalize_frames(WALK_L)
 WALK_R = _normalize_frames(WALK_R)
