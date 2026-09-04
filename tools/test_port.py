@@ -5,7 +5,6 @@ from pathlib import Path
 from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_bat, CHR_GAME
 from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels
 
-JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN=[1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
 ROOM00_PROPS=[1,1,1,2,1,1,1,1]
@@ -146,7 +145,6 @@ def main():
  assert not left_blocked(cells,0x78,0xb2)
 
  # CheckTileBelow property semantics independent of room-$00's concrete tiles.
- # Ground + tile_state permits property 2/3; jump action makes them blocking.
  def props_result(props,action=0,tile_state=0):
   trap=2
   for prop in props:
