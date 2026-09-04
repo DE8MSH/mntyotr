@@ -1,11 +1,11 @@
-; Phase 35: keep the active room collision map mapped while gameplay physics runs.
+; Phase 38: keep the active room collision map mapped while gameplay physics runs.
 ;
 ; The current physics code deliberately keeps the original C64 tile/collision
-; semantics and uses direct pointers to room00_collision_map / room01_collision_map.
-; Those data labels can move to another HuCard bank when unrelated graphics or
-; decor grow the ROM.  Mapping the selected collision bank into MPR3/MPR4 for
-; the duration of monty_update_input + monty_jump_step makes those direct reads
-; independent of ROM layout without copying or changing any collision bytes.
+; semantics and uses direct pointers to room00/01/02 collision maps. Those data
+; labels can move to another HuCard bank when unrelated graphics or decor grow
+; the ROM. Mapping the selected collision bank into MPR3/MPR4 for the duration
+; of monty_update_input + monty_jump_step makes those direct reads independent
+; of ROM layout without copying or changing any collision bytes.
 
 .zp
 collision_saved_mpr3:   ds 1
@@ -31,6 +31,8 @@ collision_bank_enter:
         lda     <monty_room
         cmp     #1
         beq     .room01
+        cmp     #2
+        beq     .room02
 
 .room00:
         lda     #<room00_collision_map
@@ -46,6 +48,14 @@ collision_bank_enter:
         lda     #>room01_collision_map
         sta     <_bp+1
         ldy     #BANK(room01_collision_map)
+        bra     .map
+
+.room02:
+        lda     #<room02_collision_map
+        sta     <_bp
+        lda     #>room02_collision_map
+        sta     <_bp+1
+        ldy     #BANK(room02_collision_map)
 
 .map:
         ; Same proven mapper used by the bank-safe Monty sprite and room upload
