@@ -21,7 +21,8 @@
         include "monty_sprite.asm"
 
 .zp
-main_jump_x_before_step: ds 1
+main_jump_x_before_step:   ds 1
+main_exit_before_jump:     ds 1
 
         .code
 
@@ -116,14 +117,25 @@ main_loop:
         stz     <monty_room_exit
 .after_unsupported_jump_edge:
 
-        ; monty_jump_step moves only Y, but the current shared edge helper also
-        ; checks X and can therefore synthesize a left/right exit while Monty is
-        ; jumping against a solid border. Save the post-input X so a side exit
-        ; created only by the vertical jump step can be rejected and undone.
+        ; A real horizontal exit may already have been produced by
+        ; monty_update_input. monty_jump_step calls monty_check_room_edges too,
+        ; whose first instruction clears monty_room_exit. Preserve a supported
+        ; exit here so jumping through a valid doorway/edge cannot be lost.
+        lda     <monty_room_exit
+        sta     <main_exit_before_jump
         lda     <monty_x
         sta     <main_jump_x_before_step
         call    monty_jump_step
 
+        lda     <main_exit_before_jump
+        beq     .guard_jump_generated_exit
+        sta     <monty_room_exit
+        bra     .after_jump_exit_guard
+
+.guard_jump_generated_exit:
+        ; No real horizontal exit existed before the vertical jump step. Reject
+        ; a side exit synthesized only because monty_check_room_edges also tests
+        ; X while processing vertical motion.
         lda     <monty_room_exit
         cmp     #1
         beq     .guard_jump_side_exit
