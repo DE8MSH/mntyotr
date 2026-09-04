@@ -1,9 +1,10 @@
-; Phase 32 room loader: first real C64 world transition, rooms $00 <-> $01.
+; Phase 33 room loader: real C64 world transition, rooms $00 <-> $01.
 ; Room $01 graphics are copied through MPR3/MPR4 so ROM-bank placement cannot
-; corrupt the new room as the ROM grows.
+; corrupt the room as the ROM grows.
 
 .zp
-room_copy_rows: ds 1
+room_copy_rows:  ds 1
+room_copy_pages: ds 1
 
 .code
 
@@ -26,6 +27,7 @@ room_load_pending:
 
 .room01:
         bsr     room01_upload_patterns
+        bsr     room01_upload_decor
         bsr     room01_draw_native
         lda     #1
         sta     <monty_room
@@ -80,6 +82,67 @@ room01_upload_patterns:
         iny
         dex
         bne     .p1
+
+        pla
+        tam4
+        pla
+        tam3
+        plp
+        rts
+
+; Phase 33: 25 exact C64 decor chars = 800 bytes, beginning at CHR_GAME+9.
+; Copy three full 256-byte pages plus the final 32 bytes through the same
+; bank-safe MPR3/MPR4 window used for all growing ROM graphics blocks.
+room01_upload_decor:
+        php
+        sei
+        tma3
+        pha
+        tma4
+        pha
+
+        lda     #<room01_decor_patterns
+        sta     <_bp
+        lda     #>room01_decor_patterns
+        sta     <_bp+1
+        ldy     #BANK(room01_decor_patterns)
+        call    map_bp_to_mpr34
+
+        lda     #<((CHR_GAME+9)*16)
+        sta     <_di
+        lda     #>((CHR_GAME+9)*16)
+        sta     <_di+1
+        call    vdc_di_to_mawr
+
+        lda     #3
+        sta     <room_copy_pages
+.full_page:
+        cly
+        ldx     #128
+.full_word:
+        lda     [_bp],y
+        sta     VDC_DL
+        iny
+        lda     [_bp],y
+        sta     VDC_DH
+        iny
+        dex
+        bne     .full_word
+        inc     <_bp+1
+        dec     <room_copy_pages
+        bne     .full_page
+
+        cly
+        ldx     #16
+.tail_word:
+        lda     [_bp],y
+        sta     VDC_DL
+        iny
+        lda     [_bp],y
+        sta     VDC_DH
+        iny
+        dex
+        bne     .tail_word
 
         pla
         tam4
