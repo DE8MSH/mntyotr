@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 34c
+Stand: 2026-09-04 — Phase 34d
 
 ## Portierungsstand
 
 **Gesamtport: ca. 44 %**
 
-Der Nutzer hat Phase 34a lokal bestaetigt: der wiederhergestellte Phase-32b-Runtime-Pfad funktioniert wieder. Monty ist steuerbar, Springen und Animationen sind in Ordnung, und Raum $00 -> $01 nach links funktioniert. Dabei wurde ein separater Bewegungsfehler gefunden: an seitlichen Bildschirmraendern, die im Gehen durch Collision blockiert sind, konnte Monty durch Springen trotzdem einen Raumwechsel ausloesen.
+Der stabile Phase-32b/34a-Runtime-Pfad funktioniert wieder. Monty ist steuerbar, Springen und Animationen sind in Ordnung, und Raum $00 -> $01 nach links funktioniert. Nach Phase 34c wurde der neue Jump-Edge-Guard im Emulator getestet: links verhielt sich der Sprung an einer blockierten Seitenkante wie gewuenscht, rechts in Raum $00 jedoch noch nicht symmetrisch.
 
 ## Verbindliche Referenz
 
@@ -32,45 +32,44 @@ Der komplette aktive Phase-34-Pfad wurde wieder auf den zuvor bestaetigten Stand
 
 Die Room-$01-Decor-Generatoren bleiben nur als inaktive Referenzdaten im Repository und sind nicht Teil des aktuellen ROM-Builds.
 
-## Phase 34b — Sprung darf keine blockierte Seitenkante umgehen
+## Phase 34b/34c — erster Jump-Edge-Guard + Branchfix
 
-Die Ursache des neuen Randfehlers liegt im aktuellen Ablauf: `monty_update_input` prueft horizontale Collision korrekt. Direkt danach fuehrt `monty_jump_step` jedoch eine rein vertikale Y-Bewegung aus und ruft intern den gemeinsamen `monty_check_room_edges` auf. Dieser Helper prueft zuerst X. Steht Monty waehrend eines Sprungs bereits nahe genug an einer linken/rechten Exit-Schwelle, kann der vertikale Sprungschritt dadurch einen seitlichen Exit setzen, obwohl die horizontale Bewegung im selben Tick durch eine Wand blockiert wurde.
+Phase 34b fing seitliche Exit-Ereignisse ab, die nur durch den vertikalen `monty_jump_step` entstanden. Phase 34c ersetzte den durch `main.asm`-Wachstum zu weit gewordenen `bsr init_c64_video` durch `call init_c64_video`.
 
-Phase 34b aendert die bestaetigte Collision-Logik selbst nicht. In `src/main.asm` wird direkt vor `monty_jump_step` die X-Position gesichert. Falls der Jump-Step anschliessend einen linken/rechten Exit meldet, obwohl `monty_is_moving` fuer diesen Tick nicht gesetzt wurde, wird dieser synthetische Side-Exit verworfen und die X-Position wiederhergestellt. Ein echter horizontaler Raumwechsel bleibt unangetastet, weil bei tatsaechlicher horizontaler Bewegung `monty_is_moving` gesetzt ist.
+Der Emulator-Test zeigte danach: links an einer blockierten Kante funktioniert das Jump-Blocking, rechts in Raum $00 noch nicht.
 
-Neu ist `tools/test_jump_edge_guard.py`; `build.sh` fuehrt ihn automatisch aus.
+## Phase 34d — unsupported Side-Exit waehrend Sprung symmetrisch blockieren
 
-Commits Phase 34b:
+Die Asymmetrie kommt daher, dass rechts in Raum $00 die Tile-Collision selbst einen horizontalen Sprungschritt zulassen kann, obwohl die Weltkarte rechts `$ff` enthaelt. Dadurch wird `monty_is_moving` gesetzt; der Phase-34b-Guard fuer rein synthetische Side-Exits greift dann absichtlich nicht.
 
-- `f2a0cce234b36826fa72e56cf385eb060a299fbf` — Side-Exit-Guard im Mainloop
-- `f29cd1b2d51b9799db550b86041eb7f8ab23c9bb` — Regressionstest
-- `de3da59c6d7d5f33a577dad3f354aea185830143` — Test in `build.sh`
+Phase 34d blockiert deshalb zusaetzlich genau die aktuell nicht unterstuetzten Weltseiten **waehrend eines Sprungs**, noch bevor `monty_jump_step` die bereits gewrappte X-Position als gegenueberliegende Kante missdeuten kann:
 
-## Phase 34c — PCEAS Branch-Reichweite im Startup
+- Raum $00, Exit rechts -> X wird auf `$9b` gesetzt, Side-Exit geloescht.
+- Raum $01, Exit links -> X wird auf `$15` gesetzt, Side-Exit geloescht, weil Raum $02 noch nicht geladen wird.
+- Der echte unterstuetzte Wechsel Raum $00 links -> Raum $01 bleibt unveraendert.
+- Der echte Rueckweg Raum $01 rechts -> Raum $00 bleibt unveraendert.
+- Collision-Map, Tile-Properties, Startposition und Sprungtabellen bleiben unveraendert.
 
-Der erste lokale Build von Phase 34b kam durch alle Python-Tests, stoppte aber in PCEAS an `bsr init_c64_video`: durch das Wachstum von `main.asm` lag die Routine jetzt ausserhalb der relativen BSR-Reichweite.
+Commits Phase 34d:
 
-Der Aufruf ist deshalb auf den bereits im Projekt verwendeten bank-/reichweitensicheren `call init_c64_video` umgestellt. Die Video-Initialisierung selbst wurde nicht veraendert. Der bestehende Jump-Edge-Test prueft jetzt zusaetzlich, dass `bsr init_c64_video` nicht wieder eingefuehrt wird.
-
-Commits Phase 34c:
-
-- `e2c77ec0157fec992067a87f302071727fbb1f1e` — `init_c64_video` von BSR auf CALL
-- `6b91e508cafc2078a5e1d118da7bf8bd102d6323` — Regressionstest fuer den Startup-Aufruf
+- `3880e3ce7a6b3d113863fbe4450c4133f00352ef` — unsupported Side-Exits beim Springen symmetrisch blockiert
+- `9843a9f72fb1c2588723b203b2914a81420ae601` — Regressionstest erweitert
 
 ## Verifikationsstatus
 
-Phase 34a ist vom Nutzer bestaetigt. Phase 34b ist inhaltlich noch nicht im Emulator verifiziert, weil der erste Build an der BSR-Reichweite stoppte. Phase 34c behebt nur diesen Assemblerfehler und ist noch lokal zu bauen.
+Phase 34d ist hochgeladen, aber noch nicht lokal mit PCEAS/Mednafen verifiziert.
 
 Als naechstes `git pull && ./build.sh` und danach pruefen:
 
-1. normaler Start/Boden/Sprung unveraendert,
-2. an einer seitlich blockierten Wand springen: kein Raumwechsel,
-3. echter offener Raumwechsel $00 -> $01 nach links muss weiterhin funktionieren.
+1. Raum $00 rechts: an der Seitenkante springen -> kein Heraus-Springen / kein Wrap.
+2. Raum $00 links: echter offener Wechsel nach Raum $01 funktioniert weiterhin.
+3. Raum $01 rechts: Rueckweg nach Raum $00 funktioniert weiterhin.
+4. normaler Start, Boden, Sprung und Animationen bleiben unveraendert.
 
 ## Naechste Portschritte
 
-1. Phase 34c lokal bestaetigen.
-2. Danach Collision-ROM-Banking des bestaetigten Phase-32b/34b-Pfads exakt analysieren und bankfest machen, ohne Sprung-/Start-/Collision-Semantik umzuschreiben.
+1. Phase 34d lokal bestaetigen.
+2. Danach Collision-ROM-Banking des bestaetigten Pfads exakt analysieren und bankfest machen, ohne Sprung-/Start-/Collision-Semantik umzuschreiben.
 3. Erst danach Room-$01-Decor wieder aktivieren.
 4. Danach Raum $02 und weitere Welt-Raeume portieren.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
