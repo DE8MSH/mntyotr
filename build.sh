@@ -18,18 +18,16 @@ for f in "$ELMER_INC/bare-startup.asm" "$HUCC_INC/common.asm" "$HUCC_INC/vdc.asm
 done
 export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
 
-# Fail before assembly if authoritative room/physics/timing fingerprints drift.
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 
-python3 "$ROOT/tools/room_rle.py" \
-  --write "$BUILD/room00-map.dat" \
-  --bat "$BUILD/room00-bat.dat" >/dev/null
+python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" >/dev/null
+python3 "$ROOT/tools/monty_sprite.py" --write "$BUILD/monty-walk-l.dat" >/dev/null
 
 cd "$BUILD"
-"$PCEAS" -S -l 3 main.asm
+"$PCEAS" -S -gA -l 3 main.asm
 
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
 if [ -s main.sym ]; then mv -f main.sym monty.sym; fi
