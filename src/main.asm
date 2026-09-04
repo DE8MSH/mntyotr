@@ -51,7 +51,7 @@ bare_main:
         ldy     #^room00_bg_palettes
         call    load_palettes
 
-        ; Room $01 needs C64 purple and blue in the two remaining shared slots.
+        ; Rooms $01/$02 need C64 purple and blue in the two remaining slots.
         lda     #13
         sta     <_al
         lda     #2
@@ -93,24 +93,17 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
-        ; Phase 35: temporarily map the active room's collision-map bank across
-        ; the complete physics slice. This keeps direct C64-style tile reads
-        ; correct even when unrelated ROM content moves room data to new banks.
         call    collision_bank_enter
-
-        ; C64-oriented order for the currently ported subset.
         call    monty_update_input
 
-        ; The currently loaded world subset is only rooms $00 and $01. During
-        ; a jump, horizontal motion can still reach an edge that the world
-        ; resolver will reject ($00 right -> $ff, $01 left -> unsupported $02).
-        ; Cancel those side exits before the vertical jump step gets a chance
-        ; to interpret the wrapped X coordinate as the opposite screen edge.
+        ; Loaded horizontal chain is now $02 <-> $01 <-> $00.
+        ; During a jump, cancel only exits whose destination is still unloaded:
+        ; Room $00 right is $ff, and Room $02 left would enter Room $03.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <monty_room
         beq     .guard_room00_right
-        cmp     #1
+        cmp     #2
         bne     .after_unsupported_jump_edge
         lda     <monty_room_exit
         cmp     #1
@@ -128,10 +121,7 @@ main_loop:
         stz     <monty_room_exit
 .after_unsupported_jump_edge:
 
-        ; A real horizontal exit may already have been produced by
-        ; monty_update_input. monty_jump_step calls monty_check_room_edges too,
-        ; whose first instruction clears monty_room_exit. Preserve a supported
-        ; exit here so jumping through a valid doorway/edge cannot be lost.
+        ; Preserve a real horizontal exit across the vertical jump step.
         lda     <monty_room_exit
         sta     <main_exit_before_jump
         lda     <monty_x
@@ -144,9 +134,7 @@ main_loop:
         bra     .after_jump_exit_guard
 
 .guard_jump_generated_exit:
-        ; No real horizontal exit existed before the vertical jump step. Reject
-        ; a side exit synthesized only because monty_check_room_edges also tests
-        ; X while processing vertical motion.
+        ; Reject side exits synthesized only by the vertical jump edge check.
         lda     <monty_room_exit
         cmp     #1
         beq     .guard_jump_side_exit
@@ -162,7 +150,6 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; Restore the normal HuCard mapping before world/VRAM/sprite work.
         call    collision_bank_exit
 
         call    world_resolve_exit
