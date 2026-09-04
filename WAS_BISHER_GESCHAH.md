@@ -1,65 +1,46 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 15
+Stand: 2026-09-04 — Phase 16
 
 ## Portierungsstand
 
-**Gesamtport: ca. 29 %**
+**Gesamtport: ca. 31 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Sie steigt nur fuer konkret portierte bzw. verifizierte Subsysteme.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme.
 
 ## Ziel
 
-1:1-orientierter Port von *Monty on the Run* (C64) auf NEC PC Engine / HuCard. Referenz fuer Verhalten und Daten ist die kommentierte/refaktorierte 6502-Rekonstruktion von Dave-Agent.
+1:1-orientierter Port von *Monty on the Run* (C64) auf NEC PC Engine / HuCard. Referenz ist die kommentierte/refaktorierte 6502-Rekonstruktion von Dave-Agent.
 
 ## Bereits umgesetzt
 
-- Linux-Mint-22-Toolchain-, Build- und Run-Grundgeruest; kein GitHub-Actions-ROM-Build mehr.
+- Linux-Mint-22 Toolchain/Build/Run-Grundgeruest; GitHub-Actions-ROM-Build bleibt entfernt.
 - PCE VDC/VCE Bring-up, Palette, Font, BAT und VSync.
-- Raum `$00` als native PCE-BAT plus echte konvertierte C64-Hintergrundtiles.
+- Raum $00 mit echten konvertierten C64-Hintergrundtiles.
 - PAL-orientierter Gameplay-Scheduler.
-- Montys originale Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
-- C64-Raumkanten und vollstaendiges statisches 6x23-Weltgrid mit Exit-Resolver.
-- Automatische Regressionstests fuer Raum, Jump-Arc, Scheduler, Weltgrid und jetzt Monty-Spritedaten.
+- Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
+- C64-Raumkanten und statisches 6x23-Weltgrid.
+- Echte Monty-Walkgrafik jetzt fuer beide Blickrichtungen.
 
-## Neu in Phase 15
+## Neu in Phase 16
 
-### Echte Monty-Grafik portiert
+`tools/monty_sprite.py` enthaelt jetzt neben den vier originalen Walk-left-Frames auch die vier originalen Walk-right-Frames (C64 Pointer $54-$57, Bereich $5500-$55ff). Beide Richtungen werden 24x21 pixelgetreu in zwei 16x32-PCE-Sprites pro Bild umgesetzt.
 
-Die ersten vier originalen Walk-left-Frames aus `Monty.sprites.walk_l_spr` (C64-Pointer `$50-$53`, Quellbereich `$5400-$54ff`) sind jetzt Teil der PCE-Asset-Pipeline. `tools/monty_sprite.py` interpretiert jeden C64-Frame als 24x21 1bpp und wandelt ihn ohne Skalierung in native PCE-SPR-Daten um.
+Der Build erzeugt nun `monty-walk-l.dat` und `monty-walk-r.dat`. `src/monty_sprite.asm` waehlt anhand des bereits portierten `monty_facing` automatisch den linken oder rechten Originalsatz. Ein Richtungswechsel markiert das Sprite sofort dirty und laedt das passende Bild in VRAM; die Vier-Tick-Animationskadenz bleibt erhalten.
 
-Da ein einzelner PCE-Hardware-Sprite die originale 24-Pixel-Breite nicht exakt abbildet, wird Monty aus zwei nebeneinanderliegenden 16x32-Sprites zusammengesetzt. Transparente Padding-Pixel erhalten die originale 24x21-Silhouette.
+Damit ist Montys normale Laufgrafik in beiden Richtungen in der Asset- und Runtime-Pipeline vorhanden. Climb und die 12+12 Somersaultframes fehlen weiterhin.
 
-### Sprite-Pfad im HuC6280-Code
+## Verifikationsstatus
 
-`src/monty_sprite.asm` fuegt VRAM-Upload, Vier-Frame-Animation und SATB-Eintraege hinzu. Die SATB-X/Y-Werte folgen direkt `monty_x`/`monty_y`, sodass die bereits portierte Pad-, Kollisions- und Sprungphysik nun einen sichtbaren Hardware-Sprite treiben kann.
-
-Der Build erzeugt `monty-walk-l.dat` automatisch und assembliert mit `-gA`, damit Symbole fuer lokale Emulator-Debugginglaeufe entstehen koennen.
-
-### Regression
-
-`tools/test_port.py` prueft jetzt, dass genau vier 64-Byte-C64-Walkframes vorliegen, jedes Bild 24x21 dekodiert wird und daraus exakt 2048 Bytes PCE-Sprite-Daten entstehen.
-
-## Wichtig: Verifikationsstatus
-
-Der Sprite-Pfad ist portiert und im Quellcode angeschlossen, aber **noch nicht durch einen lokalen PCEAS-Lauf oder Emulator/Echthardware verifiziert**. Die GitHub Action bleibt auf Wunsch entfernt. Deshalb wird noch nicht behauptet, dass SATB-Attribute/Patternadressierung auf Hardware bereits fehlerfrei sichtbar sind.
+Der neue Stand wurde nicht als ROM/Emulatorlauf verifiziert. GitHub Actions bleibt auf Wunsch entfernt. SATB-Attributbits und Patternadressierung muessen lokal mit PCEAS/Emulator bestaetigt werden.
 
 ## Aktuell offen
 
-- PCEAS-/Emulatortest des neuen Monty-Spritepfads und ggf. Korrektur der SATB-Bitfelder/Patternadressierung.
-- Walk-right, Climb und 12+12 Somersault/Jump-Frames noch in die PCE-Pipeline uebernehmen.
-- Raum `$01` und generischer Room-State/Renderer fuer echte Raumwechsel.
-- DOWN/UP, Leiter-/Seil-Semantik und vollstaendige Tile-State-Logik.
+- 12+12 Somersault-/Jumpframes und Climbframes portieren und zustandsabhaengig auswaehlen.
+- Raum $01 und generischen Room-State/Renderer anschliessen.
+- DOWN/UP, Leiter-/Seil- und vollstaendige Tile-State-Logik.
 - Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
-- 320px-Horizontalporches und PAL-Timing weiter kalibrieren.
-
-## Naechste harte Schritte
-
-1. Spritepfad assemblerfest machen und SATB/VRAM-Layout gegen HuC/PCE-Dokumentation pruefen.
-2. Walk-right und Somersault-Frames portieren; Animation an Bewegung/Jump-State koppeln.
-3. Raum `$01` + generischen Raumloader anschliessen.
-4. Leiter/Seil/Tile-State portieren.
-5. Gegner/Mechanismen/HUD/Gameflow/Audio.
+- 320px-Porches und PAL-Timing verifizieren/kalibrieren.
 
 ## Referenzen
 
