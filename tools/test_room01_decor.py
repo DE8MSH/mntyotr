@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import struct
+from pathlib import Path
 from room01 import ROOM01_RLE, make_screen_bat
 from room_rle import decode_room, SCREEN_W
 from room01_decor import (
     build_patterns, overlay_screen_bat, CHR_DECOR, PAL_BY_C64,
     BUNCH_COLOURS, PURPLE_COLOURS,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def words(blob):
@@ -36,7 +39,24 @@ def main():
         assert (w >> 12) == PAL_BY_C64[c64col]
         assert (w & 0x0fff) == first[0x41] + i
 
-    print('OK: exact room 01 purple_flowers + bunch_flower decor overlay')
+    assets = (ROOT/'src/room01_assets.asm').read_text()
+    loader = (ROOT/'src/room_loader.asm').read_text()
+    decor_loader = (ROOT/'src/room01_decor_loader.asm').read_text()
+    main_asm = (ROOT/'src/main.asm').read_text()
+    room00_assets = (ROOT/'src/room00_assets.asm').read_text()
+
+    assert 'room01_decor_patterns:' in assets
+    assert 'incbin "room01-decor-patterns.dat"' in assets
+    assert 'call    room01_upload_decor' in loader
+    assert 'bsr     room01_upload_decor' not in loader
+    assert 'include "room01_decor_loader.asm"' in main_asm
+    assert 'BANK(room01_decor_patterns)' in decor_loader
+    assert 'call    map_bp_to_mpr34' in decor_loader
+    # Returning to Room $00 must restore its larger shared decor VRAM area.
+    assert 'call    upload_room00_patterns' in loader
+    assert 'tia room00_decor_patterns,VDC_DL,1312' in room00_assets
+
+    print('OK: exact Room 01 decor + bank-safe upload + Room 00 decor restore')
 
 
 if __name__ == '__main__':
