@@ -1,4 +1,4 @@
-; Phase 33 room loader: real C64 world transition, rooms $00 <-> $01.
+; Phase 33a room loader: real C64 world transition, rooms $00 <-> $01.
 ; Room $01 graphics are copied through MPR3/MPR4 so ROM-bank placement cannot
 ; corrupt the room as the ROM grows.
 
@@ -26,9 +26,9 @@ room_load_pending:
         rts
 
 .room01:
-        bsr     room01_upload_patterns
-        bsr     room01_upload_decor
-        bsr     room01_draw_native
+        jsr     room01_upload_patterns
+        jsr     room01_upload_decor
+        jsr     room01_draw_native
         lda     #1
         sta     <monty_room
         stz     <world_transition_ready
