@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Decode/verify Monty C64 room RLE and generate PCE room tables.
 
-RLE format from the annotated reconstruction:
-  high nibble = repeat count - 1
-  low nibble  = logical tile id
-  FF FF       = stream terminator
-A single FF remains a valid run of sixteen tile-15 cells.
+Primary reference: Dave-Agent/monty-on-the-run/refactored/src/subsystems/room.asm.
+RLE expands to the 32x20 playfield.  On the C64 that playfield is copied to
+screen columns 4..35, rows 3..22; CreatePlayfieldBorder mirrors its edge chars
+into columns 2..3 and 36..37.  Character 0 stays blank and room slots 0..7 are
+installed as screen character codes 1..8 by SetupTileGraphics.
 """
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ import struct
 ROOM_W = 32
 ROOM_H = 20
 ROOM_CELLS = ROOM_W * ROOM_H
-CHR_GAME = 256  # Must match src/platform.inc: 128+16+112.
+SCREEN_W = 36                 # C64 cols 2..37 inclusive
+CHR_GAME = 256                # must match src/platform.inc
 
 ROOM00_RLE = bytes.fromhex(
     "f1 41 02 90 f1 51 02 80 f1 61 02 70 f1 71 02 60 "
@@ -49,21 +50,44 @@ def ascii_map(cells: list[int]) -> str:
     )
 
 
+def bat_word(tile_slot: int) -> int:
+    if not 0 <= tile_slot <= 7:
+        raise ValueError(f"room00 expects custom tile slot 0..7, got {tile_slot}")
+    # C64 SetupTileGraphics: slot 0..7 becomes screen character code 1..8.
+    code = tile_slot + 1
+    return (code << 12) | (CHR_GAME + code)
+
+
 def make_bat(cells: list[int]) -> bytes:
-    """PCE BAT word = palette in bits 12..15 + pattern index in bits 0..11."""
+    """32x20 playfield BAT, using the C64 screen-code 1..8 mapping."""
     data = bytearray()
     for tile in cells:
-        if tile > 7:
-            raise ValueError(f"room00 expects custom tile 0..7, got {tile}")
-        word = (tile << 12) | (CHR_GAME + tile)
-        data += struct.pack("<H", word)
+        data += struct.pack("<H", bat_word(tile))
+    return bytes(data)
+
+
+def make_screen_bat(cells: list[int]) -> bytes:
+    """20x36 C64-visible room window (screen columns 2..37).
+
+    Each row is: left edge twice, 32 playfield chars, right edge twice.  This is
+    exactly the geometry produced by Room.CreatePlayfieldBorder after the 32x20
+    DrawRoomPlayfield copy.
+    """
+    data = bytearray()
+    for y in range(ROOM_H):
+        row = cells[y*ROOM_W:(y+1)*ROOM_W]
+        expanded = [row[0], row[0], *row, row[-1], row[-1]]
+        assert len(expanded) == SCREEN_W
+        for tile in expanded:
+            data += struct.pack("<H", bat_word(tile))
     return bytes(data)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", type=Path, help="write decoded 640-byte logical map")
-    ap.add_argument("--bat", type=Path, help="write 1280-byte native PCE BAT table")
+    ap.add_argument("--bat", type=Path, help="write 1280-byte 32x20 PCE BAT table")
+    ap.add_argument("--screen-bat", type=Path, help="write 1440-byte 36x20 C64 screen-window BAT")
     args = ap.parse_args()
 
     cells = decode_room(ROOM00_RLE)
@@ -77,6 +101,10 @@ def main() -> None:
         args.bat.parent.mkdir(parents=True, exist_ok=True)
         args.bat.write_bytes(make_bat(cells))
         print(f"wrote {args.bat} ({args.bat.stat().st_size} bytes)")
+    if args.screen_bat:
+        args.screen_bat.parent.mkdir(parents=True, exist_ok=True)
+        args.screen_bat.write_bytes(make_screen_bat(cells))
+        print(f"wrote {args.screen_bat} ({args.screen_bat.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":
