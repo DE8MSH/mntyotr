@@ -1,6 +1,16 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 9
+Stand: 2026-09-04 — Phase 10
+
+## Portierungsstand
+
+**Gesamtport: ca. 18 %**
+
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems, nicht nur die Anzahl bereits angelegter Dateien. Ab jetzt wird sie bei jedem Arbeitsbericht mitgefuehrt. Sie steigt nur fuer konkret portierte bzw. verifizierte Subsysteme.
+
+Grobe Gewichtung: Plattform/Build 10 %, Video/Room-Renderer 15 %, Welt/Raumdaten 15 %, Monty Input/Physik/Kollision/Sprite 20 %, Gegner 12 %, Mechanismen/Special Items 10 %, HUD/Gameflow/Freedom Kit/Completion 8 %, Audio 10 %.
+
+Aktueller Stand nach dieser Gewichtung: Plattform/Build weitgehend angelegt; Video und Raum-$00$ teilweise portiert; Weltformat analysiert; Monty-Sprungdaten und erste echte Kollisionsroutinen portiert. Gegner, Mechanismen, kompletter Gameflow und Audio sind noch weitgehend offen.
 
 ## Ziel
 
@@ -19,36 +29,41 @@ Stand: 2026-09-04 — Phase 9
 - Automatische Regressionstests fuer Raum, Jump-Arc und Scheduler.
 - GitHub-Actions-ROM-Build fuer `motr.pce`, Symbole und Listing.
 
-## CI/Toolchain: jetzt konkret verifiziert
+## Neu in Phase 10: C64-Kollision -> HuC6280
 
-Der CI-Log zeigt, dass der aktuelle `pce-devel/huc`-Checkout PCEAS erfolgreich linkt und nach `$HOME/huc/bin/pceas` kopiert. Das vorherige `make -C huc/src` liefert trotzdem Exitcode 1, obwohl PCEAS bereits fertig vorhanden ist; Ursache ist ein anderer paralleler Upstream-Subtarget. Fuer diesen Pure-ASM-Port ist `bin/pceas` die tatsaechliche Build-Voraussetzung.
+`monty_physics.asm` enthaelt jetzt echte PCE/HuC6280-Portierungen der C64-Kollisionsproben:
 
-Der Workflow akzeptiert deshalb den aggregierten Upstream-Make-Status nur als Hinweis und prueft danach hart `test -x $HOME/huc/bin/pceas`. Fehlt PCEAS, scheitert CI weiterhin. Existiert es, geht CI endlich in unseren eigenen `./build.sh` und damit zu den echten MOTR-Assemblerfehlern weiter.
+- `room00_get_tile_xy`: liest aus dem generierten 32x20-Logikraum.
+- `room00_get_property_xy`: mappt Tile-ID auf die originale C64-Kollisionsklasse.
+- `monty_check_tile_right` / `monty_check_tile_left`.
+- `monty_check_tile_above` / `monty_check_tile_below`.
+- C64-Grenztests `(x-$0c)&3` und `(y-$32)&7` bleiben erhalten.
+- Die vertikale Sprungkurve ruft jetzt Above/Below-Kollision auf; Decke schaltet auf Abstieg, Boden beendet den Sprung.
 
-## Neu analysierte C64-Kollisionsbasis
+Die Routinen arbeiten weiterhin in C64-Pixelkoordinaten. Damit bleibt Gameplay-Logik von PCE-VRAM/BAT getrennt.
 
-Die Referenzroutine `ComputeMontyTilePointer` rechnet Montys C64-Spritekoordinaten in Tilekoordinaten um. Sie zieht von Y `$32` ab und teilt durch 8. Fuer X zieht sie `$0c` ab und teilt durch 4, bevor die Kollisionshelfer die angrenzenden Tiles pruefen. Die Referenz beschreibt `CheckTileRight/Left`, `CheckTileAbove` und `CheckTileBelow` explizit als 1-2-Tile-Abfragen um Monty; `CheckTileBelow` behandelt zusaetzlich Property 4. Diese Semantik wird fuer den PCE-Port beibehalten, statt eine neue Bounding-Box-Physik zu erfinden.
+Noch offen in diesem Teil: exakte Property-4-Piledriver-Nebenwirkung, situationsabhaengige Property-2/3-Semantik, originale dynamische Anzahl der Probe-Tiles und exakte Landekorrektur. Diese Punkte werden gegen die Referenz weiter nachgezogen und nicht als fertig behauptet.
 
-## Automatische Regression-Checks
+## CI/Toolchain
 
-Vor PCEAS wird geprueft: Raum `$00` = 640 Zellen; Tile-IDs im erlaubten Bereich; Jump-Ascent 22 Samples/20 Pixel; Jump-Descent 17 Samples/14 Pixel; Bring-up-Scheduler 5/6.
+Der CI-Log zeigt, dass der aktuelle `pce-devel/huc`-Checkout PCEAS erfolgreich linkt und nach `$HOME/huc/bin/pceas` kopiert. Der Workflow prueft deshalb gezielt dieses Binary und soll danach unseren eigenen Assemblercode bauen.
 
 ## Naechste harte Schritte
 
-1. Neuen CI-Lauf bis `./build.sh` bringen und PCEAS-Fehler unseres Codes beseitigen.
-2. Erfolgreiches `motr.pce` als Artefakt erzeugen und hier zum Test bereitstellen.
-3. Raum-$00-Darstellung im Emulator verifizieren.
-4. C64-Kollisionskoordinaten und CheckTileBelow/Above/Left/Right an `room00_collision_map` anschliessen.
-5. PCE-Pad + Sprungstart + Links/Rechts/ToggleStepGate.
-6. Monty-Sprite nach PCE-SPR konvertieren und anzeigen.
-7. Raumwechsel; danach Gegner, Mechanismen und Special Items.
+1. Aktuellen CI-Lauf bis PCEAS durchziehen und Syntax/Assemblerprobleme der neuen Routinen beseitigen.
+2. PCE-Pad auf C64-Richtungs-/Fire-Flags abbilden.
+3. Originales Links/Rechts-Verhalten samt `ToggleStepGate` anschliessen.
+4. Kollisionsproben exakt an die C64-Zustandslogik angleichen.
+5. Monty-Sprite-Daten nach PCE-SPR konvertieren und Bewegung sichtbar machen.
+6. Raumwechsel und weitere Raumdaten portieren.
+7. Danach Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 
 ## Noch nicht behauptet
 
 - Noch kein verifiziert spielbarer Port.
-- Noch kein erfolgreich erzeugtes aktuelles `motr.pce`; der neue CI-Lauf muss nun erstmals unseren Assembler erreichen.
+- Noch kein erfolgreich erzeugtes aktuelles `motr.pce`; CI muss den neuen Code assemblieren.
 - Native Raumgrafik muss noch Emulator/Echthardware-getestet werden.
-- Montys PCE-Sprite, Padsteuerung und vollstaendige Kollisionen fehlen noch.
+- Padsteuerung und Montys PCE-Sprite fehlen noch.
 - 5/6 ist weiterhin nur die Bring-up-Approximation fuer PAL-Timing.
 
 ## Referenzen
