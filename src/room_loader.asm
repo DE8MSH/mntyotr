@@ -1,7 +1,6 @@
-; Phase 43 room loader: rooms $00 <-> $01 <-> $02 <-> $03 <-> $04.
-; Rooms $02/$03/$04 keep bulk assets in the ROM tail. Their 640-byte collision
-; map plus 8 properties are copied into the shared room02_* RAM cache before
-; gameplay resumes, so the far asset bank is never left mapped during physics.
+; Phase 44 room loader: active house route includes rooms $00-$04 plus $0D/$0E.
+; Tail rooms keep bulk assets in the ROM tail. Their 640-byte collision map plus
+; 8 properties are copied into the shared room02_* RAM cache before gameplay.
 
 .zp
 room_copy_rows: ds 1
@@ -20,6 +19,10 @@ room_load_pending:
         beq     .room03
         cmp     #4
         beq     .room04
+        cmp     #$0d
+        beq     .room0d
+        cmp     #$0e
+        beq     .room0e
         clc
         rts
 
@@ -72,6 +75,26 @@ room_load_pending:
         sec
         rts
 
+.room0d:
+        call    room0d_upload_patterns
+        call    room0d_draw_native
+        call    room0d_cache_collision
+        lda     #$0d
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
+.room0e:
+        call    room0e_upload_patterns
+        call    room0e_draw_native
+        call    room0e_cache_collision
+        lda     #$0e
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
 ; Tail-room collision caches. Every payload is exactly 648 contiguous bytes:
 ; 640 collision-map bytes followed by 8 property bytes.
 room02_cache_collision:
@@ -96,6 +119,22 @@ room04_cache_collision:
         lda     #>room04_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room04_collision_map_rom)
+        bra     room_tail_cache_collision
+
+room0d_cache_collision:
+        lda     #<room0d_collision_map_rom
+        sta     <_bp
+        lda     #>room0d_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room0d_collision_map_rom)
+        bra     room_tail_cache_collision
+
+room0e_cache_collision:
+        lda     #<room0e_collision_map_rom
+        sta     <_bp
+        lda     #>room0e_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room0e_collision_map_rom)
 
 room_tail_cache_collision:
         php
@@ -170,6 +209,22 @@ room04_upload_patterns:
         lda     #>room04_patterns
         sta     <_bp+1
         ldy     #BANK(room04_patterns)
+        bra     room_upload_9_patterns
+
+room0d_upload_patterns:
+        lda     #<room0d_patterns
+        sta     <_bp
+        lda     #>room0d_patterns
+        sta     <_bp+1
+        ldy     #BANK(room0d_patterns)
+        bra     room_upload_9_patterns
+
+room0e_upload_patterns:
+        lda     #<room0e_patterns
+        sta     <_bp
+        lda     #>room0e_patterns
+        sta     <_bp+1
+        ldy     #BANK(room0e_patterns)
 
 room_upload_9_patterns:
         php
@@ -247,6 +302,22 @@ room04_draw_native:
         lda     #>room04_screen_bat
         sta     <_bp+1
         ldy     #BANK(room04_screen_bat)
+        bra     room_draw_native_36x20
+
+room0d_draw_native:
+        lda     #<room0d_screen_bat
+        sta     <_bp
+        lda     #>room0d_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room0d_screen_bat)
+        bra     room_draw_native_36x20
+
+room0e_draw_native:
+        lda     #<room0e_screen_bat
+        sta     <_bp
+        lda     #>room0e_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room0e_screen_bat)
 
 ; Draw exact 36x20 visible room window at C64 cols 2..37, rows 3..22.
 room_draw_native_36x20:
