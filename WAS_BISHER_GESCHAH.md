@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 33
+Stand: 2026-09-04 — Phase 33a
 
 ## Portierungsstand
 
@@ -47,6 +47,20 @@ Zusammen erzeugt Phase 33 25 PCE-Decor-Zeichen = 800 Byte. Sie beginnen wie die 
 
 Die vorhandenen PCE-Paletten reichen aus. Purple `$04` verwendet Room-$01-Slot 13; die restlichen Farben sind bereits durch Raum $00 bzw. die Basisraumfarben vorhanden.
 
+## Phase 33a — PCEAS Reichweitenfix im Room-Loader
+
+Beim ersten lokalen Phase-33-Build liefen alle Python-Regressionstests erfolgreich durch, inklusive Room-$01-Decor. PCEAS stoppte danach in `src/room_loader.asm` bei:
+
+`bsr room01_draw_native` — Branch address out of range.
+
+Die Room-$01-Routine ist durch den neuen 800-Byte-Decor-Upload inzwischen zu gross fuer relative `BSR`-Aufrufe aus `room_load_pending`. Phase 33a stellt deshalb alle drei Room-$01-Subroutine-Aufrufe auf absolute `JSR` um:
+
+- `room01_upload_patterns`
+- `room01_upload_decor`
+- `room01_draw_native`
+
+Die Loader-, Grafik- und Raumwechsel-Semantik bleibt unveraendert; nur die HuC6280-Reichweitenabhaengigkeit ist entfernt.
+
 ## Loader/Build
 
 `src/room01_assets.asm` bindet `room01-decor-patterns.dat` ein. `src/room_loader.asm` laedt beim Eintritt in Raum $01 zuerst die neun Custom-Tiles und danach die 25 Decor-Zeichen bankfest ueber `map_bp_to_mpr34`. Der von `tools/room01.py` erzeugte 36x20-BAT wird vor dem Assemblieren durch `tools/room01_decor.py` mit den beiden Original-Records ueberlagert.
@@ -56,13 +70,14 @@ Die vorhandenen PCE-Paletten reichen aus. Purple `$04` verwendet Room-$01-Slot 1
 ## Verifikationsstatus
 
 - Phase 32b Raumwechsel $00 <-> $01 ist vom Nutzer bestaetigt.
-- Phase 33 ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
-- Nach `git pull && ./build.sh` in Raum $01 besonders links unten/seitlich nach `purple_flowers` und rechts oben nach `bunch_flower` schauen.
-- Physik, Weltkoordinaten und Monty-Animation wurden in Phase 33 nicht geaendert.
+- Beim ersten Phase-33-Lauf liefen alle Python-Tests durch; PCEAS stoppte nur am relativen `BSR room01_draw_native`.
+- Phase 33a behebt diesen Assemblerfehler und ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS verifiziert.
+- Nach `git pull && ./build.sh` in Raum $01 besonders nach `purple_flowers` und `bunch_flower` schauen.
+- Physik, Weltkoordinaten und Monty-Animation wurden in Phase 33/33a nicht geaendert.
 
 ## Naechste Portschritte
 
-1. Phase 33 visuell bestaetigen.
+1. Phase 33a lokal bauen und die zwei Raum-$01-Decors visuell bestaetigen.
 2. Raum $02 mit seinem exakten RLE, room_defs-Tileset, Farben und Collision in den Loader aufnehmen.
 3. Danach Room-$02-Decors anbinden und die temporaere Loader-Schranke auf `$00..$02` erweitern.
 4. Den Room-Loader weiter verallgemeinern.
