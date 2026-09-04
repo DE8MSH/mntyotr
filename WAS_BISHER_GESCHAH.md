@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 43a
+Stand: 2026-09-04 — Phase 43b
 
 ## Portierungsstand
 
 **Gesamtport: ca. 53 %**
 
-Phase 42 wurde vom Nutzer lokal bestaetigt: das zusaetzliche Room-$04-ROM-Tail-Wachstum hat die bestaetigten Raeume $00-$03 nicht destabilisiert. Phase 43 aktiviert Raum $04 als fuenften echten Raum. Beim ersten lokalen Build von Phase 43 stoppte nur ein veralteter Python-Regressionstest (`tools/test_room02.py`): dessen erwarteter Kommentartext beschrieb noch die alte Kette `$03 <-> $02 <-> $01 <-> $00`. Phase 43a aktualisiert ausschliesslich diesen Test auf die neue aktive Kette; Runtime-Code wurde dabei nicht veraendert.
+Phase 42 wurde vom Nutzer lokal bestaetigt: das zusaetzliche Room-$04-ROM-Tail-Wachstum hat die bestaetigten Raeume $00-$03 nicht destabilisiert. Phase 43 aktiviert Raum $04 als fuenften echten Raum. Beim ersten lokalen Build von Phase 43 stoppte nur ein veralteter Python-Regressionstest (`tools/test_room02.py`). Phase 43a aktualisierte die Kette, besass aber noch eine zweite zu fragile Kommentar-Assertion. Phase 43b ersetzt diese nun durch eine strukturelle Pruefung der echten Jump-Guard-Instruktionen. Runtime-Code wurde dabei nicht veraendert.
 
 ## Verbindliche Referenz
 
@@ -41,27 +41,25 @@ Raum $04 verwendet die in Phase 42 exakt vorbereiteten C64-Daten:
 
 Links aus Raum $04 bleibt Raum $05 noch gesperrt; rechts aus Raum $00 bleibt die originale `$ff`-Wand. Der Jump-Edge-Guard wurde entsprechend von der linken Room-$03-Kante auf die linke Room-$04-Kante verschoben. Damit darf `$03 -> $04` gehend und springend funktionieren, ohne dass ein Sprung links aus dem noch letzten geladenen Raum $04 herauskommt.
 
-## Phase 43a — Build-Test korrigiert
+## Phase 43a/43b — Build-Tests korrigiert
 
-Der lokale Build erreichte `tools/test_room02.py` und brach dort an einer reinen String-Assertion ab. Die Testdatei erwartete noch:
+Der erste lokale Build brach in `tools/test_room02.py` an einer alten String-Assertion ueber die Room-Kette ab. Phase 43a aktualisierte diese auf `$04 <-> $03 <-> $02 <-> $01 <-> $00`, liess aber noch eine zweite Kommentar-Assertion `Room $04 left` stehen. Der Runtime-Kommentar lautet tatsaechlich kompakter `$00 right/$04 left`, deshalb schlug auch diese Assertion fehl.
 
-`Loaded horizontal chain is now $03 <-> $02 <-> $01 <-> $00.`
-
-Phase 43 hat diesen Kommentar korrekt auf `$04 <-> $03 <-> $02 <-> $01 <-> $00` erweitert. Der Test wurde daher auf die Phase-43-Kette, das World-Gate `cmp #5` und die neue aeussere Kante `Room $04 left` aktualisiert. Es handelt sich nicht um einen PCEAS- oder Runtime-Fehler.
+Phase 43b prueft jetzt nicht mehr zufaellige Kommentarformulierung, sondern den echten Guard-Block in `src/main.asm`: `collision_actual_room`, `cmp #4`, `monty_room_exit`, `cmp #1`, Clamp auf `$15` und Loeschen von `monty_room_exit`. Damit testet `test_room02.py` jetzt das Verhalten und nicht den Wortlaut eines Kommentars.
 
 ## Regressionstests
 
 Aktualisiert sind jetzt:
 
-- `tools/test_room02.py` — Phase-43-Kette und World-Gate
+- `tools/test_room02.py` — Phase-43-Kette, World-Gate und struktureller Room-$04-Left-Guard
 - `tools/test_room03.py` — Room $04 ist linker Nachbar
 - `tools/test_room04.py` — aktiver Loader, World-Gate, Collision-Cache und Jump-Gate
 - `tools/test_collision_banking.py` — gemeinsamer Room-$02/$03/$04-RAM-Cache
 - `tools/test_jump_edge_guard.py` — neue aeussere Kante an Room $04
 
-`monty_physics.asm` wurde fuer Phase 43/43a bewusst nicht veraendert.
+`monty_physics.asm` wurde fuer Phase 43/43a/43b bewusst nicht veraendert.
 
-## Commits Phase 43 / 43a
+## Commits Phase 43 / 43a / 43b
 
 - `f8ae9d7dca5cd30694d54297d01595ebff665355` — Room $04 ueber Shared-Collision-Cache gespiegelt
 - `79b915f8773a1e867ca29c113e890a2c631ddcc0` — Room-$04-Loader, Draw und Collision-Cache aktiviert
@@ -71,15 +69,16 @@ Aktualisiert sind jetzt:
 - `0b0eedef454ecd89a0174a7fd2f8b84cea6e0fe1` — Collision-Banking-Test erweitert
 - `8b3a75b2c81fdb7355cd4df3438377a4ded5f10b` — Jump-Edge-Test auf Room $04 erweitert
 - `68593623ec7f41b7d606ade7e9cf9bf6287cb516` — Room-$03-Test an neuen Nachbarn angepasst
-- `c2cace66c3234d53dead7392cc709d717d309ee9` — veralteten Room-$02-Regressionstest auf Phase 43 aktualisiert
+- `c2cace66c3234d53dead7392cc709d717d309ee9` — Room-$02-Test auf Phase-43-Kette aktualisiert
+- `a3b3dab619086f8d29ada6f8cea2de8f2db18a5a` — fragile Kommentar-Assertion durch strukturellen Guard-Test ersetzt
 
 ## Erwartetes Resultat
 
-Nach erneutem `git pull && ./build.sh` soll der vorherige `test_room02.py`-AssertionError verschwunden sein und der Build bis zu den nachfolgenden Tests/PCEAS weiterlaufen. Danach sollen die Raeume $00-$03 unveraendert funktionieren. Von Raum $03 geht es nach links in Raum $04, sowohl gehend als auch springend. In Raum $04 muss Monty sofort laufen, springen und landen koennen; nach rechts geht es zurueck nach Raum $03. Links aus Raum $04 bleibt gesperrt, bis Raum $05 portiert ist.
+Nach erneutem `git pull && ./build.sh` soll `test_room02.py` jetzt an beiden bisherigen Assertion-Stellen vorbeilaufen. Danach sollen die restlichen Python-Tests und PCEAS folgen. Im Spiel sollen die Raeume $00-$03 unveraendert funktionieren. Von Raum $03 geht es nach links in Raum $04, sowohl gehend als auch springend. In Raum $04 muss Monty sofort laufen, springen und landen koennen; nach rechts geht es zurueck nach Raum $03. Links aus Raum $04 bleibt gesperrt, bis Raum $05 portiert ist.
 
 ## Naechste Portschritte
 
-1. Phase 43/43a lokal bestaetigen.
+1. Phase 43/43a/43b lokal bestaetigen.
 2. Originale Room-$03-Decors portieren.
 3. Originale Room-$04-Decors portieren.
 4. Danach Raum $05 mit exakten C64-Daten vorbereiten/aktivieren.
