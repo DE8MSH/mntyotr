@@ -1,7 +1,7 @@
-; Phase 38a Room $02 generated ROM-tail assets.
-; Bulk graphics/map data stays at the ROM tail. The collision map and property
-; bytes are copied into RAM on Room-$02 entry so physics never has to execute
-; while the far Room-$02 asset bank is mapped over MPR3/MPR4.
+; Phase 39 Room $02 generated ROM-tail assets.
+; Bulk graphics/map/decor data stays at the ROM tail. The collision map and
+; property bytes are copied into RAM on Room-$02 entry so physics never has to
+; execute while the far Room-$02 asset bank is mapped over MPR3/MPR4.
 
 .data
 room02_patterns:
@@ -18,3 +18,9 @@ room02_tile_properties_rom:
 
 room02_screen_bat:
         incbin "room02-screen-bat.dat"
+
+room02_decor_patterns:
+        ; Exact Room-$02 Decor.room_list type order:
+        ; $19 grandfather_clock, $08 books, $05 yellow_flower,
+        ; $06 brown_flower, $42 purple_flowers = 57 chars total.
+        incbin "room02-decor-patterns.dat"
