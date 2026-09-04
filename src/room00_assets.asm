@@ -1,6 +1,7 @@
 ; Converted C64 room-$00 graphics assets.
+; C64 screen code 0 is blank; room tile slots 0..7 are installed as character
+; codes 1..8 exactly like Room.SetupTileGraphics in the refactored source.
 ; Each C64 1bpp character becomes one PCE 4bpp tile using pixel indices 0/1.
-; Palette 0..7 corresponds to logical room tile 0..7.
 
 .code
 upload_room00_patterns:
@@ -9,49 +10,52 @@ upload_room00_patterns:
         lda #>(CHR_GAME*16)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_patterns,VDC_DL,256
+        tia room00_patterns,VDC_DL,288
         rts
 
 .data
 room00_patterns:
-        ; slot 0 <- C64 tile library $0A
+        ; C64 character code 0: blank (SetupTileGraphics leaves it untouched).
+        ds 32,0
+        ; char 1 / room slot 0 <- C64 tile library $0A
         db $ee,$00,$44,$00,$11,$00,$bb,$00,$bb,$00,$11,$00,$c4,$00,$ef,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        ; slot 1 <- library $0B
+        ds 16,0
+        ; char 2 / slot 1 <- library $0B
         db $00,$00,$00,$00,$00,$00,$80,$00,$a0,$00,$10,$00,$c0,$00,$ec,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        ; slot 2 <- library $01
+        ds 16,0
+        ; char 3 / slot 2 <- library $01
         db $00,$00,$fe,$00,$fe,$00,$fe,$00,$00,$00,$ef,$00,$ef,$00,$ef,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        ; slot 3 <- library $3A
+        ds 16,0
+        ; char 4 / slot 3 <- library $3A
         db $ff,$00,$55,$00,$aa,$00,$ff,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        ; slot 4 <- library $15
+        ds 16,0
+        ; char 5 / slot 4 <- library $15
         db $44,$00,$38,$00,$83,$00,$c6,$00,$44,$00,$6c,$00,$38,$00,$83,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        ; slots 5..7 <- library $00
+        ds 16,0
+        ; chars 6..8 / slots 5..7 <- library $00
         db $30,$00,$ff,$00,$03,$00,$ff,$00,$30,$00,$ff,$00,$03,$00,$ff,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        ds 16,0
         db $30,$00,$ff,$00,$03,$00,$ff,$00,$30,$00,$ff,$00,$03,$00,$ff,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        ds 16,0
         db $30,$00,$ff,$00,$03,$00,$ff,$00,$30,$00,$ff,$00,$03,$00,$ff,$00
-        db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        ds 16,0
 
-; 8 BG palettes. Entry 0 is C64 black. Entry 1 is the room's C64 foreground
-; colour quantised to 3-bit/channel VCE GRB. Entries 4..7 of palette 0 retain
-; diagnostic-font colours so the bring-up labels remain readable.
+; BAT palette number follows the C64 screen character code. Code 0 is blank;
+; code N (1..8) uses room_colour_tbl[N-1], matching PopulateColourRam.
 room00_palettes:
-        ; tile 0: C64 brown $9 -> VCE $090
-        dw $000,$090,$000,$000,$002,$04c,$169,$1b2,$000,$000,$000,$000,$000,$000,$000,$000
-        ; tile 1: brown
+        ; code 0: blank/background
+        dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; code 1: C64 brown $9 -> VCE $090
         dw $000,$090,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; tile 2: red $2 -> $099
+        ; code 2: brown $9
+        dw $000,$090,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; code 3: red $2 -> $099
         dw $000,$099,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; tile 3: cyan $3 -> $15D
+        ; code 4: cyan $3 -> $15D
         dw $000,$15d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; tile 4: dark grey $B -> $092
+        ; code 5: dark grey $B -> $092
         dw $000,$092,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; tile 5..7: black
+        ; codes 6..8: black for room $00
         dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
         dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
         dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
