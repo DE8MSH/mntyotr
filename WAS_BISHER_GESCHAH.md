@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 23
+Stand: 2026-09-04 — Phase 23a
 
 ## Portierungsstand
 
 **Gesamtport: ca. 34 %**
 
-Der Stand steigt um einen Punkt, weil diesmal zwei zentrale Referenzfehler korrigiert wurden, die sowohl die sichtbare Raumgrafik als auch die Bewegung blockierten.
+Die Prozentzahl bleibt unveraendert: Phase 23a ist ein Build-/Regressionstest-Fix und noch kein neuer Gameplay-Block.
 
 ## Verbindliche Referenz
 
@@ -21,62 +21,43 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
 - Phase 22 baut und startet laut Nutzer.
 - 320-Pixel-Anzeige ist sichtbar aktiv.
-- Monty-Sprite ist jetzt sichtbar und in brauchbarer Form.
-- Der Nutzervergleich PCE vs. C64 zeigt weiterhin falsche Raumgrafik, nur eine minimale Linksbewegung und noch keine sichtbare Walkanimation.
+- Monty-Sprite ist sichtbar und in brauchbarer Form.
+- Phase 23 konnte wegen eines Python-Regressionstests noch nicht assembliert werden.
 
-## Phase 23 — entscheidender RLE-/Collision-Fehler gefunden
+## Phase 23 — RLE-/Collision-Korrektur
 
-Die `refactored/src/subsystems/room.asm`-Referenz zeigt eindeutig: Der untere Nibble jedes Room-RLE-Bytes ist bereits der **C64-Screen-Character-Code**. `DrawRoomPlayfield` schreibt diesen Code unveraendert in den 32x20-Scratchbuffer und danach auf den 40-Spalten-Screen. `SetupTileGraphics` ist ein separater Schritt und installiert die acht raumspezifischen Bitmaptiles in C64-Characters 1..8.
+Die `refactored/src/subsystems/room.asm`-Referenz zeigt eindeutig: Der untere Nibble jedes Room-RLE-Bytes ist bereits der C64-Screen-Character-Code. `DrawRoomPlayfield` schreibt diesen Code unveraendert in den Scratchbuffer und danach auf den 40-Spalten-Screen. Code 0 bleibt leer; Codes 1..8 referenzieren die acht von `SetupTileGraphics` installierten Raumcharacters.
 
-Der bisherige PCE-Generator hatte diese beiden Ebenen vermischt und zu jedem RLE-Wert noch `+1` addiert. Dadurch wurde insbesondere der extrem wichtige Screen-Code 0 (schwarz/leer) zu Character 1 und damit zu einem sichtbaren, soliden Raumtile. Genau deshalb war der PCE-Screenshot grossflaechig mit dem gelb/gruenen Pattern gefuellt, wo die C64-Referenz schwarzen Hintergrund zeigt.
+Der PCE-Generator verwendet deshalb keine pauschale `+1`-Transformation mehr. Gleichzeitig implementiert `room00_get_tile_property` die C64-`GetTileFlag`-Semantik: Screen-Code 0 und Codes >=9 sind Property 0, nur Codes 1..8 greifen auf `tile_property_tbl[code-1]` zu.
 
-`tools/room_rle.py` bildet RLE-Codes jetzt 1:1 ab:
+## Phase 23a — fehlerhaften WORLD-Test entfernt
 
-- Code 0 -> Blank-Character 0 / Palette 0
-- Codes 1..8 -> die von `SetupTileGraphics` installierten Raumcharacters 1..8
-- keine pauschale `+1`-Transformation mehr
+Der aktuelle Build scheiterte vor PCEAS in `tools/test_port.py` an der statisch doppelt gepflegten Python-Kopie der 6x23-Weltkarte. Die eigentliche Assembly-Tabelle in `src/world.asm` ist weiterhin 6x23 und enthaelt den bekannten Start bei Raum $00 (Zeile 2, Spalte $15), links Raum $01 und rechts eine Wand.
 
-## Phase 23 — Bewegung ebenfalls erklaert
+Der Test pflegt diese Weltkarte jetzt nicht mehr als zweite handgeschriebene Konstante. Stattdessen liest er direkt `src/world.asm`, extrahiert `world_room_grid:` und prueft:
 
-Der gleiche Screen-Code-Fehler steckte in der Collision. Das C64-`GetTileFlag` behandelt Screen-Code 0 und Codes >=9 als Property 0; nur Codes 1..8 greifen auf `tile_property_tbl[code-1]` zu.
+- exakt 6 Zeilen
+- exakt 23 Eintraege pro Zeile
+- Startzelle Raum $00
+- linker Nachbar Raum $01
+- rechter Nachbar $FF
+- Raum $33 an der bekannten Position
+- Completion-Raum $30 nicht im normalen Grid
 
-Der PCE-Port hatte dagegen Code 0 direkt als Property-Slot 0 ausgewertet. In Raum $00 ist Slot 0 Property 1 (solid). Damit war **schwarzer Leerraum fuer die PCE-Collision massiv**. Das passt exakt zur Nutzerbeobachtung: Monty konnte einmal minimal nach links und wurde danach praktisch sofort blockiert.
-
-`room00_get_tile_property` implementiert jetzt die C64-Semantik:
-
-- 0 -> leer/non-solid
-- 1..8 -> `room00_tile_properties[code-1]`
-- >=9 -> fuer den aktuellen Raumtile-Pfad Property 0
-
-Die bereits in Phase 22 korrigierte 40x25-Screen->32x20-Raumabbildung bleibt bestehen.
-
-## Regressionstests
-
-`tools/test_port.py` prueft jetzt ausdruecklich:
-
-- ein RLE-Code 0 bleibt PCE-Character/Palette 0
-- alle Playfieldcodes werden ohne +1 in die BAT uebernommen
-- `GetTileFlag`-Modell: 0->0, 1->Property Slot0, 4->Property Slot3, 9->0
-- 36-Spalten-Gutters und C64/PCE-Koordinatenbruecke bleiben erhalten
-
-## Was im C64-Vergleich noch fehlt
-
-Der neue Fix betrifft die **Basisraumgrafik**. Der C64-Screenshot enthaelt zusaetzlich Dekorationen und Objekte, die nicht Teil der simplen Room-RLE sind: z. B. `MPL ST.`-Schild, Fenster, Pflanzen, Spezialitem/Gegner und die Strassenlaterne. Diese stammen aus weiteren Subsystemen (`decor`, enemies/special items/mechanisms) und werden nach der jetzt korrigierten Basisgeometrie portiert.
+Damit ist `src/world.asm` auch fuer den Test die einzige Quelle der Wahrheit.
 
 ## Verifikationsstatus
 
-- Host-Toolchain/startendes ROM: bestaetigt.
-- Phase-22 Sprite sichtbar: bestaetigt.
-- Phase-23 Screen-Code-Fix: lokal noch zu bauen/testen.
-- Bewegung nach GetTileFlag-Fix: lokal noch zu testen.
-- Walkanimation sollte erst sichtbar werden, wenn horizontale Bewegung mehrere Ticks frei durchlaeuft; ebenfalls lokal zu testen.
+- Phase 23a Testfix: hochgeladen, lokal noch zu bauen.
+- Phase 23 Screen-Code-/Collision-Fix: lokal noch zu testen.
+- Bewegung/Walkanimation: lokal nach erfolgreichem Build erneut testen.
 - Vollstaendige Room-$00-Dekoration: noch nicht portiert.
 
 ## Naechste Portschritte
 
-1. Phase 23 lokal bauen und PCE/C64 erneut vergleichen.
-2. Wenn Bewegung jetzt frei laeuft: Walkanimation visuell pruefen und ggf. SAT/Framewechsel separat fixen.
-3. Room-$00-Decor aus `refactored/src` portieren, damit Schild/Fenster/Pflanzen etc. erscheinen.
+1. Phase 23a lokal bauen.
+2. Danach PCE/C64 erneut vergleichen und Links/Rechts/I testen.
+3. Wenn die Basisgrafik nun stimmt, Room-$00-Decor aus `refactored/src` portieren.
 4. `CheckTileBelow` Properties 2/3/4 exakt nachziehen.
 5. Danach Somersaultframes, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
 
