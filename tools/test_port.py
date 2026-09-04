@@ -34,7 +34,6 @@ def screen_to_room(col,row):
  return None
 
 def parse_world_grid():
- """Read the actual assembly table instead of maintaining a second copy."""
  text=(ROOT/'src/world.asm').read_text()
  block=text.split('world_room_grid:',1)[1]
  rows=[]
@@ -66,7 +65,6 @@ def main():
 
  bat=words(make_bat(cells))
  assert len(bat)==640
- # RLE low nibble is already the C64 screen code. Code 0 must remain blank.
  assert (bat[0]&0x0fff)==CHR_GAME+cells[0]
  assert (bat[0]>>12)==cells[0]
  screen=words(make_screen_bat(cells))
@@ -78,8 +76,6 @@ def main():
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
 
- # Refactored C64 coordinate bridge: ProcessSprites doubles X while collision
- # addresses full 40-column screen coordinates.
  assert c64_screen_xy(0x86,0xb0)==(244,126)
  assert pce_sat_xy(0x86,0xb0)==(276,190)
  assert screen_to_room(4,3)==(0,0)
@@ -88,15 +84,23 @@ def main():
  assert screen_to_room(37,22)==(31,19)
  assert screen_to_room(0,3) is None and screen_to_room(4,2) is None
 
+ # Exact refactored/source frame starts. These catch accidental 64-byte slicing
+ # of our 63-byte-per-frame transcriptions, which previously shifted frames 1..3.
+ expected_starts={
+  'WALK_L': bytes.fromhex('02 00 00'),
+  'WALK_R': bytes.fromhex('00 40 00'),
+  'CLIMB':  bytes.fromhex('07 80 00'),
+ }
  for name,frames in (("WALK_L",WALK_L),("WALK_R",WALK_R),("CLIMB",CLIMB)):
-  assert len(frames) % FRAME_BYTES == 0, f'{name}: {len(frames)} bytes is not a multiple of FRAME_BYTES={FRAME_BYTES}'
-  assert len(frames)//FRAME_BYTES == 4, f'{name}: expected 4 frames, got {len(frames)//FRAME_BYTES}'
+  assert len(frames) % FRAME_BYTES == 0
+  assert len(frames)//FRAME_BYTES == 4
   for i in range(4):
    frame=frames[i*FRAME_BYTES:(i+1)*FRAME_BYTES]
+   assert frame[:3] == expected_starts[name], f'{name} frame {i} starts {frame[:3].hex()}'
    pixels=c64_frame_pixels(frame)
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room/world source tables; C64 screen/collision/XY bridge; jump/clock; Monty walk/climb=12 frames')
+ print('OK: room/world; C64 XY/collision; 12 Monty frames with exact VIC boundaries')
 
 if __name__=='__main__': main()
