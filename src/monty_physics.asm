@@ -30,9 +30,6 @@ jump_delta:             ds 1
 monty_physics_init:
         lda     #$86
         sta     <monty_x
-        ; Restore the authentic C64 start. The original unsupported-fall path
-        ; advances $b0 -> $b1 -> $b2 before floor contact; Phase 27 now ports
-        ; that state instead of hardcoding the settled coordinate.
         lda     #$b0
         sta     <monty_y
         stz     <monty_jump_phase
@@ -51,22 +48,28 @@ monty_physics_init:
         stz     <monty_action_counter
         rts
 
-; Exact C64 GetTileFlag screen-code semantics for the room custom chars:
-; screen code 0 and codes >=9 have no room-tile property; codes 1..8 index
-; tile_property_tbl[code-1].
+; C64 GetTileFlag semantics for the currently loaded room. Screen code 0 and
+; codes >=9 are non-room-custom; codes 1..8 index that room's property table.
 room00_get_tile_property:
         beq     .empty
         cmp     #9
         bcs     .empty
         dec     a
         tax
+        lda     <monty_room
+        cmp     #1
+        beq     .room01
         lda     room00_tile_properties,x
+        rts
+.room01:
+        lda     room01_tile_properties,x
         rts
 .empty:
         cla
         rts
 
-; X/Y here are C64 screen character coordinates, not raw 32x20 map indexes.
+; X/Y are C64 screen-character coordinates. The geometry is common to rooms;
+; only the 32x20 collision-map base changes with monty_room.
 room00_get_tile_xy:
         cpy     #3
         bcc     .outside
@@ -96,11 +99,25 @@ room00_get_tile_xy:
         stx     <collision_x
         tya
         tax
+        lda     <monty_room
+        cmp     #1
+        beq     .room01
         lda     #<room00_collision_map
+        sta     <collision_ptr
+        lda     #>room00_collision_map
+        sta     <collision_ptr+1
+        bra     .add_row
+.room01:
+        lda     #<room01_collision_map
+        sta     <collision_ptr
+        lda     #>room01_collision_map
+        sta     <collision_ptr+1
+.add_row:
+        lda     <collision_ptr
         clc
         adc     room00_row_offset_lo,x
         sta     <collision_ptr
-        lda     #>room00_collision_map
+        lda     <collision_ptr+1
         adc     room00_row_offset_hi,x
         sta     <collision_ptr+1
         ldy     <collision_x
@@ -155,8 +172,6 @@ monty_update_tile_state:
 .surface:
         lda     #1
         sta     <monty_tile_state
-        ; Original UpdateTileFlags cancels unsupported falling on first
-        ; property-3 surface contact while no explicit jump action is active.
         lda     <monty_jump_phase
         bne     .done
         stz     <monty_falling
@@ -434,7 +449,6 @@ monty_update_input:
         stz <monty_climbing
         call monty_update_tile_state
 
-        ; Property-3 surfaces cancel falling in UpdateTileFlags.
         lda <monty_tile_state
         bne .after_fall
         lda <monty_jump_phase
@@ -453,7 +467,6 @@ monty_update_input:
         and #$20
         sta <monty_saved_right
 .fall_step:
-        ; C64 jumping_flag2 forces one downward movement step per gameplay tick.
         call monty_check_tile_below
         bcs .land_from_fall
         inc <monty_y
@@ -467,7 +480,6 @@ monty_update_input:
         stz <monty_saved_right
         rts
 .after_fall:
-
         lda joynow
         and #$01
         beq .directions
