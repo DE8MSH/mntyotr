@@ -24,6 +24,20 @@ def pal_ticks(vblanks):
 def words(blob):
  return list(struct.unpack('<'+'H'*(len(blob)//2),blob))
 
+def c64_screen_xy(monty_x,monty_y):
+ return 2*(monty_x-0x0c), monty_y-0x32
+
+def pce_sat_xy(monty_x,monty_y):
+ x,y=c64_screen_xy(monty_x,monty_y)
+ return x+32,y+64
+
+def screen_to_room(col,row):
+ if not 3 <= row < 23: return None
+ if col in (2,3): return 0,row-3
+ if 4 <= col < 36: return col-4,row-3
+ if col in (36,37): return 31,row-3
+ return None
+
 def main():
  cells=decode_room(ROOM00_RLE)
  assert len(cells)==ROOM_CELLS==640 and all(0<=x<=15 for x in cells)
@@ -34,12 +48,10 @@ def main():
  assert WORLD[2][0x15]==0 and WORLD[2][0x14]==1 and WORLD[2][0x16]==0xff
  assert WORLD[2][0x04]==0x33 and all(0x30 not in row for row in WORLD)
 
- # Refactored C64 SetupTileGraphics installs room slot 0 as screen code 1.
  bat=words(make_bat(cells))
  assert len(bat)==640
  assert (bat[0]&0x0fff)==CHR_GAME+cells[0]+1
  assert (bat[0]>>12)==cells[0]+1
- # CreatePlayfieldBorder geometry: each 36-char row is edge,edge,32 cells,edge,edge.
  screen=words(make_screen_bat(cells))
  assert len(screen)==36*20
  for y in range(20):
@@ -48,6 +60,16 @@ def main():
   assert row[0]==row[1]==row[2]
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t+1 for t in src]
+
+ # Refactored C64 coordinate bridge: ProcessSprites doubles X while collision
+ # addresses full 40-column screen coordinates.
+ assert c64_screen_xy(0x86,0xb0)==(244,126)
+ assert pce_sat_xy(0x86,0xb0)==(276,190)
+ assert screen_to_room(4,3)==(0,0)
+ assert screen_to_room(35,22)==(31,19)
+ assert screen_to_room(2,3)==(0,0)
+ assert screen_to_room(37,22)==(31,19)
+ assert screen_to_room(0,3) is None and screen_to_room(4,2) is None
 
  for name,frames in (("WALK_L",WALK_L),("WALK_R",WALK_R),("CLIMB",CLIMB)):
   assert len(frames) % FRAME_BYTES == 0, f'{name}: {len(frames)} bytes is not a multiple of FRAME_BYTES={FRAME_BYTES}'
@@ -58,6 +80,6 @@ def main():
    assert len(pixels)==21 and all(len(row)==24 for row in pixels)
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
- print('OK: room00=640 + C64 36x20 screen; jump=22/17; clock=5/6; world=6x23; Monty walk/climb=12 frames')
+ print('OK: C64 screen/collision/XY bridge; jump/clock/world; Monty walk/climb=12 frames')
 
 if __name__=='__main__': main()
