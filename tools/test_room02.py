@@ -55,9 +55,17 @@ def main():
     assert 'BANK(room02_collision_map_rom)' in loader
     assert 'cmp     #5' in world
 
-    # Room02 remains an interior link in the now-active Room04..Room00 chain.
+    # Room02 remains an interior link in the active Room04..Room00 chain.
+    # Check the actual guard structure, not incidental comment wording.
     assert 'Loaded horizontal chain is now $04 <-> $03 <-> $02 <-> $01 <-> $00.' in main_asm
-    assert 'Room $04 left' in main_asm
+    guard = main_asm.index('lda     <collision_actual_room')
+    guard_end = main_asm.index('.guard_room00_right:', guard)
+    outer_left_guard = main_asm[guard:guard_end]
+    assert 'cmp     #4' in outer_left_guard
+    assert 'lda     <monty_room_exit' in outer_left_guard
+    assert 'cmp     #1' in outer_left_guard
+    assert 'lda     #$15' in outer_left_guard
+    assert 'stz     <monty_room_exit' in outer_left_guard
 
     print('OK: Room 02 remains stable inside the active Room04..Room00 chain')
 
