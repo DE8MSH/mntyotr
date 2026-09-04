@@ -1,6 +1,7 @@
-; Phase 38 room loader: rooms $00 <-> $01 <-> $02.
-; Room $01/$02 graphics are copied through MPR3/MPR4 so ROM-bank placement
-; cannot corrupt the room as the ROM grows.
+; Phase 38a room loader: rooms $00 <-> $01 <-> $02.
+; Room $01/$02 graphics are copied through MPR3/MPR4. Room $02 additionally
+; caches its collision map/properties in RAM before gameplay resumes, because
+; its far ROM-tail bank must not remain mapped across runtime physics code.
 
 .zp
 room_copy_rows: ds 1
@@ -40,10 +41,62 @@ room_load_pending:
 .room02:
         call    room02_upload_patterns
         call    room02_draw_native
+        call    room02_cache_collision
         lda     #2
         sta     <monty_room
         stz     <world_transition_ready
         sec
+        rts
+
+; Copy Room-$02's 640-byte collision map plus 8 property bytes from the ROM-tail
+; payload into the RAM labels consumed by the unchanged physics code.
+room02_cache_collision:
+        php
+        sei
+        tma3
+        pha
+        tma4
+        pha
+
+        lda     #<room02_collision_map_rom
+        sta     <_bp
+        lda     #>room02_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room02_collision_map_rom)
+        call    map_bp_to_mpr34
+
+        lda     #<room02_collision_map
+        sta     <_di
+        lda     #>room02_collision_map
+        sta     <_di+1
+
+        ; 648 bytes = 2 full pages + 136 bytes.
+        ldx     #2
+        cly
+.page:
+        lda     [_bp],y
+        sta     [_di],y
+        iny
+        bne     .page
+        inc     <_bp+1
+        inc     <_di+1
+        dex
+        bne     .page
+
+        cly
+        ldx     #136
+.tail:
+        lda     [_bp],y
+        sta     [_di],y
+        iny
+        dex
+        bne     .tail
+
+        pla
+        tam4
+        pla
+        tam3
+        plp
         rts
 
 ; Upload 9*32 = 288 bytes to the shared custom-char VRAM.
