@@ -25,14 +25,28 @@ bare_main:
 
         call    upload_room00_patterns
 
+        ; C64 screen codes 0..8 each select the matching PCE BG palette.
         stz     <_al
-        lda     #8
+        lda     #9
         sta     <_ah
         lda     #<room00_palettes
         sta     <_bp + 0
         lda     #>room00_palettes
         sta     <_bp + 1
         ldy     #^room00_palettes
+        call    load_palettes
+
+        ; PCE sprite palettes are indices 16..31. Monty is C64 colour 1
+        ; (white), so plane-0 pixel index 1 must be visible in SPR palette 0.
+        lda     #16
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<monty_sprite_palette
+        sta     <_bp + 0
+        lda     #>monty_sprite_palette
+        sta     <_bp + 1
+        ldy     #^monty_sprite_palette
         call    load_palettes
         call    xfer_palettes
 
