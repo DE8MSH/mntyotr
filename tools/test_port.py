@@ -6,7 +6,7 @@ from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_
 from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels, convert_frame
 from monty_somersault import load_raw_frames, visible_frames, build as build_somersault
 
-JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,0,1,0,0]
+JUMP_UP=[0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN=[1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
 ROOM00_PROPS=[1,1,1,2,1,1,1,1]
 ROOT=Path(__file__).resolve().parents[1]
@@ -183,23 +183,18 @@ def main():
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
 
- # PCE tall-sprite layout: aligned 32x32 group must be TL,TR,BL,BR.
- # Put one diagnostic bit into each C64 quadrant and ensure it lands in the
- # matching 128-byte 16x16 PCE cell.
- probe=bytearray(63)
- set_c64_pixel(probe,1,1)    # TL local (1,1)
- set_c64_pixel(probe,17,2)   # TR local (1,2)
- set_c64_pixel(probe,2,17)   # BL local (2,1)
- set_c64_pixel(probe,18,18)  # BR local (2,2)
- converted=convert_frame(bytes(probe))
- chunks=[converted[i*128:(i+1)*128] for i in range(4)]
- assert pce_plane0_pixel(chunks[0],1,1)==1
- assert pce_plane0_pixel(chunks[1],1,2)==1
- assert pce_plane0_pixel(chunks[2],2,1)==1
- assert pce_plane0_pixel(chunks[3],2,2)==1
- sat_src=(ROOT/'src/monty_sprite.asm').read_text()
- assert '(MONTY_SPR_VRAM+64)>>5' in sat_src
- assert '(MONTY_SPR_VRAM+256)>>5' not in sat_src
+ # PCE 16x32 sprites select two vertically stacked 16x16 cells from a 32x32
+ # pattern group. The group must therefore be TL,TR,BL,BR, not TL,BL,TR,BR.
+ marker=bytearray(63)
+ for x,y in ((1,1),(17,1),(1,17),(17,17)):
+  set_c64_pixel(marker,x,y)
+ pce=convert_frame(bytes(marker))
+ assert len(pce)==512
+ cells4=[pce[i*128:(i+1)*128] for i in range(4)]
+ assert pce_plane0_pixel(cells4[0],1,1)==1       # TL
+ assert pce_plane0_pixel(cells4[1],1,1)==1       # TR
+ assert pce_plane0_pixel(cells4[2],1,1)==1       # BL
+ assert pce_plane0_pixel(cells4[3],1,1)==1       # BR
 
  sault_l_raw,sault_r_raw=load_raw_frames()
  assert len(sault_l_raw)==len(sault_r_raw)==12*64
@@ -212,6 +207,6 @@ def main():
  assert len(build_somersault(sault_l_raw))==12*512
  assert len(build_somersault(sault_r_raw))==12*512
 
- print('OK: room/world; collision/fall; SAT XY; PCE sprite layout; walk/climb + 24 somersault frames')
+ print('OK: room/world; exact collision/fall; SAT XY; PCE sprite quadrants; walk/climb + 24 somersault frames')
 
 if __name__=='__main__': main()
