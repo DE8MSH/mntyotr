@@ -59,10 +59,15 @@ room00_get_tile_property:
         lda     <monty_room
         cmp     #1
         beq     .room01
+        cmp     #2
+        beq     .room02
         lda     room00_tile_properties,x
         rts
 .room01:
         lda     room01_tile_properties,x
+        rts
+.room02:
+        lda     room02_tile_properties,x
         rts
 .empty:
         cla
@@ -102,6 +107,8 @@ room00_get_tile_xy:
         lda     <monty_room
         cmp     #1
         beq     .room01
+        cmp     #2
+        beq     .room02
         lda     #<room00_collision_map
         sta     <collision_ptr
         lda     #>room00_collision_map
@@ -111,6 +118,12 @@ room00_get_tile_xy:
         lda     #<room01_collision_map
         sta     <collision_ptr
         lda     #>room01_collision_map
+        sta     <collision_ptr+1
+        bra     .add_row
+.room02:
+        lda     #<room02_collision_map
+        sta     <collision_ptr
+        lda     #>room02_collision_map
         sta     <collision_ptr+1
 .add_row:
         lda     <collision_ptr
