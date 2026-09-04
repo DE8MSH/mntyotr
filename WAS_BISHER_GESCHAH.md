@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 20b
+Stand: 2026-09-04 — Phase 20c
 
 ## Portierungsstand
 
@@ -22,25 +22,29 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - PCE VDC/VCE Bring-up, PAL-orientierter Gameplay-Scheduler und Raum-$00-Zwischenstand.
 - Monty ist im Emulator sichtbar.
 
-## Phase 20a/20b — Sprite, Build und Koordinatenaudit
+## Phase 20c — VIC-Sprite-Slots statt Marker-Heuristik
 
-Der Nutzer meldete nach Phase 20a einen Regressionstest-Abbruch in `monty_sprite.py`: der letzte transkribierte VIC-Frame endet mit ausgelassenem Null-Padding. Der Extraktor akzeptiert jetzt ausschliesslich beim letzten Frame dieses fehlende Null-Ende und ergaenzt es auf die 63 sichtbaren VIC-Bitmapbytes. Andere Trunkierungen bleiben Fehler.
+Der zweite Buildversuch zeigte, dass die Phase-20b-Heuristik weiterhin falsch war. Die C64-Referenz legt die Walk-/Climb-Animationen an festen Adressen `$5400`, `$5500`, `$5600` ab. Damit besteht jeder Vier-Frame-Block aus vier festen 64-Byte-VIC-Slots: 63 sichtbare Bitmapbytes plus ein Slot-/Paddingbyte. Frames duerfen deshalb nicht durch Suchen nach einem wiederkehrenden Pixelprefix erkannt werden.
 
-Der Screenshot hat ausserdem einen wichtigeren Architekturfehler sichtbar gemacht: Der aktuelle PCE-Port zeichnet lediglich die rohe 32x20-Raumkarte als 32 BAT-Zeichen. Das ist **nicht** die komplette C64-Screengeometrie. Die Referenz arbeitet mit einem 40-Zeichen-Screen. Das eigentliche 32-Zeichen-Playfield liegt in Spalten 4..35 und Zeilen 3..22; `CreatePlayfieldBorder` spiegelt die Kanten in die Gutters Spalten 2..3 und 36..37. `PopulateColourRam` verarbeitet deshalb 36 Zeichen pro Zeile ab Spalte 2. HUD/obere Zeilen und Sektorname unten fehlen im PCE-Port ebenfalls noch.
+`tools/monty_sprite.py` zerlegt die transkribierten Animationsbloecke jetzt positionsbasiert in 64-Byte-Slots und nimmt aus jedem Slot exakt die ersten 63 sichtbaren Bytes. Nur am Ende des handtranskribierten Blocks fehlende Nullbytes werden bis zur bekannten Blockgroesse aufgefuellt. Damit ist die fehlerhafte `_extract_bitmap_frames`-Markerlogik entfernt.
 
-Damit ist die Beobachtung des Nutzers korrekt: Die Verhaeltnisse und Koordinaten sind noch nicht 1:1. Besonders kritisch ist Montys C64-X-System: Kollisionsroutinen rechnen `(monty_x-$0c)>>2`, waehrend der bisherige PCE-SAT-Pfad `monty_x` fast direkt als Pixel-X benutzt. Diese Skalierung wird jetzt nicht mehr als korrekt betrachtet. Vor weiterem Gameplay werden Screen-, Sprite- und Collision-Koordinaten gemeinsam aus der C64-Referenz abgeleitet.
+## Koordinatenaudit
+
+Der aktuelle PCE-Port zeichnet lediglich die rohe 32x20-Raumkarte. Die Referenz arbeitet mit einem 40-Zeichen-Screen. Das eigentliche 32-Zeichen-Playfield liegt in Spalten 4..35 und Zeilen 3..22; `CreatePlayfieldBorder` spiegelt die Kanten in die Gutters Spalten 2..3 und 36..37. `PopulateColourRam` verarbeitet deshalb 36 Zeichen pro Zeile ab Spalte 2. HUD/obere Zeilen und Sektorname unten fehlen im PCE-Port ebenfalls noch.
+
+Besonders kritisch ist Montys C64-X-System: Kollisionsroutinen rechnen `(monty_x-$0c)>>2`, waehrend der bisherige PCE-SAT-Pfad `monty_x` fast direkt als Pixel-X benutzt. Diese Skalierung gilt nicht mehr als korrekt. Vor weiterem Gameplay werden Screen-, Sprite- und Collision-Koordinaten gemeinsam aus der C64-Referenz abgeleitet.
 
 ## Verifikationsstatus
 
 - Host-Toolchain/startendes ROM: bestaetigt.
-- Phase-20b Buildfix: lokal noch zu testen.
+- Phase-20c VIC-Slot-Buildfix: lokal noch zu testen.
 - Raumgeometrie 1:1: **noch nicht erreicht**.
 - Sprite-X/Collision-X 1:1: **noch nicht erreicht**.
 - Padbewegung: durch die fehlerhafte Collision-/Koordinatenabbildung noch nicht aussagekraeftig.
 
 ## Naechste Portschritte
 
-1. Build nach dem Frame-Normalisierungsfix wieder gruen bekommen.
+1. Build nach dem positionsbasierten VIC-Slot-Fix wieder gruen bekommen.
 2. C64 `DrawRoomPlayfield` + `CreatePlayfieldBorder` als 40-Spalten-Screenmodell auf PCE abbilden.
 3. C64 Monty-X/Y -> PCE-SAT-Transformation exakt festlegen; dieselbe Transformation fuer Collision verwenden.
 4. Erst danach Bewegung/Jump erneut visuell testen.
