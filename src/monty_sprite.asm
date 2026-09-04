@@ -99,9 +99,6 @@ monty_upload_climb_frame:
  sta <monty_sprite_last_mode
  rts
 
-; C64 UpdateState advances a walk frame only while Monty is moving, advances
-; climb while vertical movement is active, and also advances during a jump.
-; Standing still keeps the current walk frame instead of cycling in place.
 monty_sprite_animate:
  lda <monty_climbing
  beq .walk_mode
@@ -151,29 +148,42 @@ monty_sprite_animate:
 .done:
  rts
 
-; PCE SAT coordinates use +64 for Y and +32 for X. The C64 sprite flush copies
-; monty_sprite_y2 and then increments it once before writing sprite 3, so the
-; PCE bridge must include that +1 as well. X remains the C64 ASL-derived 9-bit
-; mapping implemented below.
+; Coordinate bridge from the C64 internal Monty values to PCE SAT space.
+; C64 visible X = 2*(monty_x-$0c), visible Y = (monty_y+1)-$32.
+; PCE SAT origin is +32 X / +64 Y, therefore:
+;   SAT X = 2*monty_x + 8
+;   SAT Y = monty_y + 15
+; SAT X is 10-bit. Preserve the carry from ASL as bit 8; the previous code
+; cleared it before adding the offset, wrapping the original start X=276 to 20.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
  lda #>MONTY_SAT_LEFT
  sta <_di+1
  call vdc_di_to_mawr
+
+ ; left half Y
  lda <monty_y
  clc
- adc #65
+ adc #15
  sta VDC_DL
  stz VDC_DH
+
+ ; left half X = 2*x + 8, full 10-bit SAT value
  lda <monty_x
  asl a
+ ldx #0
+ bcc .left_no_asl_carry
+ inx
+.left_no_asl_carry:
  clc
  adc #8
+ bcc .left_no_add_carry
+ inx
+.left_no_add_carry:
  sta VDC_DL
- lda #0
- adc #0
- sta VDC_DH
+ stx VDC_DH
+
  lda #<(MONTY_SPR_VRAM>>5)
  sta VDC_DL
  lda #>(MONTY_SPR_VRAM>>5)
@@ -182,19 +192,29 @@ monty_sprite_update_satb:
  sta VDC_DL
  lda #$10
  sta VDC_DH
+
+ ; right half Y
  lda <monty_y
  clc
- adc #65
+ adc #15
  sta VDC_DL
  stz VDC_DH
+
+ ; right half X = 2*x + 24, full 10-bit SAT value
  lda <monty_x
  asl a
+ ldx #0
+ bcc .right_no_asl_carry
+ inx
+.right_no_asl_carry:
  clc
  adc #24
+ bcc .right_no_add_carry
+ inx
+.right_no_add_carry:
  sta VDC_DL
- lda #0
- adc #0
- sta VDC_DH
+ stx VDC_DH
+
  lda #<((MONTY_SPR_VRAM+256)>>5)
  sta VDC_DL
  lda #>((MONTY_SPR_VRAM+256)>>5)
