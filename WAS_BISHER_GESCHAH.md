@@ -1,68 +1,53 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 34
+Stand: 2026-09-04 — Phase 34a
 
 ## Portierungsstand
 
-**Gesamtport: ca. 45 %**
+**Gesamtport: ca. 44 %**
 
-Der Stabilitaets-Rollback auf Phase 32b ist vom Nutzer jetzt erneut praktisch bestaetigt: Monty ist steuerbar, Springen funktioniert, die Animationen sind in Ordnung, und der echte Raumwechsel von Raum $00 nach links in Raum $01 funktioniert wieder. Dass Raum $00 nach rechts nicht verlassen werden kann, ist korrekt, weil dort im originalen Weltgitter `$ff` liegt. Damit ist klar: die Physics-/Collision-Regressions aus Phase 33b/33c waren nicht Teil des eigentlichen Mehrraum-Grundstands und bleiben verworfen.
+Der Nutzer hat den Phase-32b-Runtime-Stand erneut bestaetigt: Monty ist steuerbar, Springen und Animationen funktionieren, und Raum $00 -> $01 nach links funktioniert. Der anschliessende Phase-34-Versuch, Room-$01-Decor wieder zu aktivieren, hat sofort erneut die schwere Boden-/Collision-Regression ausgeloest: Monty faellt durch den Boden.
 
 ## Verbindliche Referenz
 
 Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` dient nur als zusaetzliche Ground-Truth.
 
-## Wieder bestaetigter Runtime-Stand
+## Sicher bestaetigter Runtime-Stand
 
-- Monty startet wieder brauchbar und ist steuerbar.
-- Gehen, Springen, Falling und Landung funktionieren wieder im Phase-32b-Pfad.
-- Walk/Climb sowie die 12+12 Somersaultframes funktionieren visuell.
+- Monty ist steuerbar.
+- Gehen, Springen, Falling und Landung funktionieren im Phase-32b-Pfad.
+- Walk/Climb und 12+12 Somersaultframes funktionieren visuell.
 - Raum $00 -> $01 nach links funktioniert.
-- Raum $01 -> $00 nach rechts war bereits zuvor bestaetigt.
-- Rechts neben Raum $00 liegt `$ff`; dort darf kein Raumwechsel stattfinden.
+- Raum $01 -> $00 nach rechts funktioniert.
+- Rechts neben Raum $00 liegt im Original `$ff`; dort gibt es keinen Zielraum.
 
-## Phase 33d — Stabilitaets-Rollback
+## Phase 34 — fehlgeschlagener Decor-Reaktivierungsversuch
 
-Nach den fehlerhaften Collision-RAM-Experimenten wurde der aktive Runtime-Pfad auf den zuletzt bewaehrten Phase-32b-Code zurueckgesetzt. Insbesondere `monty_physics.asm` blieb danach unveraendert. Der Restore-Commit ist `0bc77d50c66d7766cc1a925cda1237a182396dcd`.
+Room-$01-Decor wurde in einem separaten Loader reaktiviert, ohne `monty_physics.asm` direkt zu veraendern. Trotzdem trat beim Nutzer sofort wieder die Fall-durch-Boden-Regression auf. Damit ist jetzt klar: bereits das zusaetzliche ROM-/Code-/Asset-Layout kann den noch nicht vollständig bankfesten Collision-Pfad verschieben. Es reicht nicht, nur die Physics-Datei unangetastet zu lassen.
 
-## Phase 34 — Room-$01-Decor erneut, aber strikt vom Gameplay isoliert
+## Phase 34a — sofortiger Rollback
 
-Die bereits portierten Original-Decors fuer Raum $01 werden nun erneut aktiviert, diesmal ohne neue Collision-/Physics-Architektur:
+Der komplette aktive Phase-34-Pfad wurde wieder auf den zuvor bestaetigten Stand `0bc77d50c66d7766cc1a925cda1237a182396dcd` zurueckgesetzt. Konkret wurden `build.sh`, `src/main.asm`, `src/room01_assets.asm` und `src/room_loader.asm` exakt auf diesen Stand gestellt; `src/room01_decor_loader.asm` und `tools/test_phase34_room01_decor_safe.py` wurden wieder entfernt.
 
-- Type `$42` `purple_flowers`, 4x4 Zeichen
-- Type `$41` `bunch_flower`, 3x3 Zeichen
+Rollback-Commit: `95f219ccae9f4e3bc6d8058230c6e299e1b032f0`.
 
-`tools/room01_decor.py` erzeugt weiterhin den dekorierten 36x20-BAT und 25 PCE-Decor-Zeichen (800 Byte). `src/room01_assets.asm` bindet nur diesen neuen Grafikblock ein.
+Die Room-$01-Decor-Generatoren bleiben als inaktive Referenzdaten im Repository, werden aber nicht mehr in den Build aufgenommen.
 
-Der entscheidende Unterschied zum verworfenen Phase-33-Pfad: der Decor-Upload liegt jetzt in der separaten Datei `src/room01_decor_loader.asm`. `room_loader.asm` selbst bekommt nur einen bank-/reichweitensicheren `call room01_upload_decor`. Die bereits funktionierenden Room-$01-Aufrufe wurden ebenfalls auf `call` statt relatives `bsr` gestellt, damit wachsender Content nicht erneut einen Branch-Range-Fehler erzeugt.
+## Technische Konsequenz
 
-`monty_physics.asm` wird in Phase 34 nicht veraendert. Es gibt keinen Collision-RAM-Cache und keine neue Startpositions-/Sprunglogik.
-
-## Regressionstest
-
-Neu ist `tools/test_phase34_room01_decor_safe.py`. Er prueft explizit:
-
-- der verworfene `room_collision_map_ram`-Pfad ist nicht in der Physics,
-- die bekannten direkten Room-$00/Room-$01-Collision-Pfade sind weiter vorhanden,
-- Room-$01-Decor ist in einer separaten Upload-Datei,
-- Loader-Aufrufe verwenden `call` statt `bsr`,
-- der Decor-Upload benutzt den bewaehrten bankfaehigen `map_bp_to_mpr34`-Pfad.
-
-`build.sh` fuehrt sowohl den bestehenden exakten Room-$01-Decor-Test als auch diesen neuen Runtime-Schutztest aus und erzeugt `room01-decor-patterns.dat` direkt im Build-Verzeichnis.
+Vor weiterem Content muss der aktive Collision-Datenzugriff bankfest gemacht werden, ohne die C64-Koordinaten-/Physiksemantik zu veraendern. Der naechste Versuch wird deshalb nicht wieder Decor zuschalten, sondern zuerst den exakt gleichen Phase-32b-Build instrumentieren bzw. die ROM-Adressen/Bank-Zuordnung der Collision-Maps verifizieren. Erst wenn klar ist, warum schon reines ROM-Wachstum die direkten `room00_collision_map`/`room01_collision_map`-Zugriffe bricht, wird neuer Content wieder aktiviert.
 
 ## Verifikationsstatus
 
-Phase 34 ist hochgeladen, aber noch nicht mit dem lokalen PCEAS/Mednafen des Nutzers ausgefuehrt. Der wichtige Ausgangspunkt ist diesmal bestaetigt: Phase 32b funktioniert wieder.
-
-Als naechstes lokal bauen. Danach zuerst kurz pruefen, dass Startposition, Sprung, Landung und Steuerung unveraendert bleiben. Dann nach links in Raum $01 gehen und auf `purple_flowers` sowie `bunch_flower` achten. Anschliessend wieder nach rechts nach Raum $00 zurueckgehen.
+Phase 34a ist hochgeladen, aber noch nicht lokal mit PCEAS/Mednafen verifiziert. Als naechstes `git pull && ./build.sh` und nur pruefen, ob der wiederhergestellte Phase-32b-Runtime-Stand erneut korrekt laeuft.
 
 ## Naechste Portschritte
 
-1. Phase 34 lokal verifizieren: Gameplay muss unveraendert bleiben, Room-$01-Decors muessen sichtbar sein.
-2. Danach Raum $02 mit demselben isolierten Daten-/Grafikmuster anbinden.
-3. Den Mehrraum-Loader schrittweise verallgemeinern, ohne die bestaetigte Physics erneut umzubauen.
-4. Danach Gegner, Mechanismen, Items und HUD/Gameflow portieren.
-5. Audio/Musik folgt auf dem stabilen Gameplay-Unterbau.
+1. Phase 34a lokal bestaetigen.
+2. Collision-ROM-Banking des unveraenderten Phase-32b-Pfads exakt analysieren und bankfest machen, ohne Sprung-/Start-/Collision-Semantik umzuschreiben.
+3. Danach Room-$01-Decor erneut aktivieren.
+4. Erst danach Raum $02 und weitere Welt-Raeume portieren.
+5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
 
 ## Referenzen
 
