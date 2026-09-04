@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 19
+Stand: 2026-09-04 — Phase 19a
 
 ## Portierungsstand
 
@@ -21,30 +21,33 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 - Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
 - C64-Raumkanten und statisches 6x23-Weltgrid.
 - Echte Monty-Walkgrafik fuer beide Blickrichtungen.
-- Echte Monty-Climbgrafik und jetzt auch deren Gameplay-Auswahl.
+- Echte Monty-Climbgrafik und deren Gameplay-Auswahl.
 
 ## Phase 18i — erster erfolgreicher ROM-Build
 
-Vom Nutzer am 2026-09-04 bestaetigt: Nach den PCEAS-Final-Pass- und Branch-Reichweitenkorrekturen baut `./build.sh` erfolgreich eine startende `.pce`. Der Nutzer hat einen Emulator-Screenshot des laufenden ROMs geliefert. Damit sind Toolchain, lokaler Regressionstest, PCEAS-Durchlauf und ROM-Start erstmals end-to-end bestaetigt. Die sichtbare Raumdarstellung ist noch ein Zwischenstand und kein Pixelvergleich gegen das C64-Original.
+Vom Nutzer am 2026-09-04 bestaetigt: `./build.sh` erzeugt erfolgreich eine startende `.pce`; der Emulator zeigt den portierten Raum $00. Damit sind Toolchain, Regressionstests, PCEAS und ROM-Start end-to-end bestaetigt.
 
 ## Phase 19 — Tile-State, UP/DOWN und Climb-Runtime
 
-Die C64-Routine `Monty.UpdateTileFlags` wurde als naechster Gameplay-Baustein uebertragen: Montys logischer 2x3-Footprint wird auf Collision-Property 3 untersucht und daraus `monty_tile_state` gebildet. Wie im C64-Code wird vertikale Spielerbewegung nur zugelassen, wenn dieser Tile-State aktiv ist und kein Sprung laeuft.
+Die C64-Routine `Monty.UpdateTileFlags` wurde fuer den aktuellen logischen Raum uebertragen: Montys 2x3-Footprint wird auf Collision-Property 3 untersucht und daraus `monty_tile_state` gebildet. Vertikale Spielerbewegung wird nur zugelassen, wenn dieser Tile-State aktiv ist und kein Sprung laeuft. PCE-Pad UP/DOWN bewegt Monty unter Collision-Pruefung; `monty_climbing` schaltet auf die authentischen vier Climb-Frames.
 
-PCE-Pad UP/DOWN bewegen Monty nun vertikal unter Collision-Pruefung. `monty_climbing` markiert die tatsaechliche vertikale Bewegung. Der bereits vorhandene authentische Viererblock der C64-Climb-Sprites wird jetzt vom Runtime-Animator ausgewaehlt; Wechsel zwischen Walk und Climb erzwingen einen VRAM-Frame-Upload. Die Animationsperiode bleibt bei vier logischen Ticks.
+## Phase 19a — C64-Animationszustand statt Dauer-Walk
 
-Wichtig: Raum $00 besitzt nach den bisher rekonstruierten Tile-Properties keine Property-3-Kachel. Der neue Leiter-/Seilpfad ist deshalb implementiert, wird aber erst in einem passenden Raum sichtbar testbar. Die generische Raumdatenpipeline ist weiterhin offen.
+Der erste PCE-Animator liess die Walkframes auch im Stillstand alle vier logischen Ticks weiterlaufen. Das entspricht nicht `Monty.UpdateState` des C64. Der Runtime-Animator wurde deshalb korrigiert: Walkframes laufen nur bei `monty_is_moving`, Climbframes nur bei aktivem vertikalem Klettern, und waehrend eines Sprungs bleibt der Animationstakt aktiv. Ein Richtungs- oder Moduswechsel erzwingt weiterhin den notwendigen VRAM-Upload. Damit steht Monty im Idle auf seinem aktuellen Walkframe statt auf der Stelle zu laufen.
+
+Die eigentlichen 12+12 Somersault-Grafiken fehlen noch; waehrend des Sprungs wird bis zu deren Port weiterhin der vorhandene Vierer-Animationspfad benutzt.
 
 ## Verifikationsstatus
 
-Vom Nutzer bestaetigt: `./build.sh` erzeugt ein startendes PCE-ROM und der bisherige Raum wird im Emulator dargestellt. Phase 19 ist im Quellcode portiert, aber der neue Stand muss nach `git pull && ./build.sh` erneut assembliert werden. Leiter-/Seilbewegung kann in Raum $00 mangels Property-3-Tile noch nicht sinnvoll visuell verifiziert werden.
+Vom Nutzer bestaetigt: Phase 19 baut erfolgreich. Phase 19a ist hochgeladen, aber noch nicht durch den naechsten lokalen `./build.sh`-Lauf bestaetigt. Raum $00 besitzt keine Property-3-Kachel, daher ist der Climbpfad dort noch nicht sinnvoll visuell testbar.
 
 ## Aktuell offen
 
-- Phase-19-Stand erneut bauen und auf PCEAS-Regression pruefen.
+- Phase 19a bauen/regressionspruefen.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
-- Raum $01 und generischen Room-State/Renderer anschliessen; damit weitere Collision-Properties und Leiter-/Seilpfade real testbar machen.
-- Collision-Abbildung zwischen C64-Screenkoordinaten und logischem 32x20-Raum weiter exakt verifizieren.
+- `CheckTileBelow` fuer Properties 2/3/4 exakt nachziehen; insbesondere Property 4 setzt nach zwei Treffern den C64-Eventwert 5.
+- Raum $01 und generischen Room-State/Renderer anschliessen.
+- Collision-Abbildung zwischen C64-Screenkoordinaten und logischem 32x20-Raum exakt verifizieren.
 - Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 
 ## Referenzen
