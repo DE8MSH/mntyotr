@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 29
+Stand: 2026-09-04 — Phase 30
 
 ## Portierungsstand
 
-**Gesamtport: ca. 40 %**
+**Gesamtport: ca. 41 %**
 
-Die Phase-28e-Sprunganimation ist vom Nutzer jetzt visuell bestaetigt. Phase 29 beginnt den echten C64-Decor-Pfad fuer Raum $00.
+Der Nutzer hat Phase 29 visuell bestaetigt (`passt`). Phase 30 erweitert Raum $00 nun um die echten patterned-colour-Decors aus der C64-Quelle.
 
 ## Verbindliche Referenz
 
@@ -15,68 +15,68 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 ## Bestaetigt
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- Basis-Raumgrafik stimmt laut Nutzer brauchbar.
+- Basis-Raumgrafik stimmt brauchbar.
 - Montys Start-/SAT-Position passt weitgehend.
-- Gehen, Springen und unsupported Falling funktionieren.
-- Landen auf Plattformen funktioniert.
+- Gehen, Springen, Falling und Landen auf Plattformen funktionieren.
 - Die Hauswandoeffnung in Raum $00 ist passierbar.
-- Die 12+12 Somersault-/Jumpframes funktionieren nach dem bankfesten Phase-28e-Loader jetzt visuell korrekt.
+- Die 12+12 Somersault-/Jumpframes funktionieren nach dem bankfesten Phase-28e-Loader visuell korrekt.
+- Phase-29-Decors (Fenster, MPL-ST-Schild und Lampenteile) sind vom Nutzer visuell bestaetigt.
 
-## Phase 28e — Jump-Sprite-Banking bestaetigt
+## Phase 30 — patterned Raum-$00-Decor
 
-Die grossen Somersaultdaten werden nicht mehr mit bankunsicheren direkten `TIA monty_sault_*`-Transfers gelesen. Der Jump-Loader benutzt Far-Pointer-Tabellen und `map_bp_to_mpr34`, sodass auch Frames in spaeteren ROM-Banks und ueber Bankgrenzen hinweg korrekt nach VRAM geladen werden.
+Die C64-Decor-Engine arbeitet pro Zeichen mit einer Farbe. Bei patterned Decors ist die Farbe deshalb ein Stream mit genau `width*height` Bytes. Phase 30 portiert drei weitere Raum-$00-Typen inklusive dieser originalen Streams:
 
-Der Nutzer hat danach bestaetigt: die Sprunganimation passt.
+- Type 2 `street_lamp_lamp`, 3x2 Zeichen, Stream `$0c,$0c,$0c,$07,$07,$0c`
+- Type 5 `yellow_flower`, 1x3 Zeichen, Stream `$07,$0d,$0a`
+- Type 6 `brown_flower`, 1x3 Zeichen, Stream `$08,$05,$0a`
 
-## Phase 29 — Raum-$00-Decor, erster echter Teil
+Die zugehoerigen C64-Bitmaps stammen ebenfalls direkt aus `refactored/src/subsystems/decor_data.asm`. Type 5 und 6 benutzen dieselbe Bitmap, werden aber wie im C64-Allocator als getrennte Type-ID-Zeichenbereiche angelegt.
 
-Die C64-Referenz `decor_data.asm` enthaelt fuer Raum $00 acht Decor-Records. Die Decor-Engine interpretiert sie als `room_id,x,y,type_id`, laedt pro Type Breite/Hoehe und allokiert dessen Zeichen nur einmal pro Raum.
-
-Phase 29 portiert zunaechst die **solid-colour** Decor-Typen aus Raum $00 exakt aus den C64-Daten:
-
-- Type 0 `street_lamp_base`, 1x2 Zeichen, C64 Farbe $0c
-- Type 1 `street_lamp_pole`, 1x4 Zeichen, C64 Farbe $0c; wird in Raum $00 zweimal verwendet
-- Type 3 `window`, 3x3 Zeichen, C64 Farbe $0f
-- Type 4 `mpl_st_sign`, 5x1 Zeichen, C64 Farbe $01
-
-Dazu sind die exakten C64-8x8-Bitmaps in `tools/room00_decor.py` uebernommen. Der Generator wandelt jedes C64-Zeichen in ein PCE-8x8-4bpp-Tile, allokiert 20 PCE-Zeichen ab `CHR_GAME+9` und legt die C64-Raumkoordinaten auf das bestehende 36x20-Fenster (C64 Spalten 2..37, Zeilen 3..22) um.
-
-Die entsprechenden Raum-$00-Records sind:
+Damit emittiert `tools/room00_decor.py` nun diese acht Raum-$00-Records:
 
 - `$00,$24,$10,$00`
 - `$00,$24,$0c,$01`
 - `$00,$24,$08,$01`
+- `$00,$22,$06,$02`
 - `$00,$17,$08,$03`
 - `$00,$03,$08,$04`
+- `$00,$0e,$0a,$05`
+- `$00,$0c,$0c,$06`
 
-`build.sh` erzeugt nach dem Basis-RLE nun `room00-decor-patterns.dat` und ueberschreibt `room00-screen-bat.dat` mit dem Decor-Overlay. `src/room00_assets.asm` laedt die 20 neuen Zeichen sowie drei dedizierte BG-Paletten fuer C64 $0c/$0f/$01. `src/main.asm` laedt diese Paletten in BG-Slots 9..11.
+Der einzige noch fehlende Raum-$00-Decor-Record ist Type `$43` (`sad_flowers`) bei `$21,$0f`; dessen Farbstrom wird erst nach eindeutiger Pinning-Pruefung aus der Quelle eingebaut.
 
-Neu ist `tools/test_room00_decor.py`. Es prueft die 20-Zeichen-Allokation, die 3x3-Fensterposition, das 5x1-MPL-ST-Schild sowie die Wiederverwendung derselben Type-1-Zeichen fuer beide Lampenmast-Records.
+## Palette-Infrastruktur
 
-## Noch offen im Raum-$00-Decor
+Phase 29 hatte fuer jeden Room-Screencode praktisch einen eigenen PCE-BG-Palettenslot reserviert. Das verschwendete Slots, obwohl mehrere Codes dieselbe C64-Farbe besitzen. Phase 30 kompaktiert deshalb die Basisbelegung ohne die bestaetigten Farben zu aendern:
 
-Vier Raum-$00-Records benutzen patterned colour streams und sind bewusst noch nicht vorgetaescht worden:
+- Palette 0: schwarz
+- Palette 1: C64 braun `$09` (von Room-Codes 1 und 2 gemeinsam benutzt)
+- Palette 2: C64 rot `$02`
+- Palette 3: C64 cyan `$03`
+- Palette 4: C64 dunkelgrau `$0b`
+- Paletten 5..12: die fuer Decor benoetigten C64-Farben `$0c,$0f,$01,$07,$0d,$0a,$08,$05`
 
-- Type 2 `street_lamp_lamp`
-- Type 5 `yellow_flower`
-- Type 6 `brown_flower`
-- Type 67 `sad_flowers`
+`tools/room_rle.py` schreibt jetzt diese kompakte Palettennummer in das BAT. Dadurch bleiben genug der 16 PCE-BG-Paletten fuer die originalen C64-Decor-Farbstroeme frei.
 
-Diese kommen als naechster Decor-Schritt mit ihren originalen Farbstroemen. Danach ist Raum-$00-Decor vollstaendig genug fuer den Vergleich mit dem C64-Raum.
+## Daten und Tests
+
+`tools/room00_decor.py` erzeugt jetzt 32 PCE-Zeichen (1024 Byte) fuer Types 0..6 und setzt pro Decor-Zelle die richtige Palette aus dem C64-Farbstrom. `src/room00_assets.asm` laedt 1024 Byte statt 640 Byte und enthaelt die gemeinsame `room00_bg_palettes`-Tabelle. `src/main.asm` laedt diese 13 BG-Paletten in einem Schritt.
+
+`tools/test_room00_decor.py` prueft jetzt zusaetzlich alle sechs Lampenkopf-Farben und beide dreizeiligen Blumen-Farbstroeme sowie die exakten Zeichenallokationen. `tools/test_port.py` prueft die neue kompakte Palette-Abbildung des Basisraums.
 
 ## Verifikationsstatus
 
-- Phase 29 ist hochgeladen.
-- Lokal muss `git pull && ./build.sh` ausgefuehrt werden.
-- Danach sollte Raum $00 sichtbar zusaetzliche feste Objekte zeigen: MPL-ST-Schild, Fenster und Teile der Strassenlampe.
-- Physik, Collision, Startposition und die bestaetigte Jump-Animation wurden nicht veraendert.
+- Phase 30 ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Als naechstes `git pull && ./build.sh`.
+- Danach besonders Lampenkopf sowie gelbe/braune Blumen in Raum $00 visuell pruefen.
+- Physik, Collision, Startposition und Jump-Animation wurden nicht veraendert.
 
 ## Naechste Portschritte
 
-1. Phase 29 lokal bauen und die neuen Raum-$00-Decors pruefen.
-2. Patterned Decor Types 2/5/6/67 inklusive originaler Colour-Streams portieren.
-3. Walk/Climb auf denselben bankfesten Original-Slot-Pfad wie Somersault umstellen.
-4. Danach generischer Room-Loader und echte Raumwechsel.
+1. Phase 30 lokal bauen und patterned Decors visuell pruefen.
+2. Type `$43` `sad_flowers` mit eindeutig gepinntem Original-Farbstrom nachziehen.
+3. Walk/Climb auf den bankfesten Original-Slot-Pfad des Somersault-Loaders vereinheitlichen.
+4. Generischen Room-Loader und echte Raumwechsel anbinden.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
