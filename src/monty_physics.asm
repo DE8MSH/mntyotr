@@ -10,6 +10,8 @@ monty_facing:           ds 1           ; 0=right, $80=left
 monty_step_phase:       ds 1
 monty_saved_left:       ds 1
 monty_saved_right:      ds 1
+monty_room:             ds 1
+monty_room_exit:        ds 1           ; 0=none, 1=left, 2=right, 3=up, 4=down
 collision_x:            ds 1
 collision_y:            ds 1
 collision_count:        ds 1
@@ -29,6 +31,8 @@ monty_physics_init:
         stz     <monty_step_phase
         stz     <monty_saved_left
         stz     <monty_saved_right
+        stz     <monty_room
+        stz     <monty_room_exit
         rts
 
 ; A = logical room tile id 0..7. Return the room-$00 C64 collision property.
@@ -43,8 +47,6 @@ room00_get_tile_property:
         rts
 
 ; X=column 0..31, Y=row 0..19. Returns logical tile id, or zero outside.
-; The 640-byte room cannot be indexed with an 8-bit X register, so use the
-; original-style pointer approach with a row*32 table.
 room00_get_tile_xy:
         cpx     #32
         bcs     .outside
@@ -272,15 +274,12 @@ monty_check_tile_below:
         sec
         rts
 
-; C64 ToggleStepGate: increment a byte and return bit 0. Left moves on 1,
-; right moves on 0, matching the two original call sites.
 monty_toggle_step_gate:
         inc     <monty_step_phase
         lda     <monty_step_phase
         and     #$01
         rts
 
-; Start jump and freeze horizontal direction for the arc, like jump_saved_*.
 monty_jump_start:
         lda     <monty_jump_phase
         bne     .done
@@ -288,19 +287,51 @@ monty_jump_start:
         sta     <monty_jump_phase
         stz     <monty_jump_index
         lda     joynow
-        and     #$80                    ; LEFT
+        and     #$80
         sta     <monty_saved_left
         lda     joynow
-        and     #$20                    ; RIGHT
+        and     #$20
         sta     <monty_saved_right
 .done:
         rts
 
-; PCE pad -> C64 Monty movement semantics. joynow is refreshed by bare-startup
-; every VBlank. PCE bits: I=$01, UP=$10, RIGHT=$20, DOWN=$40, LEFT=$80.
+; Preserve the C64 room-edge hand-off coordinates. Actual neighboring room
+; loading is deliberately separate: this routine records the requested exit
+; so the world/room subsystem can consume it without corrupting room-$00 data.
+monty_check_room_edges:
+        stz     <monty_room_exit
+        lda     <monty_x
+        cmp     #$15
+        bcc     .left_exit
+        cmp     #$9c
+        bcs     .right_exit
+        lda     <monty_y
+        cmp     #$4c
+        bcc     .up_exit
+        rts
+.left_exit:
+        lda     #1
+        sta     <monty_room_exit
+        lda     #$9b
+        sta     <monty_x
+        rts
+.right_exit:
+        lda     #2
+        sta     <monty_room_exit
+        lda     #$15
+        sta     <monty_x
+        rts
+.up_exit:
+        lda     #3
+        sta     <monty_room_exit
+        lda     #$da
+        sta     <monty_y
+        rts
+
+; PCE pad -> C64 Monty movement semantics.
 monty_update_input:
         lda     joynow
-        and     #$01                    ; button I = C64 fire
+        and     #$01
         beq     .horizontal
         lda     <monty_jump_phase
         bne     .horizontal
@@ -329,6 +360,7 @@ monty_update_input:
         bsr     monty_toggle_step_gate
         beq     .done
         dec     <monty_x
+        bsr     monty_check_room_edges
 .done:
         rts
 .right:
@@ -338,10 +370,10 @@ monty_update_input:
         bsr     monty_toggle_step_gate
         bne     .done_right
         inc     <monty_x
+        bsr     monty_check_room_edges
 .done_right:
         rts
 
-; Advance one exact C64 vertical jump-arc sample, clipping against room tiles.
 monty_jump_step:
         lda     <monty_jump_phase
         beq     .done
@@ -359,6 +391,7 @@ monty_jump_step:
         sbc     <jump_delta
         sta     <monty_y
         inc     <monty_jump_index
+        bsr     monty_check_room_edges
         rts
 .switch_down:
         lda     #2
