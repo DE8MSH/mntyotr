@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast deterministic checks for the C64->PCE port data path."""
 from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room
+from monty_sprite import WALK_L, FRAME_BYTES, build_walk_left, c64_frame_pixels
 
 JUMP_UP = [0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0]
 JUMP_DOWN = [1,0,0,0,1,0,1,0,1,0,2,1,2,1,2,2,0]
@@ -15,8 +16,7 @@ WORLD = [
 
 
 def pal_ticks(vblanks: int) -> int:
-    phase = 0
-    ticks = 0
+    phase = ticks = 0
     for _ in range(vblanks):
         phase += 5
         if phase >= 6:
@@ -34,13 +34,20 @@ def main() -> None:
     assert pal_ticks(6) == 5 and pal_ticks(60) == 50 and pal_ticks(600) == 500
 
     assert len(WORLD) == 6 and all(len(row) == 23 for row in WORLD)
-    assert WORLD[2][0x15] == 0x00       # C64 starting room
-    assert WORLD[2][0x14] == 0x01       # room $00 left -> room $01
-    assert WORLD[2][0x16] == 0xff       # room $00 right edge blocked
-    assert WORLD[2][0x04] == 0x33       # mutable C5-return slot initial value
-    assert all(0x30 not in row for row in WORLD)  # completion room bypasses grid
+    assert WORLD[2][0x15] == 0x00
+    assert WORLD[2][0x14] == 0x01
+    assert WORLD[2][0x16] == 0xff
+    assert WORLD[2][0x04] == 0x33
+    assert all(0x30 not in row for row in WORLD)
 
-    print("OK: room00=640; jump=22/17; clock=5/6; world=6x23 start=$00 left=$01")
+    assert len(WALK_L) == 4 * FRAME_BYTES == 256
+    pixels = c64_frame_pixels(WALK_L[:FRAME_BYTES])
+    assert len(pixels) == 21 and all(len(row) == 24 for row in pixels)
+    spr = build_walk_left()
+    assert len(spr) == 2048              # 4 frames x 2x(16x32) hardware sprites
+    assert any(spr)                       # authentic frame is not blank
+
+    print("OK: room00=640; jump=22/17; clock=5/6; world=6x23; Monty walk=4 authentic frames")
 
 
 if __name__ == "__main__":
