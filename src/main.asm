@@ -28,6 +28,8 @@
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
         include "room04_assets_tail.asm"
+        include "room0d_assets_tail.asm"
+        include "room0e_assets_tail.asm"
 
 .zp
 main_jump_x_before_step:   ds 1
@@ -51,7 +53,7 @@ bare_main:
         ldy     #^room00_bg_palettes
         call    load_palettes
 
-        ; Rooms $01-$04 use C64 purple and blue in slots 13/14.
+        ; Active house rooms use C64 purple and blue in slots 13/14.
         lda     #13
         sta     <_al
         lda     #2
@@ -106,10 +108,8 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Loaded horizontal chain is now $04 <-> $03 <-> $02 <-> $01 <-> $00.
-        ; collision_actual_room preserves the true tail-room id while rooms
-        ; $03/$04 shadow as $02 inside unchanged physics. Only exits into
-        ; unloaded rooms are cancelled during a jump: Room $00 right/$04 left.
+        ; Active route now includes the original detour $03 -> $0E -> $0D -> $04.
+        ; Room $04 left still points at unloaded $05, and Room $00 right is $ff.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
