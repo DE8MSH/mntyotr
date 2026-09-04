@@ -89,6 +89,33 @@ main_loop:
         ; C64-oriented order for the currently ported subset.
         call    monty_update_input
 
+        ; The currently loaded world subset is only rooms $00 and $01. During
+        ; a jump, horizontal motion can still reach an edge that the world
+        ; resolver will reject ($00 right -> $ff, $01 left -> unsupported $02).
+        ; Cancel those side exits before the vertical jump step gets a chance
+        ; to interpret the wrapped X coordinate as the opposite screen edge.
+        lda     <monty_jump_phase
+        beq     .after_unsupported_jump_edge
+        lda     <monty_room
+        beq     .guard_room00_right
+        cmp     #1
+        bne     .after_unsupported_jump_edge
+        lda     <monty_room_exit
+        cmp     #1
+        bne     .after_unsupported_jump_edge
+        lda     #$15
+        sta     <monty_x
+        stz     <monty_room_exit
+        bra     .after_unsupported_jump_edge
+.guard_room00_right:
+        lda     <monty_room_exit
+        cmp     #2
+        bne     .after_unsupported_jump_edge
+        lda     #$9b
+        sta     <monty_x
+        stz     <monty_room_exit
+.after_unsupported_jump_edge:
+
         ; monty_jump_step moves only Y, but the current shared edge helper also
         ; checks X and can therefore synthesize a left/right exit while Monty is
         ; jumping against a solid border. Save the post-input X so a side exit
