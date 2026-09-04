@@ -2,9 +2,8 @@
 """Overlay exact C64 room-$00 decorations onto the PCE BAT.
 
 Primary reference: refactored/src/subsystems/decor_data.asm.
-Phase 30 ports room-$00 types 0,1,2,3,4,5,6 exactly, including the C64
-per-character colour streams for the lamp head and the two flower variants.
-Type $43 (sad flowers) remains the only room-$00 decor record not yet emitted.
+Phase 31 completes all room-$00 decor records, including type $43 sad_flowers
+with its exact 3x3 bitmap and per-character C64 colour stream.
 """
 from __future__ import annotations
 
@@ -79,6 +78,17 @@ TYPE_BITMAPS = {
         "99 d3 6e 10 d3 6e 0c 08 "
         "ff df df 6e 6e 7e 3c 3c"
     ),
+    0x43: bytes.fromhex(
+        "00 00 00 07 1c 31 61 07 "
+        "0c 08 18 d3 26 ac c9 69 "
+        "00 00 00 c0 20 32 9a ce "
+        "1c 10 31 21 27 64 47 40 "
+        "37 14 d7 7d 1b 3a 38 00 "
+        "60 30 10 9c c0 c0 78 08 "
+        "f6 fa f6 77 0f 03 00 00 "
+        "ff ff ff 7e 7e 7e 3c 3c "
+        "1e 0f 0e 06 00 00 00 00"
+    ),
 }
 
 # width, height, either a solid C64 colour int or an exact per-character stream.
@@ -90,10 +100,10 @@ TYPE_PROPS = {
     4: (5, 1, 0x01),
     5: (1, 3, bytes.fromhex("07 0d 0a")),
     6: (1, 3, bytes.fromhex("08 05 0a")),
+    0x43: (3, 3, bytes.fromhex("05 05 05 05 05 05 07 0a 08")),
 }
 
-# Exact room-$00 records from Decor.room_list, except type $43 which follows in
-# the next phase once its colour stream is pinned from source.
+# Exact room-$00 records from Decor.room_list, in source order.
 ROOM00_RECORDS = [
     (0x24, 0x10, 0),
     (0x24, 0x0C, 1),
@@ -103,7 +113,10 @@ ROOM00_RECORDS = [
     (0x03, 0x08, 4),
     (0x0E, 0x0A, 5),
     (0x0C, 0x0C, 6),
+    (0x21, 0x0F, 0x43),
 ]
+
+TYPE_ORDER = (0, 1, 2, 3, 4, 5, 6, 0x43)
 
 
 def c64_char_to_pce_tile(char: bytes) -> bytes:
@@ -115,7 +128,7 @@ def build_patterns() -> tuple[bytes, dict[int, int]]:
     out = bytearray()
     first_char: dict[int, int] = {}
     next_char = CHR_DECOR
-    for type_id in (0, 1, 2, 3, 4, 5, 6):
+    for type_id in TYPE_ORDER:
         raw = TYPE_BITMAPS[type_id]
         w, h, _ = TYPE_PROPS[type_id]
         assert len(raw) == w * h * 8
