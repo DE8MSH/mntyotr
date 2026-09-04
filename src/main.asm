@@ -18,6 +18,7 @@
         include "monty_physics.asm"
         include "collision_banking.asm"
         include "world.asm"
+        include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
         include "room02_decor_loader.asm"
         include "room_loader.asm"
@@ -159,6 +160,10 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
+        ; The original movement engine emits a down-room exit at Y=$DA.
+        ; This was the missing traversal piece that hid the real route around
+        ; Room $03's wall: $03 down->$0E, left->$0D, up->$04.
+        call    monty_check_down_room_edge
         call    collision_bank_exit
 
         call    world_resolve_exit
