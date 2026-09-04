@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18g
+Stand: 2026-09-04 — Phase 18h
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Toolchain- und Regressionstest-Fixes erhoehen den Gameplay-Prozentsatz bewusst nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Toolchain- und Build-Fixes erhoehen den Gameplay-Prozentsatz bewusst nicht.
 
 ## Ziel
 
@@ -15,7 +15,7 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 ## Bereits umgesetzt
 
 - Linux-Mint-22 Toolchain/Build/Run-Grundgeruest; GitHub-Actions-ROM-Build bleibt entfernt.
-- PCE VDC/VCE Bring-up, Palette, Font, BAT und VSync.
+- PCE VDC/VCE Bring-up, Palette, BAT und VSync.
 - Raum $00 mit echten konvertierten C64-Hintergrundtiles.
 - PAL-orientierter Gameplay-Scheduler.
 - Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
@@ -23,19 +23,22 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 - Echte Monty-Walkgrafik fuer beide Blickrichtungen.
 - Echte Monty-Climbgrafik als PCE-Spriteasset und VRAM-Uploadpfad.
 
-## Phase 18g — robuste VIC-Spritegrenzen
+## Phase 18h — erster echter PCEAS-Lauf
 
-Der Nutzerlauf zeigte nach der ersten 63-Byte-Korrektur, dass WALK_R 255 Bytes enthaelt. Die handtranskribierten Animationen hatten also nicht einheitlich alle VIC-Paddingbytes entfernt: WALK_L war 252 Bytes, WALK_R 255 Bytes. Die Originalquelle belegt dagegen vier feste 64-Byte-VIC-Slots je Walk-Richtung und Climb ($5400-$56ff), wobei pro Frame nur die ersten 63 Bytes die 24x21-Bitmap bilden.
+Der Nutzerbuild passiert jetzt die Python-Regressionschecks und erreicht erstmals PCEAS. Dabei wurden zwei echte Buildfehler sichtbar und im Port korrigiert:
 
-`tools/monty_sprite.py` nimmt deshalb nicht mehr an, dass die Transkription einen einheitlichen 63- oder 64-Byte-Stride hat. Fuer jede der drei bekannten Viereranimationen werden die vier authentischen Frame-Startsignaturen lokalisiert und jeweils exakt die folgenden 63 Bitmapbytes extrahiert. Damit werden eventuell vorhandene VIC-Padbytes verworfen, ohne sichtbare Bilddaten zu verschieben. Danach liegen WALK_L, WALK_R und CLIMB deterministisch bei je 4x63 Bytes; die PCE-Konvertierung bleibt 512 Bytes pro Frame bzw. 2048 Bytes pro Vierergruppe.
+1. `tia [_bp],VDC_DL,512` war ungueltig. HuC6280 TIA ist ein Blocktransfer mit absoluten Quell-/Zieloperanden, nicht mit indirektem Quellzeiger. Der Monty-Upload dispatcht nun den Frame und verwendet pro Frame einen statisch assemblierbaren `tia frame_label,VDC_DL,512`.
+2. `font8x8-ascii-bold-short.dat` war eine nicht mitkopierte externe Elmer-Beispieldatei. Der Debug-Banner samt Font-Upload wurde entfernt, weil er fuer das Spiel nicht benoetigt wird. Damit ist der ROM-Build nicht mehr von diesem externen Debug-Fontasset abhaengig.
+
+Die Sprite-Regressionschecks selbst laufen im Nutzerlog bereits erfolgreich: room00=640, jump=22/17, clock=5/6, world=6x23 und 12 authentische Walk/Climb-Frames.
 
 ## Verifikationsstatus
 
-HuC/pceas und die Split-Include-Pfade werden im Nutzerlog korrekt gefunden. Der Build erreicht die lokalen Port-Regressionschecks. Phase 18g behebt den dort konkret beobachteten inkonsistenten Sprite-Stride; ein erneuter Nutzerlauf steht noch aus. Ein kompletter PCEAS-Lauf und `build/monty.pce` sind weiterhin noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
+HuC/pceas und die Split-Include-Pfade werden korrekt gefunden. Die lokalen Python-Porttests laufen im Nutzerlog erfolgreich. PCEAS startet und hat die oben dokumentierten ersten Assemblerfehler gemeldet. Die Korrekturen fuer diese Fehler sind committed; ein erneuter Nutzerlauf steht aus. `build/monty.pce` ist daher noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
-- Erneuten lokalen `./build.sh`-Lauf bis zum ersten echten PCEAS-Assemblerlauf bringen und dessen Fehler direkt beheben.
+- Erneuten `./build.sh` ausfuehren und verbleibende PCEAS-Fehler iterativ beseitigen, bis `build/monty.pce` entsteht.
 - UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` aktivieren.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
