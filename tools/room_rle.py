@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Decode/verify Monty C64 room RLE streams.
+"""Decode/verify Monty C64 room RLE and generate PCE room tables.
 
-Format from the annotated reconstruction:
+RLE format from the annotated reconstruction:
   high nibble = repeat count - 1
   low nibble  = logical tile id
   FF FF       = stream terminator
@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import struct
 
 ROOM_W = 32
 ROOM_H = 20
 ROOM_CELLS = ROOM_W * ROOM_H
+CHR_GAME = 256  # Must match src/platform.inc: 128+16+112.
 
 ROOM00_RLE = bytes.fromhex(
     "f1 41 02 90 f1 51 02 80 f1 61 02 70 f1 71 02 60 "
@@ -41,16 +43,27 @@ def decode_room(stream: bytes) -> list[int]:
 
 
 def ascii_map(cells: list[int]) -> str:
-    rows = []
-    for y in range(ROOM_H):
-        row = cells[y * ROOM_W:(y + 1) * ROOM_W]
-        rows.append("".join(format(v, "X") for v in row))
-    return "\n".join(rows)
+    return "\n".join(
+        "".join(format(v, "X") for v in cells[y * ROOM_W:(y + 1) * ROOM_W])
+        for y in range(ROOM_H)
+    )
+
+
+def make_bat(cells: list[int]) -> bytes:
+    """PCE BAT word = palette in bits 12..15 + pattern index in bits 0..11."""
+    data = bytearray()
+    for tile in cells:
+        if tile > 7:
+            raise ValueError(f"room00 expects custom tile 0..7, got {tile}")
+        word = (tile << 12) | (CHR_GAME + tile)
+        data += struct.pack("<H", word)
+    return bytes(data)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", type=Path, help="write decoded 640-byte logical map")
+    ap.add_argument("--bat", type=Path, help="write 1280-byte native PCE BAT table")
     args = ap.parse_args()
 
     cells = decode_room(ROOM00_RLE)
@@ -59,7 +72,11 @@ def main() -> None:
     if args.write:
         args.write.parent.mkdir(parents=True, exist_ok=True)
         args.write.write_bytes(bytes(cells))
-        print(f"wrote {args.write}")
+        print(f"wrote {args.write} ({args.write.stat().st_size} bytes)")
+    if args.bat:
+        args.bat.parent.mkdir(parents=True, exist_ok=True)
+        args.bat.write_bytes(make_bat(cells))
+        print(f"wrote {args.bat} ({args.bat.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":
