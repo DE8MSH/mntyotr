@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Convert authentic C64 Monty frames to native PCE sprite data.
 
-The reconstructed source lists the 63 visible bitmap bytes of each VIC-II
-24x21 sprite consecutively.  The original VIC sprite pointer stride is 64
-bytes, with one non-image padding byte per frame.  Keep the source blobs at
-63 bytes/frame and add the padding only when a caller explicitly needs a
-64-byte VIC frame.
+The refactored source occupies 64-byte VIC-II sprite slots, but only the first
+63 bytes are visible 24x21 bitmap data. The hand-transcribed blobs historically
+contained an inconsistent mix of omitted/retained pad bytes, so normalize frame
+boundaries from each animation's authentic frame-start signature before PCE
+conversion.
 """
 from pathlib import Path
 
@@ -17,17 +17,33 @@ WALK_L = bytes.fromhex(
 WALK_R = bytes.fromhex(
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 84 00 1d 6e 00 34 6e 00 37 f6 00 36 f8 00 19 f8 00 3d f0 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 68 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 17 80 00 1b f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 60 00 3e 20 00 3f d0 00 3e d8 00 1f 38 00 3f 70 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 60 00 3e 20 00 3f d0 00 3e d8 00 1f 38 00 3f 70 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 6c 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 07 80 00 03 f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 CLIMB = bytes.fromhex(
-"07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f e0 00 7f f0 00 7f b8 00 3f b8 00 7f c8 00 7f f0 00 4f f0 00 37 e0 00 7b c0 00 71 e0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 
 BITMAP_BYTES = 63
 VIC_FRAME_BYTES = 64
-FRAME_BYTES = BITMAP_BYTES  # compatibility name: stride of embedded source blobs
+FRAME_BYTES = BITMAP_BYTES
+
+
+def _extract_bitmap_frames(blob, marker, count=4):
+    """Strip any VIC pad bytes without assuming a uniform transcription stride."""
+    starts = [i for i in range(len(blob)-len(marker)+1) if blob[i:i+len(marker)] == marker]
+    assert len(starts) == count, f'expected {count} frame starts, found {len(starts)}'
+    frames = []
+    for i in starts:
+        assert i + BITMAP_BYTES <= len(blob), 'truncated C64 sprite frame'
+        frames.append(blob[i:i+BITMAP_BYTES])
+    return b''.join(frames)
+
+
+WALK_L = _extract_bitmap_frames(WALK_L, bytes.fromhex('02 00 00 1d c0'))
+WALK_R = _extract_bitmap_frames(WALK_R, bytes.fromhex('00 40 00 03 f8'))
+CLIMB = _extract_bitmap_frames(CLIMB, bytes.fromhex('07 80 00 0f c0'))
 
 
 def c64_frame_pixels(frame):
