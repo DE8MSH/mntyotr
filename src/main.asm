@@ -1,5 +1,5 @@
 ; Monty on the Run - PC Engine port
-; Native room graphics + PAL-rate gameplay + first C64 movement path.
+; Native room graphics + PAL-rate gameplay + C64 movement/world path.
 
         include "platform.inc"
         include "bare-startup.asm"
@@ -15,6 +15,7 @@
         include "room00_native.asm"
         include "game_clock.asm"
         include "monty_physics.asm"
+        include "world.asm"
 
         .code
 
@@ -61,6 +62,7 @@ bare_main:
         call    draw_room00_native
         call    game_clock_init
         call    monty_physics_init
+        call    world_init
         call    set_dspon
 
 main_loop:
@@ -69,10 +71,12 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
-        ; Preserve C64 order at bring-up level: read controls/move horizontally,
-        ; then advance the active vertical jump arc on the same logical tick.
+        ; C64-oriented order for the currently ported subset.
         call    monty_update_input
         call    monty_jump_step
+        call    world_resolve_exit
+        ; A valid destination is left pending until the generic room loader is
+        ; present; do not run room-$00 collision data as another room.
         bra     main_loop
 
 init_c64_video:
