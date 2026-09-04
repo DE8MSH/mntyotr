@@ -2,10 +2,11 @@
 """Decode/verify Monty C64 room RLE and generate PCE room tables.
 
 Primary reference: Dave-Agent/monty-on-the-run/refactored/src/subsystems/room.asm.
-RLE expands to the 32x20 playfield.  On the C64 that playfield is copied to
-screen columns 4..35, rows 3..22; CreatePlayfieldBorder mirrors its edge chars
-into columns 2..3 and 36..37.  Character 0 stays blank and room slots 0..7 are
-installed as screen character codes 1..8 by SetupTileGraphics.
+The RLE low nibble is already the C64 *screen character code* (0..15), not a
+room-tile slot. DrawRoomPlayfield copies those codes unchanged into cols 4..35,
+rows 3..22. SetupTileGraphics separately installs room tile slots 0..7 as chars
+1..8; therefore RLE code 0 must remain blank and codes 1..8 address those chars.
+CreatePlayfieldBorder mirrors the edge screen codes into cols 2..3 and 36..37.
 """
 from __future__ import annotations
 
@@ -50,36 +51,32 @@ def ascii_map(cells: list[int]) -> str:
     )
 
 
-def bat_word(tile_slot: int) -> int:
-    if not 0 <= tile_slot <= 7:
-        raise ValueError(f"room00 expects custom tile slot 0..7, got {tile_slot}")
-    # C64 SetupTileGraphics: slot 0..7 becomes screen character code 1..8.
-    code = tile_slot + 1
-    return (code << 12) | (CHR_GAME + code)
+def bat_word(screen_code: int) -> int:
+    if not 0 <= screen_code <= 15:
+        raise ValueError(f"invalid C64 screen code {screen_code}")
+    # RLE gives the screen code directly. Code 0 is blank; 1..8 are the custom
+    # room chars installed by SetupTileGraphics. Room $00 only currently uses
+    # 0..5, so one PCE palette per screen code is sufficient for this bring-up.
+    return (screen_code << 12) | (CHR_GAME + screen_code)
 
 
 def make_bat(cells: list[int]) -> bytes:
-    """32x20 playfield BAT, using the C64 screen-code 1..8 mapping."""
+    """32x20 playfield BAT preserving C64 screen codes exactly."""
     data = bytearray()
-    for tile in cells:
-        data += struct.pack("<H", bat_word(tile))
+    for code in cells:
+        data += struct.pack("<H", bat_word(code))
     return bytes(data)
 
 
 def make_screen_bat(cells: list[int]) -> bytes:
-    """20x36 C64-visible room window (screen columns 2..37).
-
-    Each row is: left edge twice, 32 playfield chars, right edge twice.  This is
-    exactly the geometry produced by Room.CreatePlayfieldBorder after the 32x20
-    DrawRoomPlayfield copy.
-    """
+    """20x36 C64-visible room window (screen columns 2..37)."""
     data = bytearray()
     for y in range(ROOM_H):
         row = cells[y*ROOM_W:(y+1)*ROOM_W]
         expanded = [row[0], row[0], *row, row[-1], row[-1]]
         assert len(expanded) == SCREEN_W
-        for tile in expanded:
-            data += struct.pack("<H", bat_word(tile))
+        for code in expanded:
+            data += struct.pack("<H", bat_word(code))
     return bytes(data)
 
 
