@@ -16,15 +16,12 @@ monty_sprite_init:
  sta <monty_sprite_last_facing
  lda #1
  sta <monty_sprite_dirty
- bsr monty_upload_walk_frame
+ call monty_upload_walk_frame
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
  rts
 
-; PCEAS block-transfer operands are absolute addresses.  The old code tried
-; `tia [_bp],...`, but TIA has no indirect-source addressing mode.  Dispatch
-; the small frame set first and assemble a real TIA for each source label.
 monty_upload_walk_frame:
  lda #<MONTY_SPR_VRAM
  sta <_di
@@ -125,7 +122,7 @@ monty_sprite_animate:
 .maybe:
  lda <monty_sprite_dirty
  beq .done
- bsr monty_upload_walk_frame
+ call monty_upload_walk_frame
 .done:
  rts
 
