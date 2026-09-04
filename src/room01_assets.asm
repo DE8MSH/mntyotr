@@ -1,9 +1,15 @@
 ; Exact room $01 custom graphics from C64 room_defs + Tiles.tile_library.
-; The generated file contains blank char 0 followed by custom chars 1..8.
+; The generated base file contains blank char 0 followed by custom chars 1..8.
+; Phase 36 additionally binds the exact Room-$01 Decor.room_list graphics.
 
 .data
 room01_patterns:
         incbin "room01-patterns.dat"
+
+room01_decor_patterns:
+        ; Exact type $42 purple_flowers (4x4) then type $41 bunch_flower (3x3),
+        ; preserving the original room-list/type-init order: 25 chars total.
+        incbin "room01-decor-patterns.dat"
 
 ; Two C64 colours not already present in the room-$00 shared BG palette set.
 ; Loaded into PCE BG palette slots 13 and 14.
