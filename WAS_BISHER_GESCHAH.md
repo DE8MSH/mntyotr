@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18e
+Stand: 2026-09-04 — Phase 18f
 
 ## Portierungsstand
 
@@ -23,20 +23,21 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 - Echte Monty-Walkgrafik fuer beide Blickrichtungen.
 - Echte Monty-Climbgrafik als PCE-Spriteasset und VRAM-Uploadpfad.
 
-## Phase 18e — Sprite-Regressionscheck
+## Phase 18f — C64-Sprite-Stride korrigiert
 
-Der echte Nutzerlauf kommt jetzt erfolgreich durch die HuC/PCEAS- und Include-Erkennung. Der naechste Abbruch liegt in `tools/test_port.py`: die pauschale verkettete Assertion fuer WALK_L/WALK_R/CLIMB schlug fehl, bevor PCEAS gestartet wurde.
+Der Nutzerlauf hat den vorher verbesserten Regressionstest erreicht und den eigentlichen Datenfehler eindeutig gezeigt: `WALK_L` enthaelt 252 Byte. Das ist korrekt fuer vier hintereinander notierte 24x21-Monochrom-Bitmaps: 21 Zeilen * 3 Byte = 63 sichtbare Bitmapbytes pro Frame, also 252 Byte fuer vier Frames.
 
-Der Test wurde so umgebaut, dass jede Spritegruppe separat auf Byte-Vielfaches und exakt vier Frames geprueft wird und bei einem Fehler den konkreten Gruppennamen, die Bytezahl und die ermittelte Framezahl meldet. Damit ist der naechste Lauf diagnostisch eindeutig statt nur `AssertionError` zu liefern. Die eigentliche Spritekonvertierung wird weiterhin auf 2048 PCE-Bytes pro Vier-Frame-Gruppe und gueltige 24x21-C64-Pixelmatrix geprueft.
+Die VIC-II-Spritepointer arbeiten dagegen mit 64-Byte-Slots. Das 64. Byte eines Slots ist kein Teil der 24x21-Bitmap. Unser Konverter hatte die eingebetteten, pad-losen 63-Byte-Quellblobs faelschlich mit einem 64-Byte-Stride zerlegt. `tools/monty_sprite.py` verwendet deshalb jetzt explizit `BITMAP_BYTES=63` fuer die eingebetteten Quelldaten und dokumentiert `VIC_FRAME_BYTES=64` separat. `c64_frame_pixels()` akzeptiert sowohl 63-Byte-Bitmapdaten als auch einen vollstaendigen 64-Byte-VIC-Slot und ignoriert beim Dekodieren ein vorhandenes Padbyte. `build()` zerlegt die eingebetteten WALK_L/WALK_R/CLIMB-Daten mit dem korrekten 63-Byte-Stride.
+
+Damit prueft `tools/test_port.py` weiterhin vier Frames je Gruppe, nun aber gegen die tatsaechliche Struktur der eingebetteten Rekonstruktionsdaten. Die erzeugte PCE-Ausgabe bleibt unveraendert 512 Byte pro konvertiertem Monty-Frame bzw. 2048 Byte pro Vier-Frame-Gruppe.
 
 ## Verifikationsstatus
 
-HuC/pceas wird im Nutzerlog gefunden und `PCE_INCLUDE` zeigt auf Elmer plus HuCC. Der Build erreicht nun die lokalen Port-Regressionschecks. Ein kompletter PCEAS-Lauf und `build/monty.pce` sind weiterhin noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
+HuC/pceas wird im Nutzerlog gefunden und `PCE_INCLUDE` zeigt auf Elmer plus HuCC. Der Build erreicht die lokalen Port-Regressionschecks. Der konkret gemeldete `WALK_L: 252 bytes ... FRAME_BYTES=64`-Fehler ist in Phase 18f im Konverter behoben. Ein erneuter Nutzerlauf muss jetzt bestaetigen, dass alle lokalen Tests passieren und PCEAS erstmals den eigentlichen Monty-Assembler erreicht. `build/monty.pce` ist weiterhin noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
-- Den nun detaillierten Sprite-Testlauf auswerten und gegebenenfalls die konkrete fehlerhafte C64-Framegruppe korrigieren.
-- Danach den ersten echten PCEAS-Assemblerlauf erreichen und dessen Fehler direkt beheben.
+- Erneuten lokalen `./build.sh`-Lauf auswerten; naechsten Fehler direkt beheben, bis PCEAS ein ROM erzeugt.
 - UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` aktivieren.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
