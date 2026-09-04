@@ -1,68 +1,89 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 40
+Stand: 2026-09-04 — Phase 41
 
 ## Portierungsstand
 
-**Gesamtport: ca. 50 %**
+**Gesamtport: ca. 51 %**
 
-Phase 39 ist lokal bestaetigt. Raum $02, seine Collision und alle fuenf originalen Decors laufen stabil. Phase 40 bereitet Raum $03 jetzt exakt als ROM-Tail-Asset vor, ohne ihn bereits in die aktive Weltkette einzuschalten.
+Phase 40 wurde vom Nutzer lokal bestaetigt: das zusaetzliche Room-$03-ROM-Wachstum hat die bestaetigten Raeume $00-$02 nicht destabilisiert. Phase 41 aktiviert Raum $03 jetzt als vierten echten Raum.
 
 ## Verbindliche Referenz
 
 Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` dient nur als zusaetzliche Ground-Truth.
 
-## Bestaetigter Runtime-Stand
+## Bestaetigter Runtime-Stand vor Phase 41
 
 - Raum $00 und $01 funktionieren mit Boden, Gehen, Springen, Landen und Animationen.
 - Raum $01 zeigt die originalen `purple_flowers` und `bunch_flower`.
 - Raum $02 ist aktiv, spielbar und besitzt seine fuenf originalen Decors.
 - Room-$02-Collision nutzt den bestaetigten 648-Byte-RAM-Cache.
-- Raum $02 -> $01 nach rechts funktioniert; links aus Raum $02 bleibt in Phase 40 noch gesperrt.
-- Raum $00 rechts bleibt korrekt gesperrt.
+- Raum $00-$02 sind lokal bestaetigt stabil.
 
-## Phase 40 — Raum $03 vorbereiten
+## Phase 41 — Raum $03 aktiv
 
-Die C64-RLE-Daten fuer Raum $03 wurden exakt aus `Room.Data.tilemap.rm_03` uebernommen:
+Raum $03 benutzt die in Phase 40 exakt vorbereiteten C64-Daten:
 
-`f1 f1 51 10 e1 20 51 31 f0 b0 f0 f0 f0 f0 f0 50 52 31 f0 c0 21 33 e0 22 90 73 40 04 f0 10 a3 10 04 52 b0 30 33 40 04 f0 10 30 33 40 04 f0 10 c0 04 b0 05 40 c0 04 70 36 05 40 c0 04 b0 05 40 c0 04 b0 05 40 c0 04 b0 05 40 f0 17 38 17 10 05 40 a3 f1 41 f3 43 a1 ff ff`
+- RLE aus `Room.Data.tilemap.rm_03`
+- Tile-IDs `$01,$2f,$00,$65,$5f,$44,$11,$55`
+- Farben `$07,$03,$0b,$05,$03,$04,$06,$0e`
+- Properties `1,2,1,3,3,2,1,4`
+- exakte Bitmaps aus `Tiles.tile_library`
 
-Die 16-Byte-Raumdefinition ist:
+`world.asm` akzeptiert jetzt Raum-IDs $00-$03. Damit ist die horizontale Originalkette aktuell:
 
-- Tile-IDs: `$01,$2f,$00,$65,$5f,$44,$11,$55`
-- Farben: `$07,$03,$0b,$05,$03,$04,$06,$0e` (Low-Nibble der C64-Farbbytes)
-- Collision-Properties nach `Monty.SetTileProperty`: `1,2,1,3,3,2,1,4`
+`$03 <-> $02 <-> $01 <-> $00`
 
-Die acht Tile-Bitmaps stammen direkt aus `Tiles.tile_library`. `tools/room03.py` erzeugt daraus wie bei den bisherigen Raeumen exakt 640 dekodierte Zellen, den 36x20-BAT und 9 PCE-Hintergrundpatterns inklusive Blank-Char 0.
+Links aus Raum $03 bleibt Raum $04 weiterhin gesperrt; rechts aus Raum $00 bleibt die originale $ff-Wand gesperrt.
 
-`src/room03_assets_tail.asm` bindet Pattern, Collision-Map, Properties und BAT ausschliesslich hinter dem bestaetigten Runtime-Code ein. Damit dient Phase 40 zuerst als weiterer ROM-Wachstumstest; weder World-Gate noch Physics noch Room-Loader wurden fuer Raum $03 aktiviert.
+## Shared RAM-Collision-Cache fuer Tail-Raeume
 
-C64 light blue `$0e` wird im vorbereiteten BAT bereits auf den freien PCE-Palettenslot 15 abgebildet. Die eigentliche Initialisierung dieses Slots erfolgt erst beim Aktivieren von Raum $03, damit Phase 40 keine unnoetige Runtime-Aenderung einfuehrt.
+Die empfindliche `monty_physics.asm` wurde fuer Phase 41 bewusst nicht umgebaut. Stattdessen teilen Raum $02 und $03 denselben bereits bestaetigten 648-Byte-RAM-Cache (`room02_collision_map` + `room02_tile_properties`). Beim Laden des jeweiligen Tail-Raums kopiert `room_loader.asm` dessen 640 Map-Bytes plus 8 Property-Bytes aus dem ROM-Tail in diesen Cache.
 
-## Regressionstest
+Fuer Raum $03 speichert `collision_banking.asm` den echten Raum in `collision_actual_room` und setzt `monty_room` nur waehrend des Physics-Slices temporaer auf $02. Dadurch benutzt die unveraenderte Physics weiterhin exakt den bestaetigten Room-$02-RAM-Pointerpfad, aber mit den frisch geladenen Room-$03-Daten. Vor `world_resolve_exit` wird der echte Raum $03 wiederhergestellt.
 
-`tools/test_room03.py` prueft RLE-Laenge/Decode, Tile-IDs, Farben, Properties, mehrere exakte Tile-Bitmaps, 9 erzeugte Patterns, 36x20-Randspiegelung sowie die ROM-Tail-Bindung.
+Der Jump-Edge-Guard benutzt deshalb `collision_actual_room`: Springen von Raum $02 nach links in Raum $03 ist jetzt erlaubt; links aus Raum $03 in den noch nicht portierten Raum $04 bleibt blockiert. Der bestaetigte Schutz gegen synthetische Jump-Side-Exits bleibt erhalten.
 
-`build.sh` fuehrt den Room-$03-Test aus und generiert `room03-map.dat`, `room03-screen-bat.dat` und `room03-patterns.dat` vor PCEAS.
+## Palette
 
-## Commits Phase 40
+Raum $03 verwendet als neue Farbe C64 light blue `$0e`. `room03_extra_palette` liegt als Tail-Asset und wird beim Start in PCE-BG-Palettenslot 15 geladen. Slots 13/14 bleiben purple/blue wie bisher.
 
-- `fb6f58bec099b887b8d6592e0e2cd81103681853` — exakter Room-$03-Generator
-- `31c86d2c5ed08d25c115ca190f39b5ebf8160f01` — Room-$03-Regressionstest
-- `d744a1a45402fca4d39620211499249a110f3add` — Room-$03-ROM-Tail-Assets
-- `98234d7dd6a18768bde799e5223c388fe93e7c4c` — Tail-Asset in Main eingebunden
-- `acd8d2f1f14f793e52d20127fe0bd1f78505aaa0` — Build erzeugt und testet Room $03
+## Regressionstests
+
+Aktualisiert wurden:
+
+- `tools/test_room03.py` — aktive Loader/World/Cache-Verkabelung
+- `tools/test_collision_banking.py` — gemeinsamer Room-$02/$03-RAM-Cache und Room-$03-Shadow
+- `tools/test_jump_edge_guard.py` — Room-$03-Aussenkante und Room-$02->$03-Sprung
+- `tools/test_room02.py` — Room-$02 bleibt stabil und darf jetzt links nach Room $03
+
+`build.sh` fuehrt die Tests weiterhin vor PCEAS aus.
+
+## Commits Phase 41
+
+- `219efc5357104b638c52a1f9af7e09c50fdecf9d` — Room-$03-Physics-Shadow auf bestaetigten RAM-Cache
+- `b9dd6034723b4636060ad930b5c90f72b0042970` — Room-$03-Loader, Draw und Collision-Cache
+- `a0db117a056767585278e1a4082043b74a91f956` — World-Gate auf $00-$03 erweitert
+- `2c77c9d1a7ec58a6238987ced08f039bcbbabcb5` — Jump-Transition $02->$03 aktiviert
+- `b598179a99ccc9f6583f9480bc242e99cb64e767` — Room-$03-Test aktiviert
+- `28716d5960cab8954c722516f951024f890e3ebb` — Collision-Banking-Test erweitert
+- `35f859d5365c2a3c8ae00b31a91f72f8d4ffa2ea` — Jump-Edge-Test erweitert
+- `f056502058dba591e29708bac0d7415cfb0fa028` — Room-$02-Test an neue Kette angepasst
+- `f327269a72b10a7e3155f7b973b0a220d3674034` — Light-blue-Palette als Room-$03-Tail-Asset
+- `21ea90add671b5749892605ec69cff3d7112f67d` — Palettenslot 15 initialisiert
 
 ## Erwartetes Resultat
 
-Nach `git pull && ./build.sh` soll sich im Spiel **noch nichts sichtbar veraendern**. Raum $00/$01/$02, Decors, Gehen, Springen und Collision sollen genauso laufen wie im bestaetigten Phase-39-Stand. Raum $03 bleibt links von $02 noch gesperrt. Wenn dieser ROM-Wachstumstest stabil ist, aktiviert Phase 41 Raum $03 mit RAM-Collision-Cache und dem fehlenden light-blue-Palettenslot.
+Nach `git pull && ./build.sh` soll Monty weiterhin in Raum $00-$02 normal laufen, springen und landen. Von Raum $02 geht es jetzt nach **links in Raum $03**, sowohl gehend als auch springend. In Raum $03 muss Monty direkt weiter steuerbar sein und korrekt mit Boden/Plattformen kollidieren. Nach rechts geht es zurueck nach Raum $02. Links aus Raum $03 bleibt bis Raum $04 gesperrt.
+
+Room-$03-Decors sind in Phase 41 noch nicht aktiviert; zuerst wird die neue vierte Raum-/Collision-Kette lokal bestaetigt.
 
 ## Naechste Portschritte
 
-1. Phase 40 lokal bestaetigen.
-2. Raum $03 aktivieren: Loader, World-Gate, Jump-Edge-Guard, RAM-Collision-Cache, Palette $0e.
-3. Room-$03-Decors portieren.
-4. Danach weitere Raeume entlang der Original-Weltkarte.
+1. Phase 41 lokal bestaetigen.
+2. Originale Room-$03-Decors portieren.
+3. Raum $04 mit exakten C64-Daten vorbereiten und aktivieren.
+4. Weitere Raeume entlang der Original-Weltkarte.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
 
 ## Referenzen
