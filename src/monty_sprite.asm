@@ -151,6 +151,8 @@ monty_sprite_animate:
 .done:
  rts
 
+; PCE SAT coordinates use +64 for Y and +32 for X. Monty's logical coordinates
+; remain in the C64-oriented coordinate system used by the movement port.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
@@ -164,7 +166,7 @@ monty_sprite_update_satb:
  stz VDC_DH
  lda <monty_x
  clc
- adc #64
+ adc #32
  sta VDC_DL
  stz VDC_DH
  lda #<(MONTY_SPR_VRAM>>5)
@@ -182,7 +184,7 @@ monty_sprite_update_satb:
  stz VDC_DH
  lda <monty_x
  clc
- adc #80
+ adc #48
  sta VDC_DL
  stz VDC_DH
  lda #<((MONTY_SPR_VRAM+256)>>5)
@@ -197,7 +199,12 @@ monty_sprite_update_satb:
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
  rts
+
 .data
+; C64 Monty uses sprite colour 1 (white). Converted graphics only use pixel
+; indices 0 and 1, so SPR palette 0 needs just transparent/black + white.
+monty_sprite_palette:
+ dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
 monty_walk_l_1: incbin "monty-walk-l.dat",512,512
 monty_walk_l_2: incbin "monty-walk-l.dat",1024,512
