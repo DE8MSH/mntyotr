@@ -9,16 +9,17 @@ def main():
     assert 'main_jump_x_before_step: ds 1' in text
     assert 'sta     <main_jump_x_before_step' in text
     assert 'call    monty_jump_step' in text
-    assert 'cmp     #1' in text and 'cmp     #2' in text
     assert 'lda     <monty_jump_phase' in text
+    assert 'lda     <monty_room' in text
+    assert '.guard_room00_right:' in text
+    assert 'lda     #$9b' in text and 'lda     #$15' in text
+    assert text.count('stz     <monty_room_exit') >= 3
     assert 'lda     <monty_is_moving' in text
     assert 'lda     <main_jump_x_before_step' in text
-    assert 'sta     <monty_x' in text
-    assert 'stz     <monty_room_exit' in text
     # main.asm has grown enough that this startup helper is outside BSR range.
     assert 'call    init_c64_video' in text
     assert 'bsr     init_c64_video' not in text
-    print('OK: blocked left/right jump exits are cancelled; startup call is range-safe')
+    print('OK: blocked/unsupported left-right jump exits are cancelled symmetrically')
 
 
 if __name__ == '__main__':
