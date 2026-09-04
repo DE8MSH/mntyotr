@@ -6,12 +6,15 @@
 .data
 room02_patterns:
         incbin "room02-patterns.dat"
+
+; Keep the 640-byte map and 8 property bytes contiguous: room loader copies the
+; complete 648-byte collision payload to RAM in one bank-safe pass.
 room02_collision_map_rom:
         incbin "room02-map.dat"
-room02_screen_bat:
-        incbin "room02-screen-bat.dat"
-
 room02_tile_properties_rom:
         ; Source chars $02,$01,$27,$60,$3d,$42,$77,$55 classified by
         ; Monty.SetTileProperty: 1,1,2,3,2,2,0,4.
         db $01,$01,$02,$03,$02,$02,$00,$04
+
+room02_screen_bat:
+        incbin "room02-screen-bat.dat"
