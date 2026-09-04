@@ -21,13 +21,15 @@ jump_delta:             ds 1
 .code
 
 monty_physics_init:
-        lda     #$40
+        ; Original startGame state: Monty at ($86,$b0), facing left.
+        lda     #$86
         sta     <monty_x
         lda     #$b0
         sta     <monty_y
         stz     <monty_jump_phase
         stz     <monty_jump_index
-        stz     <monty_facing
+        lda     #$80
+        sta     <monty_facing
         stz     <monty_step_phase
         stz     <monty_saved_left
         stz     <monty_saved_right
@@ -47,6 +49,8 @@ room00_get_tile_property:
         rts
 
 ; X=column 0..31, Y=row 0..19. Returns logical tile id, or zero outside.
+; The 640-byte room cannot be indexed with an 8-bit X register, so use the
+; original-style pointer approach with a row*32 table.
 room00_get_tile_xy:
         cpx     #32
         bcs     .outside
@@ -274,12 +278,15 @@ monty_check_tile_below:
         sec
         rts
 
+; C64 ToggleStepGate: increment a byte and return bit 0. Left moves on 1,
+; right moves on 0, matching the two original call sites.
 monty_toggle_step_gate:
         inc     <monty_step_phase
         lda     <monty_step_phase
         and     #$01
         rts
 
+; Start jump and freeze horizontal direction for the arc, like jump_saved_*.
 monty_jump_start:
         lda     <monty_jump_phase
         bne     .done
@@ -287,10 +294,10 @@ monty_jump_start:
         sta     <monty_jump_phase
         stz     <monty_jump_index
         lda     joynow
-        and     #$80
+        and     #$80                    ; LEFT
         sta     <monty_saved_left
         lda     joynow
-        and     #$20
+        and     #$20                    ; RIGHT
         sta     <monty_saved_right
 .done:
         rts
@@ -328,10 +335,11 @@ monty_check_room_edges:
         sta     <monty_y
         rts
 
-; PCE pad -> C64 Monty movement semantics.
+; PCE pad -> C64 Monty movement semantics. joynow is refreshed by bare-startup
+; every VBlank. PCE bits: I=$01, UP=$10, RIGHT=$20, DOWN=$40, LEFT=$80.
 monty_update_input:
         lda     joynow
-        and     #$01
+        and     #$01                    ; button I = C64 fire
         beq     .horizontal
         lda     <monty_jump_phase
         bne     .horizontal
@@ -374,6 +382,7 @@ monty_update_input:
 .done_right:
         rts
 
+; Advance one exact C64 vertical jump-arc sample, clipping against room tiles.
 monty_jump_step:
         lda     <monty_jump_phase
         beq     .done
