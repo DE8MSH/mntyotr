@@ -151,39 +151,29 @@ monty_sprite_animate:
 .done:
  rts
 
-; Exact coordinate bridge from refactored/src:
-; Sprites.ProcessSprites writes VIC X = monty_x<<1. Collision derives screen
-; column with (monty_x-$0c)>>2 and row with (monty_y-$32)>>3. Therefore the
-; visible C64 screen position is X=2*(monty_x-$0c), Y=monty_y-$32.
-; PCE SAT hardware offsets are +32 X/+64 Y, so SAT X=2*monty_x+8 and
-; SAT Y=monty_y+14. X is 9-bit and must keep its high carry.
+; PCE SAT coordinates use +64 for Y and +32 for X. The C64 sprite flush copies
+; monty_sprite_y2 and then increments it once before writing sprite 3, so the
+; PCE bridge must include that +1 as well. X remains the C64 ASL-derived 9-bit
+; mapping implemented below.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
  lda #>MONTY_SAT_LEFT
  sta <_di+1
  call vdc_di_to_mawr
-
  lda <monty_y
  clc
- adc #14
+ adc #65
  sta VDC_DL
  stz VDC_DH
-
  lda <monty_x
  asl a
- tax
- cla
- rol a
- tay
- txa
  clc
  adc #8
  sta VDC_DL
- tya
+ lda #0
  adc #0
  sta VDC_DH
-
  lda #<(MONTY_SPR_VRAM>>5)
  sta VDC_DL
  lda #>(MONTY_SPR_VRAM>>5)
@@ -192,27 +182,19 @@ monty_sprite_update_satb:
  sta VDC_DL
  lda #$10
  sta VDC_DH
-
  lda <monty_y
  clc
- adc #14
+ adc #65
  sta VDC_DL
  stz VDC_DH
-
  lda <monty_x
  asl a
- tax
- cla
- rol a
- tay
- txa
  clc
  adc #24
  sta VDC_DL
- tya
+ lda #0
  adc #0
  sta VDC_DH
-
  lda #<((MONTY_SPR_VRAM+256)>>5)
  sta VDC_DL
  lda #>((MONTY_SPR_VRAM+256)>>5)
@@ -227,8 +209,6 @@ monty_sprite_update_satb:
  rts
 
 .data
-; C64 Monty uses sprite colour 1 (white). Converted graphics only use pixel
-; indices 0 and 1, so SPR palette 0 needs just transparent/black + white.
 monty_sprite_palette:
  dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
