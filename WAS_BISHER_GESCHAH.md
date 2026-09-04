@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18i
+Stand: 2026-09-04 — Phase 19
 
 ## Portierungsstand
 
-**Gesamtport: ca. 32 %**
+**Gesamtport: ca. 34 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Toolchain- und Build-Fixes erhoehen den Gameplay-Prozentsatz bewusst nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Toolchain-/Buildfixes allein erhoehen sie nicht.
 
 ## Ziel
 
@@ -21,26 +21,30 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 - Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
 - C64-Raumkanten und statisches 6x23-Weltgrid.
 - Echte Monty-Walkgrafik fuer beide Blickrichtungen.
-- Echte Monty-Climbgrafik als PCE-Spriteasset und VRAM-Uploadpfad.
+- Echte Monty-Climbgrafik und jetzt auch deren Gameplay-Auswahl.
 
-## Phase 18i — PCEAS final-pass / Branch-Reichweite
+## Phase 18i — erster erfolgreicher ROM-Build
 
-Der Nutzerbuild kommt jetzt sauber durch alle Python-Regressionschecks und durch PCEAS Pass 1 und Pass 2. In Pass 3 wurden zwei getrennte Probleme sichtbar.
+Vom Nutzer am 2026-09-04 bestaetigt: Nach den PCEAS-Final-Pass- und Branch-Reichweitenkorrekturen baut `./build.sh` erfolgreich eine startende `.pce`. Der Nutzer hat einen Emulator-Screenshot des laufenden ROMs geliefert. Damit sind Toolchain, lokaler Regressionstest, PCEAS-Durchlauf und ROM-Start erstmals end-to-end bestaetigt. Die sichtbare Raumdarstellung ist noch ein Zwischenstand und kein Pixelvergleich gegen das C64-Original.
 
-Erstens waren mehrere lokale `bsr`-Aufrufe im inzwischen groesser gewordenen Monty-Code ausserhalb der relativen BSR-Reichweite. Diese Aufrufe wurden auf die bereits im Projekt und in der HuC-Library verwendete `call`-Form umgestellt. Das betrifft die Collision-/Movement-Helfer in `monty_physics.asm` sowie den verbliebenen Walk-Upload-Aufruf in `monty_sprite.asm`.
+## Phase 19 — Tile-State, UP/DOWN und Climb-Runtime
 
-Zweitens meldete die aktuelle HuC `include/hucc/vdc.asm` bei ihrer HuCard-RAM-Phase (`tia_to_vram_rom .phase tia_to_vram_ram`) in Pass 3 instabile Symboladressen. Das offizielle aktuelle Elmer-HuCard-Beispiel assembliert genau diese Bibliotheksfamilie mit `--newproc --strip -m -l 2 -S -gA --raw`. `build.sh` verwendet nun dieselbe PCEAS-Flagkombination statt nur `-S -gA -l 3`.
+Die C64-Routine `Monty.UpdateTileFlags` wurde als naechster Gameplay-Baustein uebertragen: Montys logischer 2x3-Footprint wird auf Collision-Property 3 untersucht und daraus `monty_tile_state` gebildet. Wie im C64-Code wird vertikale Spielerbewegung nur zugelassen, wenn dieser Tile-State aktiv ist und kein Sprung laeuft.
+
+PCE-Pad UP/DOWN bewegen Monty nun vertikal unter Collision-Pruefung. `monty_climbing` markiert die tatsaechliche vertikale Bewegung. Der bereits vorhandene authentische Viererblock der C64-Climb-Sprites wird jetzt vom Runtime-Animator ausgewaehlt; Wechsel zwischen Walk und Climb erzwingen einen VRAM-Frame-Upload. Die Animationsperiode bleibt bei vier logischen Ticks.
+
+Wichtig: Raum $00 besitzt nach den bisher rekonstruierten Tile-Properties keine Property-3-Kachel. Der neue Leiter-/Seilpfad ist deshalb implementiert, wird aber erst in einem passenden Raum sichtbar testbar. Die generische Raumdatenpipeline ist weiterhin offen.
 
 ## Verifikationsstatus
 
-Vom Nutzer bestaetigt: HuC/pceas wird gefunden, Split-Include-Pfade funktionieren, alle lokalen Regressionstests laufen durch, PCEAS erreicht Pass 3. Phase 18i behebt die konkret gemeldeten BSR-Reichweitenfehler und gleicht die PCEAS-Aufrufparameter an das aktuelle offizielle Elmer-HuCard-Beispiel an. Ein erfolgreicher kompletter Pass 3 und `build/monty.pce` sind noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
+Vom Nutzer bestaetigt: `./build.sh` erzeugt ein startendes PCE-ROM und der bisherige Raum wird im Emulator dargestellt. Phase 19 ist im Quellcode portiert, aber der neue Stand muss nach `git pull && ./build.sh` erneut assembliert werden. Leiter-/Seilbewegung kann in Raum $00 mangels Property-3-Tile noch nicht sinnvoll visuell verifiziert werden.
 
 ## Aktuell offen
 
-- Erneuten lokalen `./build.sh`-Lauf bis zur ROM-Erzeugung bringen und verbleibende PCEAS-Fehler direkt beheben.
-- UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` aktivieren.
+- Phase-19-Stand erneut bauen und auf PCEAS-Regression pruefen.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
-- Raum $01 und generischen Room-State/Renderer anschliessen.
+- Raum $01 und generischen Room-State/Renderer anschliessen; damit weitere Collision-Properties und Leiter-/Seilpfade real testbar machen.
+- Collision-Abbildung zwischen C64-Screenkoordinaten und logischem 32x20-Raum weiter exakt verifizieren.
 - Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 
 ## Referenzen
