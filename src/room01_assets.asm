@@ -5,11 +5,6 @@
 room01_patterns:
         incbin "room01-patterns.dat"
 
-; Phase 33: exact static decor for room $01. The two C64 room_list records are
-; type $42 purple_flowers (4x4) and type $41 bunch_flower (3x3): 25 chars.
-room01_decor_patterns:
-        incbin "room01-decor-patterns.dat"
-
 ; Two C64 colours not already present in the room-$00 shared BG palette set.
 ; Loaded into PCE BG palette slots 13 and 14.
 room01_extra_palettes:

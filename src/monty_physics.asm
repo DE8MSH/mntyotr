@@ -49,23 +49,27 @@ monty_physics_init:
         rts
 
 ; C64 GetTileFlag semantics for the currently loaded room. Screen code 0 and
-; codes >=9 are non-room-custom; codes 1..8 index the RAM-cached property table.
-; The cache is refreshed by room_collision_load_pending on every room load so
-; gameplay never depends on the current HuCard ROM bank mapping.
+; codes >=9 are non-room-custom; codes 1..8 index that room's property table.
 room00_get_tile_property:
         beq     .empty
         cmp     #9
         bcs     .empty
         dec     a
         tax
-        lda     room_tile_properties_ram,x
+        lda     <monty_room
+        cmp     #1
+        beq     .room01
+        lda     room00_tile_properties,x
+        rts
+.room01:
+        lda     room01_tile_properties,x
         rts
 .empty:
         cla
         rts
 
-; X/Y are C64 screen-character coordinates. The active 32x20 collision map is
-; copied from banked ROM into work RAM whenever a room is loaded.
+; X/Y are C64 screen-character coordinates. The geometry is common to rooms;
+; only the 32x20 collision-map base changes with monty_room.
 room00_get_tile_xy:
         cpy     #3
         bcc     .outside
@@ -95,10 +99,20 @@ room00_get_tile_xy:
         stx     <collision_x
         tya
         tax
-        lda     #<room_collision_map_ram
+        lda     <monty_room
+        cmp     #1
+        beq     .room01
+        lda     #<room00_collision_map
         sta     <collision_ptr
-        lda     #>room_collision_map_ram
+        lda     #>room00_collision_map
         sta     <collision_ptr+1
+        bra     .add_row
+.room01:
+        lda     #<room01_collision_map
+        sta     <collision_ptr
+        lda     #>room01_collision_map
+        sta     <collision_ptr+1
+.add_row:
         lda     <collision_ptr
         clc
         adc     room00_row_offset_lo,x
@@ -232,7 +246,7 @@ monty_check_tile_left:
         sbc #$01
         tax
         pla
-        and #$03
+        and #$07
         bne .three
         lda #2
         bra .count
