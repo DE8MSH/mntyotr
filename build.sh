@@ -25,9 +25,20 @@ else
 fi
 echo "Using pceas: $PCEAS"
 
-ELMER_INC="$HUC_HOME/examples/asm/elmer/include"; HUCC_INC="$HUC_HOME/include/hucc"
-for f in "$ELMER_INC/bare-startup.asm" "$HUCC_INC/common.asm" "$HUCC_INC/vdc.asm" "$HUCC_INC/font.asm" "$HUCC_INC/joypad.asm"; do test -f "$f" || { echo "ERROR: missing CORE include: $f" >&2; exit 1; }; done
+# The pure-ASM Elmer CORE used by this port lives in examples/asm/elmer/include
+# in current pce-devel/huc. Older scripts incorrectly expected font/vdc/joypad
+# under include/hucc; that directory is the HuCC compiler runtime, not Elmer.
+ELMER_INC="$HUC_HOME/examples/asm/elmer/include"
+HUCC_INC="$HUC_HOME/include/hucc"
+for f in bare-startup.asm common.asm vdc.asm font.asm joypad.asm; do
+  test -f "$ELMER_INC/$f" || {
+    echo "ERROR: missing Elmer CORE include: $ELMER_INC/$f" >&2
+    echo "HuC checkout may be incomplete or incompatible." >&2
+    exit 1
+  }
+done
 export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
+
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
