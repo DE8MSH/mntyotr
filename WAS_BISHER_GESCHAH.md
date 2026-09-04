@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 7
+Stand: 2026-09-04 — Phase 8
 
 ## Ziel
 
@@ -13,28 +13,33 @@ Stand: 2026-09-04 — Phase 7
 - 320-Pixel-Ausgabe fuer die 320x200-C64-Spielmatrix vorbereitet.
 - C64 Raum-RLE-Format analysiert und dokumentiert.
 - Raum `$00` exakt auf 640 logische Zellen = 32x20 dekodiert.
-- Die acht raumspezifischen C64-Character-Bitmaps von Raum `$00` nach PCE-4bpp konvertiert.
+- Acht raumspezifische C64-Character-Bitmaps von Raum `$00` nach PCE-4bpp konvertiert.
 - Acht PCE-BG-Paletten fuer die C64-Raumfarben angelegt.
 - Native BAT-Darstellung fuer Raum `$00` angelegt.
 - Build generiert `room00-map.dat` und `room00-bat.dat` deterministisch aus demselben RLE-Stream.
 - PAL-orientierter Gameplay-Scheduler: Display-VBlank und Spiel-Update getrennt; Bring-up-Gate 5 logische Ticks pro 6 PCE-VBlanks.
 - Montys originale Sprungkurve uebernommen: 22 Aufstiegs- und 17 Abstiegs-Samples plus Sentinel.
-- Raum-$00-Collision-Properties aus den originalen Character-Indizes abgeleitet: `1,1,1,2,1,1,1,1`.
+- Raum-$00-Collision-Properties abgeleitet.
 - `monty_physics.asm` mit C64-Pixelkoordinaten, Jump-State und Jump-Step angelegt.
-- **Neu:** `tools/test_port.py` prueft vor jedem ROM-Build deterministisch Raumgroesse, Jump-Arc-Fingerprints und 5/6-Timing.
-- **Neu:** Build bewahrt neben `.pce` nun auch `.sym` und `.lst` unter dem Monty-Namen auf, wenn PCEAS sie erzeugt.
+- `tools/test_port.py` prueft vor jedem ROM-Build Raumgroesse, Jump-Arc-Fingerprints und 5/6-Timing.
+- Build bewahrt `.pce`, `.sym` und `.lst` auf, soweit PCEAS sie erzeugt.
+- GitHub-Actions-ROM-Build angelegt, damit jeder main-Stand reproduzierbar getestet und `motr.pce` als Artefakt ausgegeben werden kann.
+
+## CI/Toolchain: neu verifiziert
+
+Der erste CI-Lauf hat einen echten Infrastrukturfehler sichtbar gemacht: `make` im Root von `pce-devel/huc` baut nicht nur die Host-Tools, sondern danach auch alle Upstream-Beispiele. PCEAS selbst wurde erfolgreich kompiliert und nach `bin/pceas` kopiert; anschliessend scheiterte ein fuer MOTR irrelevantes HuCC-Beispiel (`metatile3-multiblk`, undefiniertes `_cd_loadbank.4`). Dadurch wurde unser ROM-Schritt faelschlich blockiert.
+
+Der Workflow baut deshalb ab jetzt gezielt `huc/src` und prueft explizit `bin/pceas`. Damit wird nur die fuer MOTR benoetigte Toolchain als Voraussetzung behandelt; fehlerhafte fremde Beispiele blockieren den Port nicht mehr.
 
 ## Automatische Regression-Checks
 
-Vor PCEAS wird jetzt geprueft:
+Vor PCEAS wird geprueft:
 
 1. Raum `$00` dekodiert auf exakt 640 Zellen.
 2. Alle logischen Tile-IDs liegen im 4-Bit-Bereich.
-3. Originale Jump-Ascent-Tabelle: 22 Samples, insgesamt 20 Pixel Y-Delta.
-4. Originale Jump-Descent-Tabelle: 17 Samples, insgesamt 14 Pixel Y-Delta.
-5. Aktueller PAL-Bring-up-Scheduler liefert 5/6, 50/60 und 500/600 Ticks.
-
-Damit fallen versehentliche Daten- oder Timing-Aenderungen bereits vor dem Assemblieren auf.
+3. Jump-Ascent: 22 Samples, insgesamt 20 Pixel Y-Delta.
+4. Jump-Descent: 17 Samples, insgesamt 14 Pixel Y-Delta.
+5. PAL-Bring-up-Scheduler liefert 5/6, 50/60 und 500/600 Ticks.
 
 ## C64-Verhalten als Portierungsbasis
 
@@ -57,34 +62,29 @@ Damit fallen versehentliche Daten- oder Timing-Aenderungen bereits vor dem Assem
 - Logische Tile-ID bleibt unabhaengig vom VRAM-Pattern erhalten.
 - Gameplay-Takt ist von der VBlank-Rate getrennt.
 
-## Toolchain-Audit
-
-Die Quellbasis verwendet den neueren CORE(not TM)-artigen Startup (`bare-startup.asm`) und dessen VBlank/Joypad-Infrastruktur. Der aktuell eingetragene Installer zeigt jedoch noch auf `uli/huc`. Vor einem als verifiziert bezeichneten ROM muss deshalb die konkrete HuC/CORE-Version fest gepinnt und der Include-Satz gegen genau diese Version gebaut werden. Dieser Punkt wird nicht mehr als erledigt markiert, bis ein reproduzierbarer Linux-Mint-Build vorliegt.
-
 ## Naechste harte Schritte
 
-1. HuC/CORE-Version pinnen und Linux-Mint-Build reproduzierbar machen.
-2. Native Raum-$00-Darstellung in Emulator verifizieren.
-3. Monty-Sprite-Daten analysieren und nach PCE-SPR konvertieren.
-4. PCE-Pad auf C64-Inputflags abbilden.
-5. Links/Rechts inklusive `ToggleStepGate` portieren.
-6. Tile-Abfragen fuer Montys 2x3-Footprint an `room00_collision_map` anschliessen.
-7. CheckTileBelow/Above/Left/Right portieren.
-8. Sprungstart, Sprungkurve und Landung mit Kollisionen verbinden.
-9. Raumwechsel anschliessen.
-10. Danach Enemy-Slots, Mechanismen und Special Items.
+1. Den korrigierten CI-Lauf bis zum eigenen `main.asm` laufen lassen und dessen konkrete Assemblerfehler beseitigen.
+2. Erfolgreiches `motr.pce` als CI-Artefakt erzeugen und lokal testen.
+3. Native Raum-$00-Darstellung im Emulator verifizieren.
+4. Monty-Sprite-Daten analysieren und nach PCE-SPR konvertieren.
+5. PCE-Pad auf C64-Inputflags abbilden.
+6. Links/Rechts inklusive `ToggleStepGate` portieren.
+7. Tile-Abfragen fuer Montys 2x3-Footprint anschliessen.
+8. CheckTileBelow/Above/Left/Right portieren.
+9. Sprungstart, Sprungkurve und Landung verbinden.
+10. Raumwechsel, danach Gegner/Mechanismen/Special Items.
 
 ## Noch nicht behauptet
 
 - Noch kein verifiziert spielbarer Port.
-- Noch kein reproduzierbar verifizierter HuC/CORE-ROM-Build auf Linux Mint 22.
-- Native Raumgrafik muss noch in Emulator/Echthardware getestet werden.
+- Noch kein erfolgreich erzeugtes aktuelles `motr.pce`; der erste CI-Versuch scheiterte an einem fremden Upstream-Beispiel, nicht am MOTR-Assembler.
+- Native Raumgrafik muss noch im Emulator/Echthardware getestet werden.
 - Montys PCE-Sprite, Padsteuerung und vollstaendige Kollisionen fehlen noch.
-- Der 5/6-Scheduler ist eine Bring-up-Approximation und noch nicht die finale PAL-50,12-Hz-Kalibrierung.
+- Der 5/6-Scheduler ist eine Bring-up-Approximation.
 
 ## Referenzen
 
 - C64-Rekonstruktion: https://github.com/Dave-Agent/monty-on-the-run
 - Zielprojekt: https://github.com/DE8MSH/mntyotr
-- HuC/PCEAS: https://github.com/uli/huc
-- Aktuell gepflegter CORE-Zweig: https://github.com/pce-devel/huc
+- Aktuell gepflegte HuC/PCEAS-Basis: https://github.com/pce-devel/huc
