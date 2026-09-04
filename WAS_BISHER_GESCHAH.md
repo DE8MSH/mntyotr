@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18
+Stand: 2026-09-04 — Phase 18a
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme. Der Toolchain-Fix in Phase 18a erhoeht den Gameplay-Prozentsatz bewusst nicht.
 
 ## Ziel
 
@@ -31,12 +31,19 @@ Die vier originalen C64-Climbframes (Pointer $58-$5B, $5600-$56ff) sind jetzt in
 
 Die Regressionstests pruefen nun Walk-left, Walk-right und Climb: insgesamt 12 authentische C64-Frames. Zusaetzlich wird die im Original vorhandene Gleichheit von Climbframe 0 und 2 abgesichert.
 
+## Phase 18a — Linux-Mint-Toolchain korrigiert
+
+Ein echter Nutzer-Build zeigte, dass das aktuelle HuC-Buildsystem `pceas` erfolgreich erzeugt und aus `src/mkit/as` nach `src/bin` kopiert, waehrend `install.sh` nur `$HUC_DIR/bin/pceas` akzeptierte. Dadurch meldete der Installer faelschlich `expected pceas`, obwohl der Assembler bereits gebaut war.
+
+`install.sh` erkennt jetzt zuerst `$HUC_DIR/src/bin/pceas`, danach die aelteren bekannten Pfade und als letzte Absicherung ein ausfuehrbares `pceas` innerhalb des HuC-Trees. Anschliessend wird wie bisher `~/.local/bin/pceas` verlinkt. Die Compiler-Warnungen aus `map.c` sind nicht die Ursache des Abbruchs; entscheidend war ausschliesslich die falsche Pfadannahme im Installer.
+
 ## Verifikationsstatus
 
-Die Assetkonvertierung und statische Runtime-Verkabelung sind implementiert, aber ein echter PCEAS-/Emulatorlauf wurde weiterhin nicht ausgefuehrt. GitHub Actions bleibt auf Wunsch entfernt. Der Climb-Upload wird noch nicht vom Gameplay aktiviert, weil UP/DOWN und Leiter-/Seil-Tile-State als naechster Gameplayblock fehlen.
+Der HuC/pceas-Compile aus dem Nutzerlog war erfolgreich bis zum Kopieren des Assemblers; der anschliessende Installer-Pfadcheck war der Fehler und ist nun korrigiert. Der eigentliche Monty-ROM-Build muss danach noch mit `./build.sh` ausgefuehrt werden. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
+- Naechsten echten lokalen `./build.sh`-Lauf auswerten und eventuelle PCEAS-Assemblerfehler direkt beheben.
 - UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` im Zustandsdispatcher aktivieren.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
