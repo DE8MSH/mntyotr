@@ -60,6 +60,12 @@ bare_main:
 
 main_loop:
         call    wait_vsync
+
+        ; Keep gameplay input deterministic while the port is brought up.
+        ; bare-startup also polls during VBLANK, but an explicit poll here makes
+        ; joynow current immediately before the PAL-rate C64 gameplay tick.
+        call    read_joypads
+
         call    game_clock_step
         bcc     main_loop
         inc     game_tick_counter
