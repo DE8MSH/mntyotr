@@ -1,61 +1,50 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 20a
+Stand: 2026-09-04 — Phase 20b
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Sicht-/Input-Reparaturen erhoehen den Stand noch nicht.
+Die Prozentzahl bleibt konservativ: sichtbare Bring-up-Reparaturen zaehlen noch nicht als neuer Gameplay-Funktionsblock.
 
 ## Verbindliche Referenz
 
-Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`. Diese Version ist die editierbare, subsystem-orientierte KickAssembler-Rekonstruktion und laut Upstream funktional identisch zum Original. `byte-perfect` wird nur als zusaetzliche Ground-Truth fuer Originaladressen/Opcodefragen herangezogen. PCE-spezifische Anpassungen duerfen Hardwaredetails aendern, nicht aber Spielregeln, Raumdaten oder Animationslogik ohne dokumentierten Grund.
+Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` dient nur als zusaetzliche Ground-Truth.
 
 ## Ziel
 
 1:1-orientierter Port von *Monty on the Run* (C64) auf NEC PC Engine / HuCard.
 
-## Bereits umgesetzt
+## Bestaetigt
 
-- Linux-Mint-22 Toolchain/Build/Run-Grundgeruest; GitHub-Actions-ROM-Build bleibt entfernt.
-- PCE VDC/VCE Bring-up, Palette, BAT und VSync.
-- PAL-orientierter Gameplay-Scheduler.
-- Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
-- C64-Raumkanten und statisches 6x23-Weltgrid.
-- Echte Monty-Walkgrafik fuer beide Blickrichtungen.
-- Echte Monty-Climbgrafik und deren Gameplay-Auswahl.
+- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
+- PCE VDC/VCE Bring-up, PAL-orientierter Gameplay-Scheduler und Raum-$00-Zwischenstand.
+- Monty ist im Emulator sichtbar.
 
-## Phase 18i — erster erfolgreicher ROM-Build
+## Phase 20a/20b — Sprite, Build und Koordinatenaudit
 
-Vom Nutzer am 2026-09-04 bestaetigt: `./build.sh` erzeugt erfolgreich eine startende `.pce`; Toolchain, Regressionstests, PCEAS und ROM-Start sind end-to-end bestaetigt.
+Der Nutzer meldete nach Phase 20a einen Regressionstest-Abbruch in `monty_sprite.py`: der letzte transkribierte VIC-Frame endet mit ausgelassenem Null-Padding. Der Extraktor akzeptiert jetzt ausschliesslich beim letzten Frame dieses fehlende Null-Ende und ergaenzt es auf die 63 sichtbaren VIC-Bitmapbytes. Andere Trunkierungen bleiben Fehler.
 
-## Phase 20 — sichtbare C64-Paritaet zuerst
+Der Screenshot hat ausserdem einen wichtigeren Architekturfehler sichtbar gemacht: Der aktuelle PCE-Port zeichnet lediglich die rohe 32x20-Raumkarte als 32 BAT-Zeichen. Das ist **nicht** die komplette C64-Screengeometrie. Die Referenz arbeitet mit einem 40-Zeichen-Screen. Das eigentliche 32-Zeichen-Playfield liegt in Spalten 4..35 und Zeilen 3..22; `CreatePlayfieldBorder` spiegelt die Kanten in die Gutters Spalten 2..3 und 36..37. `PopulateColourRam` verarbeitet deshalb 36 Zeichen pro Zeile ab Spalte 2. HUD/obere Zeilen und Sektorname unten fehlen im PCE-Port ebenfalls noch.
 
-Room-Character-Off-by-one, Sprite-Palette und PCE-SAT-X-Offset wurden korrigiert. Der folgende Nutzerscreenshot bestaetigte: Monty ist nun sichtbar und Raum $00 ist wesentlich plausibler aufgebaut. Er zeigte aber auch zwei neue konkrete Fehler: Monty sieht zusammengedrueckt/geduckt aus und Padbewegung reagiert nicht sichtbar.
-
-## Phase 20a — Sprite-Layout und Pad-Bring-up
-
-1. **Monty-Spriteformat:** Der C64-Pixeldecoder selbst liefert 24x21 Pixel. Der PCE-Konverter schrieb die vier Bitplanes eines 16x16-Sprite-Cells jedoch als vier komplette serielle Ebenen. Native PCE-Spritepatterns speichern die Ebenen paarweise/interleaved (0/1 je Scanline, danach 2/3). `tools/monty_sprite.py` erzeugt dieses Layout jetzt explizit. Das soll den im Screenshot zusammengedrueckten Monty beheben.
-2. **Pad-Polling:** `bare-startup.asm` liest Pads im VBLANK bereits automatisch. Fuer den Bring-up wird `read_joypads` jetzt zusaetzlich unmittelbar nach `wait_vsync` aufgerufen, damit `joynow` garantiert direkt vor dem PAL-Gameplay-Gate frisch ist. Die verwendeten Bits bleiben die HuC-Werte I=$01, UP=$10, RIGHT=$20, DOWN=$40, LEFT=$80.
-
-Beide Aenderungen muessen jetzt im lokalen Emulator verifiziert werden. Falls Pad danach weiterhin keine sichtbare Bewegung ergibt, ist als naechstes nicht das Padformat, sondern die aktuelle C64-Screen-zu-32x20-Collision-Abbildung zu korrigieren.
+Damit ist die Beobachtung des Nutzers korrekt: Die Verhaeltnisse und Koordinaten sind noch nicht 1:1. Besonders kritisch ist Montys C64-X-System: Kollisionsroutinen rechnen `(monty_x-$0c)>>2`, waehrend der bisherige PCE-SAT-Pfad `monty_x` fast direkt als Pixel-X benutzt. Diese Skalierung wird jetzt nicht mehr als korrekt betrachtet. Vor weiterem Gameplay werden Screen-, Sprite- und Collision-Koordinaten gemeinsam aus der C64-Referenz abgeleitet.
 
 ## Verifikationsstatus
 
-- HuC/PCEAS Host-Toolchain: bestaetigt.
-- Startendes `.pce`: bestaetigt.
-- Phase-20-Raumdarstellung: Screenshot bestaetigt, aber noch nicht 1:1 gegen C64.
-- Monty sichtbar: bestaetigt.
-- Monty korrekt geformt: Phase 20a zu testen.
-- Pad/Bewegung: Phase 20a zu testen.
+- Host-Toolchain/startendes ROM: bestaetigt.
+- Phase-20b Buildfix: lokal noch zu testen.
+- Raumgeometrie 1:1: **noch nicht erreicht**.
+- Sprite-X/Collision-X 1:1: **noch nicht erreicht**.
+- Padbewegung: durch die fehlerhafte Collision-/Koordinatenabbildung noch nicht aussagekraeftig.
 
-## Aktuell offen
+## Naechste Portschritte
 
-- Phase 20a bauen und Screenshot + Links/Rechts/I testen.
-- C64 `DrawRoomPlayfield`, `CreatePlayfieldBorder`, `PopulateColourRam` und PCE-BAT-Ausgabe gegeneinander verifizieren.
-- Collision-Abbildung zwischen C64-40-Spalten-Screenkoordinaten und logischem 32x20-Raum exakt verifizieren.
-- Danach 12+12 Somersault-/Jumpframes, generischer Room-Loader, Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
+1. Build nach dem Frame-Normalisierungsfix wieder gruen bekommen.
+2. C64 `DrawRoomPlayfield` + `CreatePlayfieldBorder` als 40-Spalten-Screenmodell auf PCE abbilden.
+3. C64 Monty-X/Y -> PCE-SAT-Transformation exakt festlegen; dieselbe Transformation fuer Collision verwenden.
+4. Erst danach Bewegung/Jump erneut visuell testen.
+5. Danach Somersaultframes, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
