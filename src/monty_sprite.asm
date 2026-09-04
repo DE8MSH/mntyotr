@@ -99,16 +99,11 @@ monty_upload_climb_frame:
  sta <monty_sprite_last_mode
  rts
 
-; C64 JumpRight/JumpLeft use movement_ticker 0..11 and clamp at frame 11.
-; The generated .dat files contain the exact 12 raw VIC slots converted to PCE.
-; HuC6280 relative branches are limited to +/-128 bytes, so the two 12-way
-; dispatch tables deliberately use absolute JMP for long exits/side selection.
+; The 24 somersault frames live after ~6 KiB of walk/climb graphics, so their
+; ROM labels cross PCE 8 KiB banks. A raw TIA label,VDC_DL,512 only sees the
+; CPU address in the currently mapped bank and therefore corrupts later frames.
+; Use BANK(label) plus HuC's map_bp_to_mpr34 and copy through the mapped far ptr.
 monty_upload_jump_frame:
- lda #<MONTY_SPR_VRAM
- sta <_di
- lda #>MONTY_SPR_VRAM
- sta <_di+1
- call vdc_di_to_mawr
  lda <monty_anim_frame
  cmp #12
  bcc .index_ok
@@ -116,108 +111,94 @@ monty_upload_jump_frame:
 .index_ok:
  tax
  lda <monty_facing
- bpl .jump_right
- jmp .jump_left
-.jump_right:
- cpx #0
- beq .jr0
- cpx #1
- beq .jr1
- cpx #2
- beq .jr2
- cpx #3
- beq .jr3
- cpx #4
- beq .jr4
- cpx #5
- beq .jr5
- cpx #6
- beq .jr6
- cpx #7
- beq .jr7
- cpx #8
- beq .jr8
- cpx #9
- beq .jr9
- cpx #10
- beq .jr10
- tia monty_sault_r_11,VDC_DL,512
- jmp .jdone
-.jr0: tia monty_sault_r_0,VDC_DL,512
- jmp .jdone
-.jr1: tia monty_sault_r_1,VDC_DL,512
- jmp .jdone
-.jr2: tia monty_sault_r_2,VDC_DL,512
- jmp .jdone
-.jr3: tia monty_sault_r_3,VDC_DL,512
- jmp .jdone
-.jr4: tia monty_sault_r_4,VDC_DL,512
- jmp .jdone
-.jr5: tia monty_sault_r_5,VDC_DL,512
- jmp .jdone
-.jr6: tia monty_sault_r_6,VDC_DL,512
- jmp .jdone
-.jr7: tia monty_sault_r_7,VDC_DL,512
- jmp .jdone
-.jr8: tia monty_sault_r_8,VDC_DL,512
- jmp .jdone
-.jr9: tia monty_sault_r_9,VDC_DL,512
- jmp .jdone
-.jr10: tia monty_sault_r_10,VDC_DL,512
- jmp .jdone
-.jump_left:
- cpx #0
- beq .jl0
- cpx #1
- beq .jl1
- cpx #2
- beq .jl2
- cpx #3
- beq .jl3
- cpx #4
- beq .jl4
- cpx #5
- beq .jl5
- cpx #6
- beq .jl6
- cpx #7
- beq .jl7
- cpx #8
- beq .jl8
- cpx #9
- beq .jl9
- cpx #10
- beq .jl10
- tia monty_sault_l_11,VDC_DL,512
- jmp .jdone
-.jl0: tia monty_sault_l_0,VDC_DL,512
- jmp .jdone
-.jl1: tia monty_sault_l_1,VDC_DL,512
- jmp .jdone
-.jl2: tia monty_sault_l_2,VDC_DL,512
- jmp .jdone
-.jl3: tia monty_sault_l_3,VDC_DL,512
- jmp .jdone
-.jl4: tia monty_sault_l_4,VDC_DL,512
- jmp .jdone
-.jl5: tia monty_sault_l_5,VDC_DL,512
- jmp .jdone
-.jl6: tia monty_sault_l_6,VDC_DL,512
- jmp .jdone
-.jl7: tia monty_sault_l_7,VDC_DL,512
- jmp .jdone
-.jl8: tia monty_sault_l_8,VDC_DL,512
- jmp .jdone
-.jl9: tia monty_sault_l_9,VDC_DL,512
- jmp .jdone
-.jl10: tia monty_sault_l_10,VDC_DL,512
-.jdone:
+ bmi .left
+ lda monty_sault_r_lo,x
+ sta <_bp
+ lda monty_sault_r_hi,x
+ sta <_bp+1
+ ldy monty_sault_r_bank,x
+ bra .upload
+.left:
+ lda monty_sault_l_lo,x
+ sta <_bp
+ lda monty_sault_l_hi,x
+ sta <_bp+1
+ ldy monty_sault_l_bank,x
+.upload:
+ call monty_upload_far_512
  stz <monty_sprite_dirty
  lda <monty_facing
  sta <monty_sprite_last_facing
  lda #2
  sta <monty_sprite_last_mode
  rts
+
+; Copy one 512-byte PCE sprite frame from arbitrary banked ROM to VRAM.
+; map_bp_to_mpr34 maps the source bank into MPR3 and the following bank into
+; MPR4, so a frame that straddles an 8 KiB ROM-bank boundary remains readable.
+; MPR3/MPR4 and IRQ state are restored after the transfer.
+monty_upload_far_512:
+ php
+ sei
+ tma3
+ pha
+ tma4
+ pha
+ call map_bp_to_mpr34
+
+ lda #<MONTY_SPR_VRAM
+ sta <_di
+ lda #>MONTY_SPR_VRAM
+ sta <_di+1
+ call vdc_di_to_mawr
+
+ ldx #2
+ cly
+.page:
+ lda [_bp],y
+ sta VDC_DL
+ iny
+ lda [_bp],y
+ sta VDC_DH
+ iny
+ bne .page
+ inc <_bp+1
+ dex
+ bne .page
+
+ pla
+ tam4
+ pla
+ tam3
+ plp
+ rts
+
+; Compile-time far pointers for the exact 12-frame C64 sets. Keep these tiny
+; tables in code space so selecting a bank never depends on the sprite-data bank.
+monty_sault_l_lo:
+ db <monty_sault_l_0,<monty_sault_l_1,<monty_sault_l_2,<monty_sault_l_3
+ db <monty_sault_l_4,<monty_sault_l_5,<monty_sault_l_6,<monty_sault_l_7
+ db <monty_sault_l_8,<monty_sault_l_9,<monty_sault_l_10,<monty_sault_l_11
+monty_sault_l_hi:
+ db >monty_sault_l_0,>monty_sault_l_1,>monty_sault_l_2,>monty_sault_l_3
+ db >monty_sault_l_4,>monty_sault_l_5,>monty_sault_l_6,>monty_sault_l_7
+ db >monty_sault_l_8,>monty_sault_l_9,>monty_sault_l_10,>monty_sault_l_11
+monty_sault_l_bank:
+ db BANK(monty_sault_l_0),BANK(monty_sault_l_1),BANK(monty_sault_l_2),BANK(monty_sault_l_3)
+ db BANK(monty_sault_l_4),BANK(monty_sault_l_5),BANK(monty_sault_l_6),BANK(monty_sault_l_7)
+ db BANK(monty_sault_l_8),BANK(monty_sault_l_9),BANK(monty_sault_l_10),BANK(monty_sault_l_11)
+monty_sault_r_lo:
+ db <monty_sault_r_0,<monty_sault_r_1,<monty_sault_r_2,<monty_sault_r_3
+ db <monty_sault_r_4,<monty_sault_r_5,<monty_sault_r_6,<monty_sault_r_7
+ db <monty_sault_r_8,<monty_sault_r_9,<monty_sault_r_10,<monty_sault_r_11
+monty_sault_r_hi:
+ db >monty_sault_r_0,>monty_sault_r_1,>monty_sault_r_2,>monty_sault_r_3
+ db >monty_sault_r_4,>monty_sault_r_5,>monty_sault_r_6,>monty_sault_r_7
+ db >monty_sault_r_8,>monty_sault_r_9,>monty_sault_r_10,>monty_sault_r_11
+monty_sault_r_bank:
+ db BANK(monty_sault_r_0),BANK(monty_sault_r_1),BANK(monty_sault_r_2),BANK(monty_sault_r_3)
+ db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
+ db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
 
 ; Animation state follows C64 UpdateState more closely:
 ; - walk: four frames, timer 4, only advances while moving
@@ -316,7 +297,7 @@ monty_sprite_animate:
 ; PCE 16x32 sprites are halves of an aligned 32x32 pattern group. The group
 ; in VRAM is TL,TR,BL,BR (64 words per 16x16 cell). Left SAT entry selects
 ; the left half at the group base; right SAT entry selects the right half at
-; base+64 words. The old +256-word pointer skipped beyond the uploaded frame.
+; base+64 words.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
