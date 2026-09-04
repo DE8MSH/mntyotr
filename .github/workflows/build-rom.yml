@@ -1,0 +1,41 @@
+name: Build HuCard ROM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential git cmake make python3
+
+      - name: Build current HuC/PCEAS toolchain
+        run: |
+          git clone --depth 1 https://github.com/pce-devel/huc.git "$HOME/huc"
+          make -C "$HOME/huc" -j"$(nproc)"
+          echo "$HOME/huc/bin" >> "$GITHUB_PATH"
+
+      - name: Build MOTR HuCard
+        env:
+          HUC_HOME: ${{ github.workspace }}/../huc
+        run: |
+          export HUC_HOME="$HOME/huc"
+          export PATH="$HUC_HOME/bin:$PATH"
+          ./build.sh
+          cp build/monty.pce build/motr.pce
+          sha256sum build/motr.pce
+
+      - name: Upload ROM and symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: motr-pce
+          path: |
+            build/motr.pce
+            build/monty.sym
+            build/monty.lst
+          if-no-files-found: error
