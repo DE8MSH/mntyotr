@@ -16,6 +16,7 @@
         include "room01_native.asm"
         include "game_clock.asm"
         include "monty_physics.asm"
+        include "collision_banking.asm"
         include "world.asm"
         include "room_loader.asm"
         include "monty_sprite.asm"
@@ -87,6 +88,11 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
+        ; Phase 35: temporarily map the active room's collision-map bank across
+        ; the complete physics slice. This keeps direct C64-style tile reads
+        ; correct even when unrelated ROM content moves room data to new banks.
+        call    collision_bank_enter
+
         ; C64-oriented order for the currently ported subset.
         call    monty_update_input
 
@@ -150,6 +156,9 @@ main_loop:
         sta     <monty_x
         stz     <monty_room_exit
 .after_jump_exit_guard:
+
+        ; Restore the normal HuCard mapping before world/VRAM/sprite work.
+        call    collision_bank_exit
 
         call    world_resolve_exit
         bcc     .no_room_change
