@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 17
+Stand: 2026-09-04 — Phase 18
 
 ## Portierungsstand
 
-**Gesamtport: ca. 31 %**
+**Gesamtport: ca. 32 %**
 
-Die Prozentzahl steigt nur fuer neue konkret portierte Spielsysteme. Dieser Block korrigiert den vorhandenen Spritepfad und erhoeht deshalb den Gesamtwert bewusst nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems und steigt nur fuer konkret portierte Subsysteme.
 
 ## Ziel
 
@@ -20,27 +20,26 @@ Die Prozentzahl steigt nur fuer neue konkret portierte Spielsysteme. Dieser Bloc
 - PAL-orientierter Gameplay-Scheduler.
 - Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
 - C64-Raumkanten und statisches 6x23-Weltgrid.
-- Echte Monty-Walkgrafik fuer beide Blickrichtungen, 8 authentische C64-Frames.
+- Echte Monty-Walkgrafik fuer beide Blickrichtungen.
+- Echte Monty-Climbgrafik als PCE-Spriteasset und VRAM-Uploadpfad.
 
-## Neu in Phase 17
+## Neu in Phase 18
 
-Der PCE-Spritepfad wurde gegen die HuC6270-SATB-Dokumentation geprueft und drei konkrete Fehler wurden korrigiert:
+Die vier originalen C64-Climbframes (Pointer $58-$5B, $5600-$56ff) sind jetzt in `tools/monty_sprite.py` enthalten. Wie die Walkframes werden die 24x21-C64-Bitmaps pixelgetreu in je zwei 16x32-PCE-Sprites umgesetzt.
 
-1. Die SATB-Quelladresse wird jetzt ueber VDC-Register $13 gesetzt und nach Aktualisierung erneut fuer den VRAM->internen-SAT-Transfer aktiviert.
-2. Das SPBG-Prioritaetsbit ist jetzt gesetzt, damit Monty vor dem Background liegt. Fuer 16x32 wird das Attributwort $1080 verwendet: CGY=01, CGX=0, foreground, Palette 0.
-3. Der rechte 16x32-Teil beginnt nach 256 Bytes. Vorher stand dort faelschlich +128, was auf den unteren 16x16-Block des linken Sprites zeigte.
+`build.sh` erzeugt nun zusaetzlich `monty-climb.dat`. `src/monty_sprite.asm` bindet alle vier Frames ein und besitzt mit `monty_upload_climb_frame` einen eigenen VRAM-Uploadpfad. Der C64-Code verwendet fuer Climb `(movement_ticker & 3) + $58` und eine Vier-Tick-Animationskadenz; diese Vier-Frame-Struktur ist damit auf PCE-Seite vorbereitet.
 
-Ausserdem war `tools/test_port.py` nach der Walk-right-Erweiterung inkonsistent: er importierte noch die entfernte Funktion `build_walk_left`. Der Test nutzt jetzt die aktuelle `build()`-API und prueft beide Richtungen, insgesamt acht authentische Frames.
+Die Regressionstests pruefen nun Walk-left, Walk-right und Climb: insgesamt 12 authentische C64-Frames. Zusaetzlich wird die im Original vorhandene Gleichheit von Climbframe 0 und 2 abgesichert.
 
 ## Verifikationsstatus
 
-Die statische SATB-/Patternlogik entspricht jetzt der dokumentierten HuC6270-Struktur. Ein echter PCEAS-/Emulatorlauf wurde weiterhin nicht ausgefuehrt; GitHub Actions bleibt auf Wunsch entfernt. Deshalb wird sichtbare Laufzeitfunktion noch nicht behauptet.
+Die Assetkonvertierung und statische Runtime-Verkabelung sind implementiert, aber ein echter PCEAS-/Emulatorlauf wurde weiterhin nicht ausgefuehrt. GitHub Actions bleibt auf Wunsch entfernt. Der Climb-Upload wird noch nicht vom Gameplay aktiviert, weil UP/DOWN und Leiter-/Seil-Tile-State als naechster Gameplayblock fehlen.
 
 ## Aktuell offen
 
-- 12+12 Somersault-/Jumpframes und 4 Climbframes portieren und zustandsabhaengig auswaehlen.
+- UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` im Zustandsdispatcher aktivieren.
+- 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
-- DOWN/UP, Leiter-/Seil- und vollstaendige Tile-State-Logik.
 - Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 - 320px-Porches und PAL-Timing lokal verifizieren/kalibrieren.
 
