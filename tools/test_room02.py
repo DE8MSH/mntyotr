@@ -53,13 +53,13 @@ def main():
     assert 'call    room02_draw_native' in loader
     assert 'call    room02_cache_collision' in loader
     assert 'BANK(room02_collision_map_rom)' in loader
-    assert 'cmp     #4' in world
+    assert 'cmp     #5' in world
 
-    # Room02 left is now a supported transition into Room03.
-    assert 'Loaded horizontal chain is now $03 <-> $02 <-> $01 <-> $00.' in main_asm
-    assert 'Room $03 left' in main_asm
+    # Room02 remains an interior link in the now-active Room04..Room00 chain.
+    assert 'Loaded horizontal chain is now $04 <-> $03 <-> $02 <-> $01 <-> $00.' in main_asm
+    assert 'Room $04 left' in main_asm
 
-    print('OK: Room 02 remains stable and now links left into Room 03')
+    print('OK: Room 02 remains stable inside the active Room04..Room00 chain')
 
 
 if __name__ == '__main__':
