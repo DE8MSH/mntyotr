@@ -1,11 +1,11 @@
-; Phase 38: keep the active room collision map mapped while gameplay physics runs.
+; Phase 38a: keep Room $00/$01 collision banks mapped during physics, but use
+; a RAM-backed collision/property cache for Room $02.
 ;
-; The current physics code deliberately keeps the original C64 tile/collision
-; semantics and uses direct pointers to room00/01/02 collision maps. Those data
-; labels can move to another HuCard bank when unrelated graphics or decor grow
-; the ROM. Mapping the selected collision bank into MPR3/MPR4 for the duration
-; of monty_update_input + monty_jump_step makes those direct reads independent
-; of ROM layout without copying or changing any collision bytes.
+; Room $02 lives in the ROM-tail area. Mapping that far bank across MPR3/MPR4
+; for the whole physics slice can hide runtime code on this build, which leaves
+; Monty apparently frozen immediately after entering the room. Room $02 is
+; therefore copied once on room load into RAM; physics keeps the same direct
+; room02_collision_map / room02_tile_properties labels and semantics.
 
 .zp
 collision_saved_mpr3:   ds 1
@@ -13,11 +13,13 @@ collision_saved_mpr4:   ds 1
 collision_saved_bp_lo:  ds 1
 collision_saved_bp_hi:  ds 1
 
+.bss
+room02_collision_map:   ds 640
+room02_tile_properties: ds 8
+
 .code
 
 collision_bank_enter:
-        ; Physics is short; keep IRQs off while MPR3/MPR4 temporarily point at
-        ; collision data so an interrupt cannot observe the temporary mapping.
         sei
         tma3
         sta     <collision_saved_mpr3
@@ -29,10 +31,10 @@ collision_bank_enter:
         sta     <collision_saved_bp_hi
 
         lda     <monty_room
+        cmp     #2
+        beq     .room02_ram
         cmp     #1
         beq     .room01
-        cmp     #2
-        beq     .room02
 
 .room00:
         lda     #<room00_collision_map
@@ -48,20 +50,12 @@ collision_bank_enter:
         lda     #>room01_collision_map
         sta     <_bp+1
         ldy     #BANK(room01_collision_map)
-        bra     .map
-
-.room02:
-        lda     #<room02_collision_map
-        sta     <_bp
-        lda     #>room02_collision_map
-        sta     <_bp+1
-        ldy     #BANK(room02_collision_map)
 
 .map:
-        ; Same proven mapper used by the bank-safe Monty sprite and room upload
-        ; paths. It maps the selected bank into MPR3 and the following bank into
-        ; MPR4, so the 640-byte collision map may straddle an 8 KiB boundary.
         call    map_bp_to_mpr34
+.room02_ram:
+        ; Room $02 direct pointers target RAM, so leave the normal runtime MPRs
+        ; untouched while monty_update_input/monty_jump_step execute.
         rts
 
 collision_bank_exit:
