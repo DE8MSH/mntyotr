@@ -1,6 +1,6 @@
-; Phase 40 Room $03 generated ROM-tail assets.
-; Prepared only: Room $03 is not reachable yet. Keeping all bulk data here
-; preserves the confirmed runtime/physics layout while we validate ROM growth.
+; Phase 41 Room $03 ROM-tail assets.
+; Bulk room data stays behind the confirmed runtime code. Collision/properties
+; are copied into the shared tail-room RAM cache on entry.
 
 .data
 room03_patterns:
@@ -15,3 +15,7 @@ room03_tile_properties_rom:
 
 room03_screen_bat:
         incbin "room03-screen-bat.dat"
+
+; PCE BG palette slot 15: C64 light blue $0e.
+room03_extra_palette:
+        dw $000,$16f,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
