@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 11
+Stand: 2026-09-04 — Phase 12
 
 ## Portierungsstand
 
@@ -23,34 +23,29 @@ Grobe Gewichtung: Plattform/Build 10 %, Video/Room-Renderer 15 %, Welt/Raumdaten
 - Acht raumspezifische C64-Character-Bitmaps nach PCE-4bpp konvertiert und Paletten angelegt.
 - PAL-orientierter Gameplay-Scheduler mit getrenntem VBlank/Gameplay-Takt.
 - Montys originale Sprungkurve und erste Kollisionslogik.
+- PCE-Pad: Links/Rechts + Button I/Fire, gespeicherte Sprungrichtung und C64-`ToggleStepGate`.
+- 16-Bit-Zugriff auf die komplette 640-Byte-Kollisionsmap.
 - Automatische Regressionstests fuer Raum, Jump-Arc und Scheduler.
-- GitHub-Actions-ROM-Build fuer `motr.pce`, Symbole und Listing.
+- GitHub-Actions-ROM-Build fuer `motr.pce` und Diagnosedateien.
 
-## Neu in Phase 11
+## Neu in Phase 12
 
-### Toolchain-Pfad korrigiert
+### CI-Fehler exakt diagnostiziert
 
-Der aktuelle `pce-devel/huc`-Baum hat `bare-startup.asm` unter `examples/asm/elmer/include`, waehrend `common.asm`, `vdc.asm`, `font.asm` und `joypad.asm` unter `include/hucc` liegen. `build.sh` setzt `PCE_INCLUDE` nun explizit auf beide Verzeichnisse und prueft die benoetigten Dateien vor PCEAS. `install.sh` baut die Host-Tools und gated gezielt auf `bin/pceas`.
+Der aktuelle GitHub-Actions-Lauf erreichte den Upstream-HuC-Build. `pceas` wurde nachweislich erfolgreich gelinkt und nach `$HOME/huc/bin/pceas` kopiert. Trotzdem beendete der Upstream-`make -C src` den Schritt mit Exitcode 1. Dadurch wurde unser eigener PCEAS-Aufruf noch gar nicht erreicht.
 
-### PCE-Pad -> Monty
+Der Workflow wurde deshalb robuster gemacht: Der bekannte Upstream-Gesamt-Make-Exit wird separat erfasst; entscheidend ist danach, ob das fuer diesen Pure-ASM-Port benoetigte `$HOME/huc/bin/pceas` wirklich existiert und ausfuehrbar ist. Erst dann geht CI in `./build.sh`.
 
-Die aktuelle CORE-Joypadroutine liefert `joynow` mit aktiven High-Bits: I=$01, UP=$10, RIGHT=$20, DOWN=$40, LEFT=$80. `bare-startup.asm` aktualisiert diese Daten automatisch im VBlank-IRQ. Der Port nutzt jetzt I als C64-Fire und LEFT/RIGHT fuer Montys horizontale Bewegung.
+Ausserdem ist der Artifact-Upload tolerant gegen optionale `.sym`/`.lst`: `motr.pce` bleibt zwingend, Diagnosedateien werden hochgeladen, wenn PCEAS sie erzeugt.
 
-### C64 ToggleStepGate
+### Warum der Prozentstand nicht steigt
 
-Das originale `ToggleStepGate` inkrementiert einen Byte-Zaehler und liefert Bit 0. Diese Semantik ist als `monty_toggle_step_gate` portiert. Links bewegt auf Gate=1, rechts auf Gate=0, entsprechend den originalen Call-Sites.
+Diese Phase beseitigt einen Build-Infrastrukturblocker, portiert aber kein weiteres Gameplay-Subsystem. Deshalb bleibt der belastbare Gesamtstand bei ca. 22 %, bis der eigene Assemblercode erfolgreich durch CI geht bzw. Montys sichtbarer Spritepfad implementiert ist.
 
-### Sprungrichtung gespeichert
+## Aktuell offen
 
-Beim Start eines Sprungs werden LEFT/RIGHT gespeichert. Waehrend des Sprungs verwendet die horizontale Bewegung diese gespeicherten Richtungen, analog zu `jump_saved_left/right` der C64-Version.
-
-### 640-Byte-Kollisionsmap korrigiert
-
-Die Raumkarte ist groesser als ein 8-Bit-X-Index. `room00_get_tile_xy` benutzt deshalb jetzt einen 16-Bit-Pointer plus row*32-Tabelle statt eines ueberlaufenden 8-Bit-Index. Dadurch sind auch die unteren Raumzeilen adressierbar.
-
-## Noch offen
-
-- Der neue Code muss durch den aktuellen PCEAS-CI-Lauf und eventuelle Syntaxprobleme muessen beseitigt werden.
+- Neuer CI-Lauf muss jetzt erstmals `./build.sh` / unseren PCEAS-Code erreichen.
+- Etwaige echte Assemblerfehler werden aus diesem Lauf behoben.
 - Monty ist noch nicht als PCE-Sprite sichtbar.
 - UP/DOWN, Leiter-/Seil-Semantik und exakte Tile-State-Logik fehlen.
 - Property-4/Piledriver-Nebenwirkung und Raumwechsel fehlen.
@@ -59,12 +54,12 @@ Die Raumkarte ist groesser als ein 8-Bit-X-Index. `room00_get_tile_xy` benutzt d
 
 ## Naechste harte Schritte
 
-1. CI/PCEAS des neuen Codes gruen bekommen und `motr.pce` erzeugen.
-2. Montys C64-Spritedaten extrahieren und in PCE-SPR-4bpp konvertieren.
-3. SATB-Update anschliessen, damit Pad/Jump sichtbar werden.
-4. UP/DOWN und vollstaendige C64-Tile-State-Logik portieren.
-5. Raumwechsel und weitere Raeume.
-6. Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
+1. CI bis zum eigenen PCEAS-Lauf bringen und alle Assemblerfehler beseitigen.
+2. Ein echtes `motr.pce` als CI-Artifact erzeugen und lokal zum Test bereitstellen.
+3. Montys C64-Spritedaten extrahieren und in PCE-SPR-4bpp konvertieren.
+4. SATB-Update anschliessen, damit Pad/Jump sichtbar werden.
+5. UP/DOWN und vollstaendige C64-Tile-State-Logik portieren.
+6. Raumwechsel, Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
