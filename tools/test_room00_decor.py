@@ -14,7 +14,7 @@ def main():
     patterns, first = build_patterns()
 
     assert CHR_DECOR == CHR_GAME + 9
-    assert len(patterns) == 32 * 32
+    assert len(patterns) == 41 * 32
     assert first == {
         0: CHR_DECOR,
         1: CHR_DECOR+2,
@@ -23,6 +23,7 @@ def main():
         4: CHR_DECOR+21,
         5: CHR_DECOR+26,
         6: CHR_DECOR+29,
+        0x43: CHR_DECOR+32,
     }
 
     bat = words(decorated)
@@ -65,7 +66,16 @@ def main():
             assert (w >> 12) == PAL_BY_C64[c64col]
             assert (w & 0x0fff) == first[type_id] + i
 
-    print('OK: room 00 solid + patterned decor records/colour streams/BAT overlay')
+    # Final room-$00 record: type $43 sad_flowers at ($21,$0f), exact 3x3
+    # colour stream 05 05 05 / 05 05 05 / 07 0a 08.
+    sad_expected = [0x05,0x05,0x05,0x05,0x05,0x05,0x07,0x0a,0x08]
+    for i,c64col in enumerate(sad_expected):
+        dy,dx = divmod(i,3)
+        w = bat[(0x0f-3+dy)*SCREEN_W + (0x21-2+dx)]
+        assert (w >> 12) == PAL_BY_C64[c64col]
+        assert (w & 0x0fff) == first[0x43] + i
+
+    print('OK: complete room 00 decor records/colour streams/BAT overlay')
 
 
 if __name__ == '__main__':
