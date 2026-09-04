@@ -7,6 +7,7 @@ monty_anim_frame: ds 1
 monty_anim_timer: ds 1
 monty_sprite_dirty: ds 1
 monty_sprite_last_facing: ds 1
+monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb
 .code
 monty_sprite_init:
  stz <monty_anim_frame
@@ -14,9 +15,11 @@ monty_sprite_init:
  sta <monty_anim_timer
  lda #$ff
  sta <monty_sprite_last_facing
+ sta <monty_sprite_last_mode
  lda #1
  sta <monty_sprite_dirty
  call monty_upload_walk_frame
+ stz <monty_sprite_last_mode
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
@@ -41,14 +44,11 @@ monty_upload_walk_frame:
  beq .r2
  tia monty_walk_r_3,VDC_DL,512
  bra .uploaded
-.r0:
- tia monty_walk_r_0,VDC_DL,512
+.r0: tia monty_walk_r_0,VDC_DL,512
  bra .uploaded
-.r1:
- tia monty_walk_r_1,VDC_DL,512
+.r1: tia monty_walk_r_1,VDC_DL,512
  bra .uploaded
-.r2:
- tia monty_walk_r_2,VDC_DL,512
+.r2: tia monty_walk_r_2,VDC_DL,512
  bra .uploaded
 .left:
  cpx #0
@@ -59,18 +59,16 @@ monty_upload_walk_frame:
  beq .l2
  tia monty_walk_l_3,VDC_DL,512
  bra .uploaded
-.l0:
- tia monty_walk_l_0,VDC_DL,512
+.l0: tia monty_walk_l_0,VDC_DL,512
  bra .uploaded
-.l1:
- tia monty_walk_l_1,VDC_DL,512
+.l1: tia monty_walk_l_1,VDC_DL,512
  bra .uploaded
-.l2:
- tia monty_walk_l_2,VDC_DL,512
+.l2: tia monty_walk_l_2,VDC_DL,512
 .uploaded:
  stz <monty_sprite_dirty
  lda <monty_facing
  sta <monty_sprite_last_facing
+ stz <monty_sprite_last_mode
  rts
 
 monty_upload_climb_frame:
@@ -90,25 +88,41 @@ monty_upload_climb_frame:
  beq .c2
  tia monty_climb_3,VDC_DL,512
  bra .cdone
-.c0:
- tia monty_climb_0,VDC_DL,512
+.c0: tia monty_climb_0,VDC_DL,512
  bra .cdone
-.c1:
- tia monty_climb_1,VDC_DL,512
+.c1: tia monty_climb_1,VDC_DL,512
  bra .cdone
-.c2:
- tia monty_climb_2,VDC_DL,512
+.c2: tia monty_climb_2,VDC_DL,512
 .cdone:
  stz <monty_sprite_dirty
+ lda #1
+ sta <monty_sprite_last_mode
  rts
 
+; C64 animation cadence is 4 logical ticks. Climbing has its own authentic
+; four-frame source and is selected only while UP/DOWN movement is active on a
+; property-3 tile state.
 monty_sprite_animate:
- lda <monty_facing
- cmp <monty_sprite_last_facing
- beq .same_dir
+ lda <monty_climbing
+ beq .walk_mode
+ lda <monty_sprite_last_mode
+ cmp #1
+ beq .tick
  lda #1
  sta <monty_sprite_dirty
-.same_dir:
+ bra .tick
+.walk_mode:
+ lda <monty_sprite_last_mode
+ beq .check_dir
+ lda #1
+ sta <monty_sprite_dirty
+.check_dir:
+ lda <monty_facing
+ cmp <monty_sprite_last_facing
+ beq .tick
+ lda #1
+ sta <monty_sprite_dirty
+.tick:
  dec <monty_anim_timer
  bne .maybe
  lda #4
@@ -122,6 +136,11 @@ monty_sprite_animate:
 .maybe:
  lda <monty_sprite_dirty
  beq .done
+ lda <monty_climbing
+ beq .upload_walk
+ call monty_upload_climb_frame
+ bra .done
+.upload_walk:
  call monty_upload_walk_frame
 .done:
  rts
