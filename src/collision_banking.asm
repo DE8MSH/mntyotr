@@ -1,17 +1,17 @@
-; Phase 38a: keep Room $00/$01 collision banks mapped during physics, but use
-; a RAM-backed collision/property cache for Room $02.
+; Phase 41: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
+; $02/$03 use the same 648-byte RAM collision/property cache, refilled on room
+; entry. Physics itself still addresses the established room02_* RAM labels.
 ;
-; Room $02 lives in the ROM-tail area. Mapping that far bank across MPR3/MPR4
-; for the whole physics slice can hide runtime code on this build, which leaves
-; Monty apparently frozen immediately after entering the room. Room $02 is
-; therefore copied once on room load into RAM; physics keeps the same direct
-; room02_collision_map / room02_tile_properties labels and semantics.
+; For Room $03 only, collision_bank_enter temporarily shadows monty_room as $02
+; while monty_update_input/monty_jump_step run. collision_actual_room preserves
+; the real room id for edge guards and is restored before world navigation.
 
 .zp
 collision_saved_mpr3:   ds 1
 collision_saved_mpr4:   ds 1
 collision_saved_bp_lo:  ds 1
 collision_saved_bp_hi:  ds 1
+collision_actual_room:  ds 1
 
 .bss
 room02_collision_map:   ds 640
@@ -31,8 +31,17 @@ collision_bank_enter:
         sta     <collision_saved_bp_hi
 
         lda     <monty_room
+        sta     <collision_actual_room
+        cmp     #3
+        bne     .select_room
+        ; Room $03 has already copied its collision payload into the shared
+        ; room02_* RAM cache. Shadow the id only for the unchanged physics code.
+        lda     #2
+        sta     <monty_room
+.select_room:
+        lda     <monty_room
         cmp     #2
-        beq     .room02_ram
+        beq     .tail_room_ram
         cmp     #1
         beq     .room01
 
@@ -53,12 +62,12 @@ collision_bank_enter:
 
 .map:
         call    map_bp_to_mpr34
-.room02_ram:
-        ; Room $02 direct pointers target RAM, so leave the normal runtime MPRs
-        ; untouched while monty_update_input/monty_jump_step execute.
+.tail_room_ram:
         rts
 
 collision_bank_exit:
+        lda     <collision_actual_room
+        sta     <monty_room
         lda     <collision_saved_mpr4
         tam4
         lda     <collision_saved_mpr3
