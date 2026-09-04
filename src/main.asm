@@ -20,6 +20,9 @@
         include "room_loader.asm"
         include "monty_sprite.asm"
 
+.zp
+main_jump_x_before_step: ds 1
+
         .code
 
 bare_main:
@@ -85,7 +88,30 @@ main_loop:
 
         ; C64-oriented order for the currently ported subset.
         call    monty_update_input
+
+        ; monty_jump_step moves only Y, but the current shared edge helper also
+        ; checks X and can therefore synthesize a left/right exit while Monty is
+        ; jumping against a solid border. Save the post-input X so a side exit
+        ; created only by the vertical jump step can be rejected and undone.
+        lda     <monty_x
+        sta     <main_jump_x_before_step
         call    monty_jump_step
+
+        lda     <monty_room_exit
+        cmp     #1
+        beq     .guard_jump_side_exit
+        cmp     #2
+        bne     .after_jump_exit_guard
+.guard_jump_side_exit:
+        lda     <monty_jump_phase
+        beq     .after_jump_exit_guard
+        lda     <monty_is_moving
+        bne     .after_jump_exit_guard
+        lda     <main_jump_x_before_step
+        sta     <monty_x
+        stz     <monty_room_exit
+.after_jump_exit_guard:
+
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending
