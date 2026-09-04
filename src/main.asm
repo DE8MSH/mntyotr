@@ -51,7 +51,7 @@ bare_main:
         ldy     #^room00_bg_palettes
         call    load_palettes
 
-        ; Rooms $01-$03 use C64 purple and blue in slots 13/14.
+        ; Rooms $01-$04 use C64 purple and blue in slots 13/14.
         lda     #13
         sta     <_al
         lda     #2
@@ -106,15 +106,15 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Loaded horizontal chain is now $03 <-> $02 <-> $01 <-> $00.
-        ; collision_actual_room preserves the true room while Room $03 shadows
-        ; as $02 inside the unchanged physics code. Only exits into unloaded
-        ; rooms are cancelled during a jump: Room $00 right and Room $03 left.
+        ; Loaded horizontal chain is now $04 <-> $03 <-> $02 <-> $01 <-> $00.
+        ; collision_actual_room preserves the true tail-room id while rooms
+        ; $03/$04 shadow as $02 inside unchanged physics. Only exits into
+        ; unloaded rooms are cancelled during a jump: Room $00 right/$04 left.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
         beq     .guard_room00_right
-        cmp     #3
+        cmp     #4
         bne     .after_unsupported_jump_edge
         lda     <monty_room_exit
         cmp     #1
