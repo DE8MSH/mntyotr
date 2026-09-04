@@ -1,6 +1,8 @@
-; Phase 32 room loader: first real C64 world transition, rooms $00 <-> $01.
+; Phase 34 room loader: proven Phase-32b gameplay path plus isolated Room-$01
+; decor upload. Physics/collision semantics are intentionally untouched.
+;
 ; Room $01 graphics are copied through MPR3/MPR4 so ROM-bank placement cannot
-; corrupt the new room as the ROM grows.
+; corrupt the room as the ROM grows.
 
 .zp
 room_copy_rows: ds 1
@@ -25,8 +27,11 @@ room_load_pending:
         rts
 
 .room01:
-        bsr     room01_upload_patterns
-        bsr     room01_draw_native
+        ; Use absolute/far-safe calls: room/decor growth must never reintroduce
+        ; the relative BSR range failure seen in the earlier Phase 33 attempt.
+        call    room01_upload_patterns
+        call    room01_upload_decor
+        call    room01_draw_native
         lda     #1
         sta     <monty_room
         stz     <world_transition_ready
