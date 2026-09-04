@@ -9,7 +9,6 @@
 
         include "common.asm"
         include "vdc.asm"
-        include "font.asm"
         include "joypad.asm"
         include "room00_assets.asm"
         include "room00_native.asm"
@@ -24,21 +23,6 @@ bare_main:
         call    init_256x224
         bsr     init_c64_video
 
-        stz     <_di + 0
-        lda     #>(CHR_FONT * 16)
-        sta     <_di + 1
-        lda     #$ff
-        sta     <_al
-        stz     <_ah
-        lda     #16 + 96
-        sta     <_bl
-        lda     #<font_data
-        sta     <_bp + 0
-        lda     #>font_data
-        sta     <_bp + 1
-        ldy     #^font_data
-        call    dropfnt8x8_vdc
-
         call    upload_room00_patterns
 
         stz     <_al
@@ -51,14 +35,6 @@ bare_main:
         ldy     #^room00_palettes
         call    load_palettes
         call    xfer_palettes
-
-        lda     #<(0 * BAT_LINE + 2)
-        sta     <_di + 0
-        lda     #>(0 * BAT_LINE + 2)
-        sta     <_di + 1
-        call    vdc_di_to_mawr
-        cly
-        bsr     print_banner
 
         call    draw_room00_native
         call    game_clock_init
@@ -91,24 +67,3 @@ init_c64_video:
         st1     #$27
         st2     #$00
         rts
-
-print_char_loop:
-        clc
-        adc     #<CHR_ASCII_ZERO
-        sta     VDC_DL
-        lda     #$00
-        adc     #>CHR_ASCII_ZERO
-        sta     VDC_DH
-        iny
-print_banner:
-        lda     banner_text, y
-        bne     print_char_loop
-        rts
-
-banner_text:
-        db      "MONTY PCE ROOM 00 NATIVE", 0
-
-        .data
-        align   2
-font_data:
-        incbin  "font8x8-ascii-bold-short.dat"
