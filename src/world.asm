@@ -60,7 +60,8 @@ world_resolve_exit:
 .left:
         lda     <world_exit_col
         beq     .blocked_left
-        dec     a
+        sec
+        sbc     #1
         tax
         ldy     <world_map_row
         bsr     world_get_room_xy
@@ -70,7 +71,8 @@ world_resolve_exit:
         bra     .valid
 .right:
         lda     <world_exit_col
-        inc     a
+        clc
+        adc     #1
         tax
         ldy     <world_map_row
         bsr     world_get_room_xy
@@ -81,7 +83,8 @@ world_resolve_exit:
 .up:
         lda     <world_map_row
         beq     .blocked_up
-        dec     a
+        sec
+        sbc     #1
         tay
         ldx     <world_exit_col
         bsr     world_get_room_xy
@@ -91,7 +94,8 @@ world_resolve_exit:
         bra     .valid
 .down:
         lda     <world_map_row
-        inc     a
+        clc
+        adc     #1
         tay
         ldx     <world_exit_col
         bsr     world_get_room_xy
