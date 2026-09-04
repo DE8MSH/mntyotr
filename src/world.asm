@@ -41,7 +41,7 @@ world_get_room_xy:
         lda     #$ff
         rts
 
-; Phase 41 has real loaders for rooms $00..$03. Other valid world cells remain
+; Phase 43 has real loaders for rooms $00..$04. Other valid world cells remain
 ; blocked until their room data is ported.
 world_resolve_exit:
         stz     <world_transition_ready
@@ -68,7 +68,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_left
-        cmp     #4
+        cmp     #5
         bcs     .blocked_left
         dec     <world_exit_col
         bra     .valid
@@ -81,7 +81,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_right
-        cmp     #4
+        cmp     #5
         bcs     .blocked_right
         inc     <world_exit_col
         bra     .valid
@@ -95,7 +95,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_up
-        cmp     #4
+        cmp     #5
         bcs     .blocked_up
         dec     <world_map_row
         bra     .valid
@@ -108,7 +108,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_down
-        cmp     #4
+        cmp     #5
         bcs     .blocked_down
         inc     <world_map_row
 .valid:
