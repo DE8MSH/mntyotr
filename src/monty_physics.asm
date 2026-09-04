@@ -4,7 +4,7 @@
 .zp
 monty_x:                ds 1
 monty_y:                ds 1
-monty_jump_phase:       ds 1           ; 0=ground, 1=ascent, 2=descent
+monty_jump_phase:       ds 1           ; 0=ground, 1=ascent, 2=descent (C64 monty_action proxy)
 monty_jump_index:       ds 1
 monty_facing:           ds 1           ; 0=right, $80=left
 monty_step_phase:       ds 1
@@ -12,12 +12,16 @@ monty_saved_left:       ds 1
 monty_saved_right:      ds 1
 monty_room:             ds 1
 monty_room_exit:        ds 1           ; 0=none, 1=left, 2=right, 3=up, 4=down
-monty_tile_state:       ds 1           ; C64: standing in/on property-3 ladder/rope tiles
+monty_tile_state:       ds 1           ; C64 property-3 surface state
 monty_is_moving:        ds 1
 monty_climbing:         ds 1
+monty_falling:          ds 1           ; C64 monty_jumping_flag2 unsupported-fall state
+monty_action_counter:   ds 1           ; C64 action_counter subset; type-4 trap sets 5
 collision_x:            ds 1
 collision_y:            ds 1
 collision_count:        ds 1
+collision_trap_count:   ds 1
+collision_tmp_prop:     ds 1
 collision_ptr:          ds 2
 jump_delta:             ds 1
 
@@ -26,12 +30,10 @@ jump_delta:             ds 1
 monty_physics_init:
         lda     #$86
         sta     <monty_x
-        ; The C64 starts at $b0, then its unsupported-fall path advances two
-        ; one-pixel ticks before CheckTileBelow sees the room-00 floor at $b2.
-        ; Until the full jumping_flag2/action state machine is ported, start at
-        ; that deterministic post-settle coordinate so side collision samples
-        ; the doorway rows rather than the solid wall tile above the opening.
-        lda     #$b2
+        ; Restore the authentic C64 start. The original unsupported-fall path
+        ; advances $b0 -> $b1 -> $b2 before floor contact; Phase 27 now ports
+        ; that state instead of hardcoding the settled coordinate.
+        lda     #$b0
         sta     <monty_y
         stz     <monty_jump_phase
         stz     <monty_jump_index
@@ -45,6 +47,8 @@ monty_physics_init:
         stz     <monty_tile_state
         stz     <monty_is_moving
         stz     <monty_climbing
+        stz     <monty_falling
+        stz     <monty_action_counter
         rts
 
 ; Exact C64 GetTileFlag screen-code semantics for the room custom chars:
@@ -151,6 +155,12 @@ monty_update_tile_state:
 .surface:
         lda     #1
         sta     <monty_tile_state
+        ; Original UpdateTileFlags cancels unsupported falling on first
+        ; property-3 surface contact while no explicit jump action is active.
+        lda     <monty_jump_phase
+        bne     .done
+        stz     <monty_falling
+.done:
         rts
 
 monty_check_tile_right:
@@ -288,7 +298,13 @@ monty_check_tile_above:
 .solid: sec
         rts
 
+; Exact refactored/src Utils.CheckTileBelow semantics for the currently ported
+; action/tile-state subset. Property 1 always blocks. Properties 2/3 block while
+; a jump action is active, and also on normal ground unless tile_state is set.
+; Two property-4 samples set action_counter=5 and return collision.
 monty_check_tile_below:
+        lda #2
+        sta <collision_trap_count
         lda <monty_y
         sec
         sbc #$32
@@ -315,26 +331,47 @@ monty_check_tile_below:
         beq .two
         lda #3
         bra .count
-.two: lda #2
-.count: sta <collision_count
+.two:
+        lda #2
+.count:
+        sta <collision_count
 .loop:
         phx
         phy
         call room00_get_property_xy
         ply
         plx
+        cmp #$04
+        bne .not_trap
+        dec <collision_trap_count
+        bne .not_trap
+        lda #5
+        sta <monty_action_counter
+        sec
+        rts
+.not_trap:
         cmp #$01
         beq .solid
+        sta <collision_tmp_prop
+        lda <monty_jump_phase
+        bne .check_23
+        lda <monty_tile_state
+        bne .next
+.check_23:
+        lda <collision_tmp_prop
         cmp #$02
         beq .solid
         cmp #$03
         beq .solid
+.next:
         inx
         dec <collision_count
         bne .loop
-.clear: clc
+.clear:
+        clc
         rts
-.solid: sec
+.solid:
+        sec
         rts
 
 monty_toggle_step_gate:
@@ -345,6 +382,8 @@ monty_toggle_step_gate:
 
 monty_jump_start:
         lda <monty_jump_phase
+        bne .done
+        lda <monty_falling
         bne .done
         lda #1
         sta <monty_jump_phase
@@ -388,16 +427,53 @@ monty_check_room_edges:
         rts
 
 ; PCE bits after HuC joypad transform: I=$01 UP=$10 RIGHT=$20 DOWN=$40 LEFT=$80.
+; Order mirrors the C64 UpdateMovement subset: UpdateTileFlags, unsupported-fall
+; detection, fire/jump, then directional movement.
 monty_update_input:
         stz <monty_is_moving
         stz <monty_climbing
         call monty_update_tile_state
+
+        ; Property-3 surfaces cancel falling in UpdateTileFlags.
+        lda <monty_tile_state
+        bne .after_fall
+        lda <monty_jump_phase
+        bne .after_fall
+        lda <monty_falling
+        bne .fall_step
+        call monty_check_tile_below
+        bcs .after_fall
+        lda #1
+        sta <monty_falling
+        stz <monty_jump_index
+        lda joynow
+        and #$80
+        sta <monty_saved_left
+        lda joynow
+        and #$20
+        sta <monty_saved_right
+.fall_step:
+        ; C64 jumping_flag2 forces one downward movement step per gameplay tick.
+        call monty_check_tile_below
+        bcs .land_from_fall
+        inc <monty_y
+        lda #1
+        sta <monty_is_moving
+        call monty_check_room_edges
+        rts
+.land_from_fall:
+        stz <monty_falling
+        stz <monty_saved_left
+        stz <monty_saved_right
+        rts
+.after_fall:
+
         lda joynow
         and #$01
         beq .directions
         lda <monty_jump_phase
         bne .directions
-        lda <monty_tile_state
+        lda <monty_falling
         bne .directions
         call monty_jump_start
 .directions:
@@ -451,22 +527,22 @@ monty_update_input:
         bcs .done
         lda #$80
         sta <monty_facing
+        lda #1
+        sta <monty_is_moving
         call monty_toggle_step_gate
         beq .done
         dec <monty_x
-        lda #1
-        sta <monty_is_moving
         call monty_check_room_edges
 .done:  rts
 .right:
         call monty_check_tile_right
         bcs .done_right
         stz <monty_facing
+        lda #1
+        sta <monty_is_moving
         call monty_toggle_step_gate
         bne .done_right
         inc <monty_x
-        lda #1
-        sta <monty_is_moving
         call monty_check_room_edges
 .done_right:
         rts
@@ -510,6 +586,7 @@ monty_jump_step:
 .land:
         stz <monty_jump_phase
         stz <monty_jump_index
+        stz <monty_falling
         stz <monty_saved_left
         stz <monty_saved_right
 .done:  rts
