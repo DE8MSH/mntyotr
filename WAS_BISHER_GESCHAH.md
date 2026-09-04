@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 27
+Stand: 2026-09-04 — Phase 28
 
 ## Portierungsstand
 
-**Gesamtport: ca. 37 %**
+**Gesamtport: ca. 39 %**
 
-Phase 27 ersetzt den Phase-26-Hardcode fuer Montys Y-Start durch den echten C64-Unterstuetzungs-/Fallpfad und zieht `CheckTileBelow` fuer die Properties 1/2/3/4 deutlich naeher an `refactored/src`.
+Phase 28 portiert den naechsten sichtbaren C64-Gameplayblock: Montys echte 12+12 Somersault-/Sprungframes und die zugehoerige Animationsauswahl. Die vom Nutzer bestaetigte Bewegungs-/Collision-Basis aus Phase 27 bleibt dabei unangetastet.
 
 ## Verbindliche Referenz
 
@@ -16,64 +16,68 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
 - Die Basis-Raumgrafik stimmt laut Nutzer brauchbar mit der C64-Referenz ueberein.
-- Montys SAT-Position passt inzwischen weitgehend.
-- Seitenwand-Collision funktioniert plausibel.
-- Phase 26 wurde vom Nutzer bestaetigt: Monty kann durch die Hauswandoeffnung laufen.
+- Montys Start-/SAT-Position passt inzwischen weitgehend.
+- Gehen funktioniert.
+- Springen funktioniert.
+- Unsupported Falling funktioniert.
+- Landen auf Plattformen funktioniert.
+- Die Hauswandoeffnung in Raum $00 ist passierbar.
+- Die exakte optische Richtigkeit aller Animationsframes war vor Phase 28 noch nicht bestaetigt.
 
-## Phase 27 — wieder echter C64-Startwert
+## Phase 28 — echte Somersaultdaten
 
-Phase 26 startete Monty vorlaeufig direkt bei `Y=$b2`, weil genau dort die C64-Collision nach dem Start stabilen Boden erkennt. Das war als Diagnose richtig, sollte aber kein dauerhafter Ersatz fuer das Originalverhalten bleiben.
+Die C64-Referenz benutzt beim normalen Sprung nicht die vier Walkframes. `UpdateState` waehlt bei JumpRight die Spritepointer `$68-$73` und bei JumpLeft `$5c-$67`, also jeweils **12 Frames**. Der Bewegungsticker wird bei 11 gekappt.
 
-Phase 27 setzt deshalb wieder den authentischen Startwert `monty_y=$b0`. Neu ist jetzt ein eigener `monty_falling`-Zustand als Port des C64-Flags `monty_jumping_flag2` fuer ungestuetztes Fallen. Wenn Monty nicht auf einer Property-3-Flaeche steht, keine normale Jump-Action aktiv ist und `CheckTileBelow` frei meldet, wird dieser Zustand gesetzt. Pro Gameplay-Tick wird Monty exakt einen internen Y-Schritt nach unten bewegt, bis `CheckTileBelow` Kollision meldet.
+Die originalen Rohdaten wurden deshalb direkt aus `refactored/src/subsystems/monty_spr.asm` uebernommen:
 
-Fuer Raum $00 ergibt sich damit wieder automatisch:
+- `sault_l_spr`: `$5700-$59ff`, 12 x 64 Byte
+- `sault_r_spr`: `$5a00-$5cff`, 12 x 64 Byte
+- pro VIC-Slot: 63 sichtbare Bitmapbytes + 1 unbenutztes Slotbyte
 
-- Start `$86,$b0`
-- erster Falltick -> `$b1`
-- zweiter Falltick -> `$b2`
-- dort meldet `CheckTileBelow` Boden
+Die Daten liegen im Zielprojekt jetzt separat in `tools/monty_somersault_source.asm`. Damit muessen die 12 Frames nicht ueber unsichere Prefix-Heuristiken rekonstruiert werden.
 
-Die Hauswandoeffnung bleibt dadurch passierbar, ohne dass `$b2` als Startposition fest verdrahtet ist.
+`tools/monty_somersault.py` liest die beiden festen 768-Byte-Bloecke, entfernt aus jedem 64-Byte-VIC-Slot nur das letzte Paddingbyte und nutzt denselben 24x21-C64 -> PCE-16x16-Spriteconverter wie Walk/Climb. `build.sh` erzeugt daraus `monty-sault-l.dat` und `monty-sault-r.dat` mit jeweils 12 x 512 Byte PCE-Spritedaten.
 
-## Phase 27 — `CheckTileBelow` Properties 1/2/3/4
+## Phase 28 — Jump-Animationszustand
 
-Die Implementierung folgt jetzt der dokumentierten C64-Routine aus `refactored/src/subsystems/utils.asm`:
+`src/monty_sprite.asm` besitzt jetzt einen echten dritten Animationsmodus neben Walk und Climb:
 
-- Property 1 blockiert immer.
-- Property 2 und 3 blockieren bei aktiver Jump-Action.
-- Im normalen Ground-Zustand blockieren Property 2 und 3 nur, wenn `monty_tile_state` nicht bereits aktiv ist.
-- Property 4 zaehlt Treffer separat; der zweite Property-4-Treffer setzt `monty_action_counter=5` und liefert Collision, entsprechend dem originalen Piledriver-/Trap-Pfad.
-- Bei nicht auf 8 Pixel ausgerichtetem Y liefert `CheckTileBelow` wie im C64 sofort frei; genau dadurch entstehen die beiden Start-Fallticks von `$b0` nach `$b2`.
+- Mode 0: Walk, vier Frames
+- Mode 1: Climb, vier Frames
+- Mode 2: Jump/Somersault, zwoelf Frames
 
-`monty_jump_phase` dient im aktuellen Teilport weiterhin als Proxy fuer den originalen `monty_action`-Zustand. Der Piledriver-Dispatcher selbst ist noch nicht portiert, aber `action_counter=5` wird bereits korrekt erzeugt.
+Beim Eintritt in einen normalen Jump wird Frame 0 geladen und der Timer auf 4 gesetzt. Danach wird alle vier logischen Gameplay-Ticks auf den naechsten Somersaultframe gewechselt. Frame 11 bleibt stehen, falls die physische Jump-Action laenger dauert. Das entspricht der C64-Logik, die `monty_movement_ticker` vor der Addition zum Spritepointer auf `$0b` begrenzt.
+
+Die Blickrichtung entscheidet zwischen dem linken und rechten 12-Frame-Satz. Der separate unsupported-fall-Zustand ist weiterhin **keine** normale Jump-Action und wird deshalb nicht faelschlich als Somersault dargestellt.
+
+Walk und Climb werden beim Modus- bzw. Richtungswechsel wieder auf Frame 0 synchronisiert. Ihre vier Frames laufen weiterhin mit Timer 4 und Walk wird nur bei echter Bewegung weitergeschaltet.
 
 ## Regressionstests
 
-`tools/test_port.py` prueft jetzt:
+`tools/test_port.py` prueft jetzt zusaetzlich:
 
-- `$b0` und `$b1` unter der Startposition sind noch frei;
-- `$b2` ist stabiler Boden;
-- der modellierte unsupported-fall-Pfad setzt sich von `$b0` exakt nach `$b2`;
-- der Hauseingang bleibt bei `$b2` frei;
-- Property 1 blockiert;
-- Property 2/3 verhalten sich unterschiedlich je nach Jump-Action und `tile_state`;
-- zwei Property-4-Treffer ergeben Collision plus `action_counter=5`.
+- beide Somersault-Rohbloecke sind exakt `12*64 = 768` Byte lang;
+- erster und letzter Frame besitzen die bekannten Original-Startbytes;
+- nach Entfernen der VIC-Paddingbytes entstehen exakt `12*63` sichtbare Bytes pro Richtung;
+- die PCE-Konvertierung ergibt exakt `12*512 = 6144` Byte pro Richtung.
+
+Damit ist die Sprunganimation jetzt wesentlich staerker gegen verschobene oder versehentlich verkuerzte Frames abgesichert als der fruehe Walk/Climb-Bring-up.
 
 ## Noch offen
 
-- Phase 27 muss lokal gebaut und im Emulator bestaetigt werden.
-- Die Walk-L/R-Animationsframes muessen weiterhin visuell endgueltig abgehakt werden.
-- Der aktuelle Jump-State ist noch eine vereinfachte Trennung aus `monty_jump_phase` und `monty_falling`; weitere Action-Semantik aus dem C64 folgt.
-- Somersaultframes fehlen noch.
-- Room-$00-Decor, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio fehlen noch.
+- Phase 28 muss lokal gebaut und im Emulator visuell bestaetigt werden.
+- Walk-L/R und Climb sollten danach noch einmal gegen die C64-Animation verglichen werden; deren alte Texttranskription ist weniger sauber als der jetzt feste Somersault-Datenpfad.
+- Der Piledriver-Dispatcher fuer `action_counter=5` fehlt noch.
+- Room-$00-Decor fehlt noch.
+- Generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio fehlen noch.
 
 ## Naechste Portschritte
 
-1. Phase 27 lokal bauen und kontrollieren, dass Monty bei `$b0` startet, sichtbar auf den Boden absinkt und weiterhin durch die Hauswandoeffnung kommt.
-2. Walk-L/R-Animation bytegenau finalisieren; keine weiteren heuristischen Framegrenzen.
-3. Somersault-L/R (12+12 Frames) und Jump-Animation an den echten C64-Zustandsautomaten anbinden.
-4. Room-$00-Decor portieren.
-5. Danach generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
+1. Phase 28 lokal bauen und beim Springen pruefen, ob Monty jetzt sichtbar durch die 12 Somersaultphasen laeuft.
+2. Walk-/Climb-Rohdaten ebenfalls auf einen festen, adressbasierten Datenpfad ohne Prefix-Heuristik umstellen.
+3. Room-$00-Decor aus `refactored/src/subsystems/decor.asm` und den Raumtabellen portieren.
+4. Danach generischer Room-Loader und echte Raumwechsel.
+5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
 
