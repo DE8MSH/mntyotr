@@ -50,6 +50,9 @@ python3 "$ROOT/tools/room_rle.py" \
   --write "$BUILD/room00-map.dat" \
   --bat "$BUILD/room00-bat.dat" \
   --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" \
+  --screen-bat "$BUILD/room00-screen-bat.dat" \
+  --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 cd "$BUILD"
