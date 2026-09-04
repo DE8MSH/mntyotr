@@ -11,6 +11,12 @@ recovered from the authentic repeated frame prefixes visible at $5400/$5440/
 $5480/$54c0 etc., and only the omitted trailing zero bytes of each individual
 frame are restored. Prefix bytes may also occur inside a bitmap (notably climb),
 so only candidates separated by a plausible frame-length interval are accepted.
+
+PCE layout note: Monty's 24x21 image is carried by two 16x32 SAT sprites. The
+VDC treats 16x32 as a half of an aligned 32x32 pattern group, so the four 16x16
+cells in VRAM must be row-major: TL, TR, BL, BR. The previous x-major order
+TL, BL, TR, BR made tall-sprite hardware fetch the wrong cells, which became
+very obvious during the 12-frame somersault animation.
 """
 from pathlib import Path
 
@@ -28,7 +34,7 @@ CLIMB = bytes.fromhex(
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f e0 00 7f f0 00 7f b8 00 3f b8 00 7f c8 00 7f f0 00 4f f0 00 37 e0 00 7b c0 00 71 e0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+"07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 
 BITMAP_BYTES = 63
 VIC_FRAME_BYTES = 64
@@ -36,15 +42,6 @@ FRAME_BYTES = BITMAP_BYTES
 
 
 def _recover_frames(blob: bytes, prefix: bytes, count: int = 4) -> bytes:
-    """Recover four visible 63-byte VIC frames from the source transcription.
-
-    A prefix can occur inside a frame as ordinary bitmap data.  The authentic
-    frame starts in this transcription are roughly 60 bytes apart because only
-    trailing zero runs were omitted.  Select the first prefix, then only prefix
-    candidates at least 48 bytes after the previous accepted start.  This keeps
-    the real $5600/$5640/$5680/$56c0 climb starts and rejects the identical
-    07 80 00 sequence that appears six bytes into each climb bitmap.
-    """
     candidates=[]
     pos=0
     while True:
@@ -55,7 +52,6 @@ def _recover_frames(blob: bytes, prefix: bytes, count: int = 4) -> bytes:
         pos=i+1
     if not candidates or candidates[0] != 0:
         raise AssertionError(f'missing first frame prefix {prefix.hex()}: {candidates}')
-
     starts=[0]
     for i in candidates[1:]:
         if i - starts[-1] >= 48:
@@ -64,7 +60,6 @@ def _recover_frames(blob: bytes, prefix: bytes, count: int = 4) -> bytes:
                 break
     if len(starts) != count:
         raise AssertionError(f'could not recover {count} frame starts for {prefix.hex()}: candidates={candidates}, selected={starts}')
-
     out=[]
     for n,start in enumerate(starts):
         end=starts[n+1] if n+1<count else len(blob)
@@ -107,8 +102,11 @@ def pce_16x16(tile):
 def convert_frame(frame):
     pix=c64_frame_pixels(frame)
     chunks=[]
-    for x0 in (0,16):
-        for y0 in (0,16):
+    # PCE 32x32 sprite-group order is row-major. A 16x32 SAT entry selects
+    # one half of this aligned group, so hardware fetches TL+BL or TR+BR.
+    # Keep the group as TL,TR,BL,BR in VRAM rather than TL,BL,TR,BR.
+    for y0 in (0,16):
+        for x0 in (0,16):
             tile=[[0]*16 for _ in range(16)]
             for y in range(16):
                 for x in range(16):
