@@ -2,21 +2,17 @@
 """Convert authentic C64 Monty frames to native PCE sprite data.
 
 Primary gameplay/art reference: Dave-Agent/monty-on-the-run refactored/src.
-The reference sprite labels are aligned to 256-byte animation blocks. Each VIC
-sprite frame has 63 visible bitmap bytes and one padding byte in memory.
+The reference sprite labels are aligned to four 64-byte VIC slots. Each VIC
+sprite uses 63 visible bitmap bytes plus one unused byte.
 
-The transcribed constants below contain only the visible bytes. The upstream
-assembly listing elides some final zero bytes at the tail of these blocks, so
-_normalize_frames() restores only those trailing zeroes. It never inserts bytes
-between frames.
-
-PCE 16x16 sprite cells store each 16-bit plane as a 32-byte block (16 words),
-then the next plane. Monty is composed from two 16x32 PCE sprites.
+The text transcription below omits runs of trailing zero bytes at some frame
+ends. Therefore its total byte count is shorter than 4*63. Frame boundaries are
+recovered from the authentic repeated frame prefixes visible at $5400/$5440/
+$5480/$54c0 etc., and only the omitted trailing zero bytes of each individual
+frame are restored. This avoids the previous broken whole-block padding/slicing.
 """
 from pathlib import Path
 
-# Exact visible bitmap bytes from $5400-$56ff in
-# refactored/src/subsystems/monty_spr.asm. Padding bytes are omitted here.
 WALK_L = bytes.fromhex(
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
@@ -38,33 +34,42 @@ VIC_FRAME_BYTES = 64
 FRAME_BYTES = BITMAP_BYTES
 
 
-def _normalize_frames(blob, count=4):
-    """Return count concatenated 63-byte visible bitmap frames.
+def _recover_frames(blob: bytes, prefix: bytes, count: int = 4) -> bytes:
+    """Recover four visible 63-byte VIC frames from the source transcription.
 
-    The refactored source labels prove each animation occupies a 256-byte VIC
-    block. Our transcription intentionally removes the per-frame padding bytes.
-    Some trailing all-zero bytes at the *end of the final frame* were omitted by
-    the original text extraction; those may safely be restored as zero. We do
-    not pad or re-slice between frames, which was the corruption in Phase 24a.
+    The upstream listing proves each frame begins at a 64-byte boundary. In our
+    transcription the omitted bytes are trailing zeroes, so the next authentic
+    frame prefix is the reliable delimiter. Each recovered segment is padded to
+    63 visible bytes; no data is inserted before non-zero sprite bytes.
     """
-    visible = count * BITMAP_BYTES
-    raw = count * VIC_FRAME_BYTES
-    if len(blob) == raw:
-        return b''.join(blob[n*VIC_FRAME_BYTES:n*VIC_FRAME_BYTES+BITMAP_BYTES] for n in range(count))
-    if len(blob) <= visible:
-        missing = visible - len(blob)
-        if missing > 8:
-            raise AssertionError(f'too many missing C64 sprite bytes: {missing}')
-        return blob + bytes(missing)
-    raise AssertionError(f'unexpected C64 sprite block length: {len(blob)} (expected <= {visible} or {raw})')
+    starts=[]
+    pos=0
+    while True:
+        i=blob.find(prefix,pos)
+        if i < 0:
+            break
+        starts.append(i)
+        pos=i+1
+    if starts != sorted(starts) or len(starts) != count or starts[0] != 0:
+        raise AssertionError(f'expected {count} frame prefixes {prefix.hex()}, got {starts}')
+    out=[]
+    for n,start in enumerate(starts):
+        end=starts[n+1] if n+1<count else len(blob)
+        frame=blob[start:end]
+        if len(frame) > BITMAP_BYTES:
+            raise AssertionError(f'frame {n} too long: {len(frame)}')
+        frame += bytes(BITMAP_BYTES-len(frame))
+        out.append(frame)
+    return b''.join(out)
 
-WALK_L = _normalize_frames(WALK_L)
-WALK_R = _normalize_frames(WALK_R)
-CLIMB = _normalize_frames(CLIMB)
+WALK_L = _recover_frames(WALK_L, bytes.fromhex('02 00 00'))
+WALK_R = _recover_frames(WALK_R, bytes.fromhex('00 40 00'))
+CLIMB  = _recover_frames(CLIMB,  bytes.fromhex('07 80 00'))
 
 
 def c64_frame_pixels(frame):
-    assert len(frame) in (BITMAP_BYTES,VIC_FRAME_BYTES); frame=frame[:BITMAP_BYTES]
+    assert len(frame) in (BITMAP_BYTES,VIC_FRAME_BYTES)
+    frame=frame[:BITMAP_BYTES]
     rows=[]
     for y in range(21):
         v=(frame[y*3]<<16)|(frame[y*3+1]<<8)|frame[y*3+2]
@@ -77,7 +82,6 @@ def _plane_word(tile,plane,y):
 
 
 def pce_16x16(tile):
-    """Encode one 16x16 PCE sprite cell as four consecutive 32-byte planes."""
     out=bytearray()
     for plane in range(4):
         for y in range(16):
@@ -88,14 +92,16 @@ def pce_16x16(tile):
 
 
 def convert_frame(frame):
-    pix=c64_frame_pixels(frame); chunks=[]
+    pix=c64_frame_pixels(frame)
+    chunks=[]
     for x0 in (0,16):
         for y0 in (0,16):
             tile=[[0]*16 for _ in range(16)]
             for y in range(16):
                 for x in range(16):
                     sy,sx=y0+y,x0+x
-                    if sy<21 and sx<24: tile[y][x]=pix[sy][sx]
+                    if sy<21 and sx<24:
+                        tile[y][x]=pix[sy][sx]
             chunks.append(pce_16x16(tile))
     return b''.join(chunks)
 
@@ -107,10 +113,16 @@ def build(frames):
 
 def main():
     import argparse
-    ap=argparse.ArgumentParser(); ap.add_argument('--left',type=Path); ap.add_argument('--right',type=Path); ap.add_argument('--climb',type=Path); a=ap.parse_args()
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--left',type=Path)
+    ap.add_argument('--right',type=Path)
+    ap.add_argument('--climb',type=Path)
+    a=ap.parse_args()
     left,right,climb=build(WALK_L),build(WALK_R),build(CLIMB)
     if a.left: a.left.write_bytes(left)
     if a.right: a.right.write_bytes(right)
     if a.climb: a.climb.write_bytes(climb)
     print(f'Monty walk/climb: 12 authentic C64 frames -> {len(left)+len(right)+len(climb)} bytes PCE SPR')
-if __name__=='__main__': main()
+
+if __name__=='__main__':
+    main()
