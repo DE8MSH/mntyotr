@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 25
+Stand: 2026-09-04 — Phase 26
 
 ## Portierungsstand
 
-**Gesamtport: ca. 35 %**
+**Gesamtport: ca. 36 %**
 
-Die Prozentzahl bleibt unveraendert: Phase 25 korrigiert die zentrale SAT-Koordinatenbruecke, fuegt aber noch keinen neuen Gameplay-Block hinzu.
+Phase 26 korrigiert einen konkret nachweisbaren Raum-$00-Collision-Fehler am Hauseingang und bringt damit die Bewegungsbasis einen Schritt naeher an das C64-Verhalten.
 
 ## Verbindliche Referenz
 
@@ -16,49 +16,46 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
 - Die Basis-Raumgrafik stimmt laut Nutzer inzwischen brauchbar mit der C64-Referenz ueberein.
-- Monty-Sprite ist sichtbar; Seitenwand-Collision reagiert plausibel.
-- Nach Phase 24d steht Monty jedoch weit links unten statt an der C64-Startposition.
+- Phase 25 hat Montys SAT-Position weitgehend an die richtige Stelle gebracht.
+- Seitenwand-Collision reagiert grundsaetzlich plausibel.
+- Verbleibender Fehler vor Phase 26: Monty konnte nicht durch die sichtbare Oeffnung in der Hauswand laufen.
 
-## Phase 25 — SAT-X-Highbit und SAT-Y korrigiert
+## Phase 26 — Hauseingang analysiert
 
-Der Positionsfehler hatte zwei konkrete Ursachen in `src/monty_sprite.asm`.
+Die C64-Referenz startet Montys interne Y-Koordinate bei `$b0`. `UpdateMovement` prueft jedoch sofort `CheckTileBelow`. Da `(Y-$32)&7` bei `$b0` noch nicht ausgerichtet ist, meldet `CheckTileBelow` zunaechst frei und der originale `monty_jumping_flag2`-Fallpfad bewegt Monty pixelweise nach unten.
 
-Erstens ist Montys horizontale C64-Spielkoordinate intern halb aufgeloest; `Sprites.ProcessSprites` verdoppelt sie vor dem VIC-II. Fuer die PCE gilt deshalb weiterhin:
+Fuer Raum $00 laesst sich das exakt aus den originalen RLE- und Tile-Property-Daten nachvollziehen:
 
-- sichtbares C64-X = `2 * (monty_x - $0c)`
-- PCE SAT-X = `2 * monty_x + 8`
+- bei `Y=$b0`: unter Monty noch keine ausgerichtete Bodenkollision;
+- bei `Y=$b1`: weiterhin keine ausgerichtete Bodenkollision;
+- bei `Y=$b2`: `CheckTileBelow` trifft den Boden und Monty steht stabil.
 
-Beim Originalstart `monty_x=$86` ist SAT-X damit **276 = $0114**. Die bisherige HuC6280-Routine machte zwar `ASL`, loeschte danach aber mit `CLC` genau den Carry, der das 9. X-Bit enthielt. Dadurch wurde `$0114` effektiv als `$0014` geschrieben: Monty erschien ganz links. Phase 25 bewahrt den ASL-Carry und addiert auch einen eventuellen Carry des Offsets in das SAT-Highbyte. Fuer die rechte 16-Pixel-Haelfte gilt entsprechend `$0124`.
+Das ist fuer den Hauseingang entscheidend. Am relevanten X-Bereich um `monty_x=$78` prueft `CheckTileLeft` bei `Y=$b0` drei vertikale Tiles und erwischt dabei noch den soliden Wandstein **oberhalb** der Oeffnung. Bei `Y=$b2` liegen die drei Proben eine Tilezeile tiefer und die Oeffnung ist frei. Damit erklaert sich exakt, warum der PCE-Port trotz optisch korrekter Oeffnung nicht hineinlaufen konnte.
 
-Zweitens war SAT-Y in Phase 24 versehentlich auf `monty_y+65` gesetzt. Das addierte die PCE-64-Pixel-SAT-Origin ein zweites Mal. Die korrekte Ableitung ist:
+## Implementierung
 
-- sichtbares C64-Y = `(monty_y + 1) - $32`
-- PCE SAT-Y = sichtbares Y + 64 = `monty_y + 15`
+Der komplette C64-`monty_jumping_flag2`-/Action-Zustandsautomat ist noch nicht portiert. Um nicht erneut einen unvollstaendigen Fall-Proxy einzubauen, startet Raum $00 vorlaeufig direkt auf der deterministischen Post-Settle-Y-Koordinate `$b2` statt `$b0`.
 
-Beim Originalstart `monty_y=$b0` ergibt das **SAT-Y=191** statt 241. Damit sollte Monty wieder im eigentlichen Raum und nicht am unteren Bildschirmrand erscheinen.
+Das ist kein frei erfundener Offset, sondern genau der Zustand, den der C64 nach zwei unsupported-fall-Ticks aus `$b0` erreicht. Sobald `CheckTileBelow`, `monty_action` und `monty_jumping_flag2` vollstaendig 1:1 portiert sind, wird der Initialwert wieder auf `$b0` zurueckgestellt und das echte Fallen uebernimmt diese zwei Pixel automatisch.
 
 ## Regressionstest
 
-`tools/test_port.py` prueft jetzt fuer den Originalstart explizit:
+`tools/test_port.py` prueft jetzt zusaetzlich direkt gegen Raum $00:
 
-- sichtbares C64 `(244,127)`
-- PCE SAT `(276,191)`
-- linkes SAT-X als Low/High `($14,$01)`
-- rechtes SAT-X als Low/High `($24,$01)`
+- `$86,$b0`: Boden noch frei
+- `$86,$b1`: Boden noch frei
+- `$86,$b2`: Boden blockiert/stabil
+- Hauseingang bei X `$78`, Y `$b0`: linke Seitenkollision trifft die Wand ueber der Oeffnung
+- Hauseingang bei X `$78`, Y `$b2`: linke Seitenkollision ist frei
 
-Damit kann der konkrete Highbit-Wrap auf die linke Bildschirmkante nicht wieder unbemerkt eingefuehrt werden.
+Damit ist der Hauseingang nicht mehr nur visuell, sondern anhand derselben C64-Screen-/Tile-Geometrie als Regression abgedeckt.
 
-## Animationsstatus
+## Noch offen
 
-Die Spriteframe-Rekonstruktion aus Phase 24d bleibt aktiv. Die Position muss zuerst visuell bestaetigt werden. Falls die Walkframes danach weiterhin falsch aussehen, wird als naechstes nicht mehr heuristisch an Prefixen gearbeitet, sondern die vier 64-Byte-VIC-Slots werden als explizite per-Frame-Referenzdaten aus `refactored/src/subsystems/monty_spr.asm` abgelegt und gegen die PCE-Ausgabe geprueft.
-
-## Naechste Portschritte
-
-1. Phase 25 lokal bauen und Original-Startposition visuell pruefen.
-2. Walk-L/R-Animation visuell pruefen.
-3. Falls Frames falsch bleiben: explizite VIC-Frames statt Heuristik.
-4. Danach `CheckTileBelow` Properties 1/2/3/4 und echten Fallzustand portieren, damit das Mauerloch korrekt funktioniert.
-5. Anschliessend Somersaultframes, Room-$00-Decor, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
+- Phase 26 lokal bauen und Hauseingang testen.
+- Walk-L/R-Animationsframes weiter visuell pruefen; der Sprite-Datenpfad ist noch nicht final abgehakt.
+- Danach `CheckTileBelow` Properties 1/2/3/4 exakt portieren und den echten `monty_jumping_flag2`-Fallzustand wieder aktivieren.
+- Anschliessend Somersaultframes, Room-$00-Decor, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
