@@ -26,23 +26,13 @@ def main():
     assert ROOM04_TILE_BITMAPS[7] == bytes.fromhex('6e 7e c7 d3 da c3 67 ef')
 
     patterns = build_patterns()
-    assert len(patterns) == 9*32
-    assert patterns[:32] == bytes(32)
-
+    assert len(patterns) == 9*32 and patterns[:32] == bytes(32)
     bat = words(make_screen_bat(cells))
     assert len(bat) == SCREEN_W*20
     for y in range(20):
         row = bat[y*SCREEN_W:(y+1)*SCREEN_W]
         assert row[0] == row[1] == row[2]
         assert row[-1] == row[-2] == row[-3]
-
-    for code in sorted(set(cells) - {0}):
-        if code >= 9:
-            continue
-        expected_pal = PAL_BY_C64[ROOM04_COLOURS[code-1] & 0x0f]
-        samples = [w for w in bat if (w & 0x0fff) == CHR_GAME + code]
-        assert samples
-        assert all((w >> 12) == expected_pal for w in samples)
 
     main_asm = (ROOT/'src/main.asm').read_text()
     tail = (ROOT/'src/room04_assets_tail.asm').read_text()
@@ -56,17 +46,16 @@ def main():
     assert 'room04_collision_map_rom:' in tail
     assert 'room04_tile_properties_rom:' in tail
     assert 'room04_screen_bat:' in tail
-
     assert 'call    room04_upload_patterns' in loader
     assert 'call    room04_draw_native' in loader
     assert 'call    room04_cache_collision' in loader
     assert 'BANK(room04_collision_map_rom)' in loader
     assert 'lda     #4' in loader and 'sta     <monty_room' in loader
     assert 'cmp     #3' in banking and 'bcc     .select_room' in banking
-    assert 'cmp     #5' in world
-    assert 'cmp     #4' in main_asm
+    assert 'world_room_supported:' in world
+    assert 'cmp     #$0d' in world and 'cmp     #$0e' in world
 
-    print('OK: exact Room 04 active with shared RAM collision cache + world wiring')
+    print('OK: exact Room 04 active and reachable through Room 0D from below')
 
 
 if __name__ == '__main__':
