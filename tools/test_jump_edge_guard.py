@@ -15,7 +15,7 @@ def main():
     assert '.guard_jump_generated_exit:' in text
     assert 'lda     <monty_jump_phase' in text
     assert 'lda     <collision_actual_room' in text
-    assert 'cmp     #3' in text
+    assert 'cmp     #4' in text
     assert '.guard_room00_right:' in text
     assert 'lda     #$9b' in text and 'lda     #$15' in text
     assert text.count('stz     <monty_room_exit') >= 3
@@ -23,7 +23,7 @@ def main():
     assert 'lda     <main_jump_x_before_step' in text
     assert 'call    init_c64_video' in text
     assert 'bsr     init_c64_video' not in text
-    print('OK: Room03 jump entry works; only unloaded outer edges stay blocked')
+    print('OK: Room04 jump entry works; only unloaded outer edges stay blocked')
 
 
 if __name__ == '__main__':
