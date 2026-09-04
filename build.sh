@@ -46,6 +46,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_sprite_banking.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room00_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room01.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 python3 "$ROOT/tools/room_rle.py" \
