@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 24
+Stand: 2026-09-04 — Phase 24a
 
 ## Portierungsstand
 
 **Gesamtport: ca. 35 %**
 
-Phase 24 ist wieder echter Gameplay-Fortschritt: C64-Fallzustand, horizontale Bewegungs-/Animationssemantik und Sprite-Y-Flush wurden nach der Referenz korrigiert.
+Die Prozentzahl bleibt unveraendert: Phase 24a korrigiert zwei falsche Bring-up-Entscheidungen, statt einen neuen Gameplay-Block hinzuzufuegen.
 
 ## Verbindliche Referenz
 
@@ -15,41 +15,53 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 ## Bestaetigt
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- Phase 23a baut laut Nutzer.
-- Die Basis-Raumgrafik stimmt nun laut Nutzer zunaechst brauchbar mit der C64-Referenz ueberein.
-- Monty-Sprite ist sichtbar und in brauchbarer Grundform.
-- Verbleibende sichtbare Probleme: keine korrekte Walkanimation, Monty steht etwas ueber dem Boden, Durchgang durch das Mauerloch blockiert.
+- Die Basis-Raumgrafik stimmt laut Nutzer jetzt zunaechst brauchbar mit der C64-Referenz ueberein.
+- Monty-Sprite ist sichtbar; die Collision gegen Waende reagiert plausibel.
+- Phase 24 brachte jedoch einen klaren Rueckschritt: Monty fiel nach dem Start bis ganz nach unten und stand nicht mehr an der originalen Startposition.
+- Die Walk-Animationsframes waren weiterhin sichtbar defekt.
 
-## Phase 24 — C64-Fallzustand und Walk-Trigger
+## Phase 24a — vorzeitigen Fall-Proxy wieder entfernt
 
-Die verbindliche `refactored/src/subsystems/monty.asm`-Referenz setzt `monty_is_moving` bei einer akzeptierten Links-/Rechtsbewegung **vor** `ToggleStepGate`. Das ist wichtig: Die horizontale Koordinate aendert sich nur an jedem zweiten Gate-Tick, die Animation gilt aber trotzdem auf jedem akzeptierten Bewegungstick als aktiv.
+Der in Phase 24 eingefuehrte `monty_falling`-Proxy war zu frueh. Zwar besitzt die C64-Referenz mit `monty_jumping_flag2` einen separaten Fallzustand, dieser haengt aber an der exakten `CheckTileBelow`-/Action-/Tile-State-Semantik. Unser aktuelles `CheckTileBelow` ist fuer Properties 2/3/4 noch nicht vollstaendig 1:1. Dadurch interpretierte der Proxy die Startposition faelschlich als ungestuetzt und liess Monty bis an den unteren Rand fallen.
 
-Der PCE-Port setzte `monty_is_moving` bisher erst nach der tatsaechlichen X-Aenderung. Dadurch bekam `monty_sprite_animate` nur die halbe bzw. unterbrochene Bewegungsinformation und die vier Walkframes liefen nicht wie im C64-Zustandsautomaten. Links und rechts setzen `monty_is_moving` jetzt unmittelbar nach erfolgreicher Collision-Pruefung und vor dem Gate.
+`src/monty_physics.asm` ist deshalb auf den letzten stabilen Phase-23a-Zustand zurueckgesetzt. Damit gelten wieder die originalen Startwerte `monty_x=$86`, `monty_y=$b0`, ohne automatische Fallbewegung. Der echte Fallzustand wird erst wieder aktiviert, wenn `CheckTileBelow`, `monty_action` und `monty_jumping_flag2` gemeinsam portiert sind.
 
-## Phase 24 — fehlende Gravitation
+## Phase 24a — eigentlichen Animationsdatenfehler gefunden
 
-Ein groesserer Unterschied war, dass der PCE-Port den C64-Zustand `monty_jumping_flag2` fuer ungestuetztes Fallen praktisch nicht besass. Im Original prueft `UpdateMovement` vor der Eingabeverarbeitung: wenn Monty nicht auf Property-3 steht, keine Jump-Action aktiv ist und `CheckTileBelow` frei meldet, wird ein separater Fallzustand gestartet. Dabei werden horizontale Bewegungen unterdrueckt und Monty wird nach unten bewegt, bis `CheckTileBelow` wieder Kollision meldet.
+Der sichtbare Framefehler lag im Converter `tools/monty_sprite.py`.
 
-Der Port hat jetzt `monty_falling` als diesen Zustand. Damit soll Monty nach dem Raumstart bzw. nach Kanten/Lochern automatisch bis zur korrekten Collision-Hoehe absinken, statt auf einer zufaelligen Y-Position stehenzubleiben. Das ist besonders relevant fuer den gemeldeten Abstand zum Boden und fuer den Durchgang durch das Mauerloch, weil die Side-Collision ihre 2/3 vertikalen Samples aus Montys aktueller Y-Position ableitet.
+Die transkribierten Konstanten enthalten pro C64-Spriteframe genau die 63 sichtbaren Bitmapbytes. Die vier Frames einer Animation sind dort direkt als 4x63 Bytes aneinandergehaengt. Der Converter behandelte diesen 252-Byte-Block jedoch nachtraeglich wie vier 64-Byte-VIC-Slots, fuellte nur am Ende auf 256 Bytes auf und schnitt dann bei Offsets 0,64,128,192.
 
-## Phase 24 — Sprite-Y
+Damit war Frame 0 noch korrekt, aber Frames 1..3 jeweils um Bytes verschoben. Genau das passt zur Beobachtung, dass Monty selbst erkennbar ist, seine Animationsphasen aber kaputt aussehen.
 
-`Sprites.ProcessSprites` aus der C64-Referenz kopiert `monty_sprite_y2`, fuehrt danach `INX` aus und schreibt erst diesen Wert in den Sprite-3-Y-Puffer. Die PCE-SAT-Bruecke hatte dieses +1 unterschlagen. Der SAT-Y-Wert wurde daher um exakt einen Pixel nach unten korrigiert.
+Der Converter akzeptiert jetzt explizit zwei Formate:
 
-## Noch offen
+- 4x63 Bytes: bereits normalisierte sichtbare Bitmapframes -> unveraendert benutzen
+- 4x64 Bytes: roher VIC-Slotblock -> aus jedem Slot die ersten 63 Bitmapbytes nehmen
 
-- Die Phase-24-Aenderungen muessen lokal gebaut und visuell getestet werden.
-- Falls die Walkframes trotz korrektem `monty_is_moving` noch falsch aussehen, wird als naechstes die 64-Byte-VIC-Slot->PCE-Frame-Konvertierung frameweise gegen `refactored/src/subsystems/monty_spr.asm` verglichen.
-- `CheckTileBelow` Properties 2/3/4 ist noch nicht vollstaendig 1:1; insbesondere Property 4 / `action_counter=5` fehlt noch.
-- Room-$00-Decor, Gegner und Spezialobjekte fehlen weiterhin.
+Andere Laengen gelten als Transkriptionsfehler. Die Regressionstests pruefen ausserdem fuer alle vier Frames die bekannten Startbytes aus `refactored/src/subsystems/monty_spr.asm`:
+
+- Walk Left: `02 00 00`
+- Walk Right: `00 40 00`
+- Climb: `07 80 00`
+
+Damit kann die bisherige ein-Byte-Verschiebung der Frames nicht unbemerkt zurueckkehren.
+
+## Verifikationsstatus
+
+- Phase-24a Positionsrollback: hochgeladen, lokal noch zu bauen.
+- Framegrenzen Walk-L/R/Climb: im Converter und Regressionstest korrigiert, lokal noch visuell zu testen.
+- Sprite-SAT-Y hat weiterhin das aus `Sprites.ProcessSprites` uebernommene +1.
+- Collision gegen Seitenwaende scheint laut Nutzer grundsaetzlich zu funktionieren.
+- Das Mauerloch bleibt noch separat zu pruefen; dafuer ist die exakte vertikale Collision-/Fallsemantik noch offen.
 
 ## Naechste Portschritte
 
-1. Phase 24 lokal bauen und Bodenposition/Links-Rechts/Walkframes/Mauerloch testen.
-2. Falls Animation visuell falsch bleibt: alle 4 Walk-L/R VIC-Slots bytegenau gegen `monty_spr.asm` pruefen und Converter korrigieren.
-3. `CheckTileBelow` Properties 2/3/4 exakt portieren.
-4. Room-$00-Decor und danach Somersaultframes/generischer Room-Loader.
-5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
+1. Phase 24a lokal bauen und Startposition + Walkframes testen.
+2. `CheckTileBelow` fuer Properties 1/2/3/4 exakt aus `refactored/src` portieren.
+3. Danach den echten C64-Fallzustand (`monty_jumping_flag2`) ohne Proxy wieder einsetzen und das Mauerloch testen.
+4. Anschliessend 12+12 Somersaultframes sowie Room-$00-Decor.
+5. Danach generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
