@@ -28,6 +28,13 @@ ROOM00_RLE = bytes.fromhex(
     "40 45 30 85 f5 f5 f5 f5 ff ff"
 )
 
+# Room $00 uses five distinct C64 colours.  Palette slots are deliberately
+# compacted instead of wasting one PCE palette per screen code, leaving enough
+# BG palettes for the decoration colour streams.
+# code 0 = background black; codes 1/2 share brown; 3 red; 4 cyan; 5 dark grey;
+# unused room-$00 codes 6..8 are black.
+ROOM00_PAL_BY_CODE = (0, 1, 1, 2, 3, 4, 0, 0, 0)
+
 
 def decode_room(stream: bytes) -> list[int]:
     out: list[int] = []
@@ -54,10 +61,8 @@ def ascii_map(cells: list[int]) -> str:
 def bat_word(screen_code: int) -> int:
     if not 0 <= screen_code <= 15:
         raise ValueError(f"invalid C64 screen code {screen_code}")
-    # RLE gives the screen code directly. Code 0 is blank; 1..8 are the custom
-    # room chars installed by SetupTileGraphics. Room $00 only currently uses
-    # 0..5, so one PCE palette per screen code is sufficient for this bring-up.
-    return (screen_code << 12) | (CHR_GAME + screen_code)
+    pal = ROOM00_PAL_BY_CODE[screen_code] if screen_code < len(ROOM00_PAL_BY_CODE) else 0
+    return (pal << 12) | (CHR_GAME + screen_code)
 
 
 def make_bat(cells: list[int]) -> bytes:
