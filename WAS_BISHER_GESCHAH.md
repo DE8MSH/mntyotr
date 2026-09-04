@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 20d
+Stand: 2026-09-04 — Phase 21
 
 ## Portierungsstand
 
 **Gesamtport: ca. 32 %**
 
-Die Prozentzahl bleibt konservativ: Bring-up- und Testreparaturen zaehlen noch nicht als neuer Gameplay-Funktionsblock.
+Die Prozentzahl bleibt vorerst konservativ, bis der neue Bildschirm-/Sprite-Stand lokal gebaut und im Emulator verifiziert ist.
 
 ## Verbindliche Referenz
 
@@ -19,34 +19,34 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 ## Bestaetigt
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- PCE VDC/VCE Bring-up, PAL-orientierter Gameplay-Scheduler und Raum-$00-Zwischenstand.
-- Monty ist im Emulator sichtbar.
+- PCE VDC/VCE Bring-up und PAL-orientierter Gameplay-Scheduler.
+- Monty war vor der letzten Spriteformat-Aenderung im Emulator sichtbar.
+- Der Nutzer hat korrekt erkannt, dass der bisherige Raum nur ein 32x20-Rohplayfield war und nicht die C64-Screengeometrie abbildete.
 
-## Phase 20d — Regressionstest an Referenzdaten angepasst
+## Phase 21 — C64-Screengeometrie und PCE-Spriteformat
 
-Der Build nach Phase 20c kam nun bis `tools/test_port.py` und scheiterte an der alten Annahme, Climb-Frame 0 und 2 muessten byteidentisch sein. Diese Gleichheit ist keine Eigenschaft des VIC-Spriteformats und darf die Daten aus der verbindlichen `refactored/src`-Referenz nicht ueberschreiben. Der Test prueft jetzt stattdessen fuer alle 12 Walk-/Climbframes: vier Frames pro Animation, jeweils 24x21 dekodierbare C64-Pixel sowie 2048 Byte gueltige PCE-Spritedaten pro Vier-Frame-Animation. Die falsche Frame-0==Frame-2-Assertion ist entfernt.
+Die verbindliche `refactored/src/subsystems/room.asm`-Referenz wurde jetzt direkt in die PCE-Datenpipeline uebernommen. `DrawRoomPlayfield` erzeugt ein 32x20-Playfield in C64-Screen-Spalten 4..35 und Zeilen 3..22; `CreatePlayfieldBorder` spiegelt pro Zeile den linken Rand nach Spalten 2..3 und den rechten Rand nach 36..37. Der PCE-Build erzeugt deshalb nun zusaetzlich eine echte 36x20-Screen-Window-BAT-Datei und zeichnet sie ab BAT-Spalte 2 / Zeile 3.
 
-## Koordinatenaudit
+Dabei wurde ein weiterer konkreter Fehler entdeckt: `tools/room_rle.py` verwendete trotz der Phase-20-Assetkorrektur weiterhin Raumslot 0 direkt als PCE-Character/Palette 0. Das widerspricht `Room.SetupTileGraphics`: C64-Character 0 bleibt leer, die acht Raumslots 0..7 werden als Screen-Codes 1..8 installiert. Die BAT-Generierung verwendet jetzt konsequent `slot+1` fuer Pattern und Palette. Die Regressionstests pruefen diese Zuordnung und die 36-Spalten-Gutter-Geometrie.
 
-Der aktuelle PCE-Port zeichnet lediglich die rohe 32x20-Raumkarte. Die Referenz arbeitet mit einem 40-Zeichen-Screen. Das eigentliche 32-Zeichen-Playfield liegt in Spalten 4..35 und Zeilen 3..22; `CreatePlayfieldBorder` spiegelt die Kanten in die Gutters Spalten 2..3 und 36..37. `PopulateColourRam` verarbeitet deshalb 36 Zeichen pro Zeile ab Spalte 2. HUD/obere Zeilen und Sektorname unten fehlen im PCE-Port ebenfalls noch.
-
-Besonders kritisch ist Montys C64-X-System: Kollisionsroutinen rechnen `(monty_x-$0c)>>2`, waehrend der bisherige PCE-SAT-Pfad `monty_x` fast direkt als Pixel-X benutzt. Diese Skalierung gilt nicht mehr als korrekt. Vor weiterem Gameplay werden Screen-, Sprite- und Collision-Koordinaten gemeinsam aus der C64-Referenz abgeleitet.
+Der zwischenzeitlich eingefuehrte interleaved PCE-Sprite-Encoder war ebenfalls falsch. Die HuC6270-Spritedaten bestehen bei einem 16x16-Cell aus vier aufeinanderfolgenden 32-Byte-Plane-Bloecken (16 16-Bit-Worte pro Plane). Der Converter ist auf dieses dokumentierte Layout zurueckgestellt. Das entspricht zugleich dem letzten Zustand, in dem Monty im Emulator sichtbar war. Die C64-Grafikquelle bleibt unveraendert `refactored/src/subsystems/monty_spr.asm`.
 
 ## Verifikationsstatus
 
 - Host-Toolchain/startendes ROM: bestaetigt.
-- Phase-20d Testfix: lokal noch zu testen.
-- Raumgeometrie 1:1: **noch nicht erreicht**.
-- Sprite-X/Collision-X 1:1: **noch nicht erreicht**.
-- Padbewegung: durch die fehlerhafte Collision-/Koordinatenabbildung noch nicht aussagekraeftig.
+- Phase-21 Build: **noch lokal zu testen**.
+- C64 Screen-Code 0/1..8 Zuordnung: im Generator/Test korrigiert.
+- 36x20 Playfield+Gutters: im Generator/Renderer umgesetzt, visuell noch zu testen.
+- Monty-Spriteformat: auf dokumentiertes HuC6270-Plane-Layout korrigiert, visuell noch zu testen.
+- Monty-Koordinaten/Collision 1:1: weiterhin offen.
 
 ## Naechste Portschritte
 
-1. Build mit dem korrigierten Regressionstest bestaetigen.
-2. C64 `DrawRoomPlayfield` + `CreatePlayfieldBorder` als 40-Spalten-Screenmodell auf PCE abbilden.
-3. C64 Monty-X/Y -> PCE-SAT-Transformation exakt festlegen; dieselbe Transformation fuer Collision verwenden.
-4. Erst danach Bewegung/Jump erneut visuell testen.
-5. Danach Somersaultframes, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
+1. Phase 21 mit `git pull && ./build.sh` bauen und Screenshot pruefen.
+2. C64 Monty-X/Y -> PCE-SAT-Transformation aus `refactored/src` exakt festlegen.
+3. Dieselbe Screenkoordinaten-Abbildung fuer Collision statt direkter 32x20-Indexierung verwenden.
+4. Danach Links/Rechts/Jump sichtbar verifizieren.
+5. Erst danach Somersaultframes, generischer Room-Loader, Gegner, Mechanismen, Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
