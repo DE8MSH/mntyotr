@@ -1,6 +1,6 @@
-; Phase 32 room loader: first real C64 world transition, rooms $00 <-> $01.
-; Room $01 graphics are copied through MPR3/MPR4 so ROM-bank placement cannot
-; corrupt the new room as the ROM grows.
+; Phase 36 room loader: rooms $00 <-> $01 with Room-$01 decor restored.
+; Room $01 graphics/decor are copied through MPR3/MPR4 so ROM-bank placement
+; cannot corrupt the room as the ROM grows.
 
 .zp
 room_copy_rows: ds 1
@@ -17,6 +17,8 @@ room_load_pending:
         rts
 
 .room00:
+        ; This restores both the base Room-$00 chars and all 41 Room-$00 decor
+        ; chars, so returning from Room-$01 cannot leave its decor in shared VRAM.
         call    upload_room00_patterns
         call    draw_room00_native
         stz     <monty_room
@@ -25,8 +27,10 @@ room_load_pending:
         rts
 
 .room01:
-        bsr     room01_upload_patterns
-        bsr     room01_draw_native
+        ; Use absolute CALLs: these helpers can move out of BSR range as ROM grows.
+        call    room01_upload_patterns
+        call    room01_upload_decor
+        call    room01_draw_native
         lda     #1
         sta     <monty_room
         stz     <world_transition_ready
@@ -89,6 +93,7 @@ room01_upload_patterns:
         rts
 
 ; Draw the exact 36x20 visible room window at C64 cols 2..37, rows 3..22.
+; The generated BAT already contains the two exact Room-$01 decor overlays.
 ; The 1440-byte BAT source remains mapped across MPR3/MPR4 for the whole copy.
 room01_draw_native:
         php
