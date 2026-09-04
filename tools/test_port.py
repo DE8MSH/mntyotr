@@ -2,7 +2,7 @@
 """Fast deterministic checks for the C64->PCE port data path."""
 import struct
 from pathlib import Path
-from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_bat, CHR_GAME
+from room_rle import ROOM00_RLE, ROOM_CELLS, decode_room, make_bat, make_screen_bat, CHR_GAME, ROOM00_PAL_BY_CODE
 from monty_sprite import WALK_L, WALK_R, CLIMB, FRAME_BYTES, build, c64_frame_pixels, convert_frame
 from monty_somersault import load_raw_frames, visible_frames, build as build_somersault
 
@@ -124,7 +124,7 @@ def main():
  bat=words(make_bat(cells))
  assert len(bat)==640
  assert (bat[0]&0x0fff)==CHR_GAME+cells[0]
- assert (bat[0]>>12)==cells[0]
+ assert (bat[0]>>12)==ROOM00_PAL_BY_CODE[cells[0]]
  screen=words(make_screen_bat(cells))
  assert len(screen)==36*20
  for y in range(20):
@@ -133,6 +133,7 @@ def main():
   assert row[0]==row[1]==row[2]
   assert row[33]==row[34]==row[35]
   assert [w&0x0fff for w in row[2:34]] == [CHR_GAME+t for t in src]
+  assert [w>>12 for w in row[2:34]] == [ROOM00_PAL_BY_CODE[t] for t in src]
 
  assert c64_screen_xy(0x86,0xb0)==(244,127)
  assert pce_sat_xy(0x86,0xb0)==(276,191)
@@ -183,18 +184,16 @@ def main():
   spr=build(frames)
   assert len(spr)==2048 and any(spr)
 
- # PCE 16x32 sprites select two vertically stacked 16x16 cells from a 32x32
- # pattern group. The group must therefore be TL,TR,BL,BR, not TL,BL,TR,BR.
  marker=bytearray(63)
  for x,y in ((1,1),(17,1),(1,17),(17,17)):
   set_c64_pixel(marker,x,y)
  pce=convert_frame(bytes(marker))
  assert len(pce)==512
  cells4=[pce[i*128:(i+1)*128] for i in range(4)]
- assert pce_plane0_pixel(cells4[0],1,1)==1       # TL
- assert pce_plane0_pixel(cells4[1],1,1)==1       # TR
- assert pce_plane0_pixel(cells4[2],1,1)==1       # BL
- assert pce_plane0_pixel(cells4[3],1,1)==1       # BR
+ assert pce_plane0_pixel(cells4[0],1,1)==1
+ assert pce_plane0_pixel(cells4[1],1,1)==1
+ assert pce_plane0_pixel(cells4[2],1,1)==1
+ assert pce_plane0_pixel(cells4[3],1,1)==1
 
  sault_l_raw,sault_r_raw=load_raw_frames()
  assert len(sault_l_raw)==len(sault_r_raw)==12*64
