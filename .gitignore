@@ -1,0 +1,9 @@
+build/
+tools/huc/
+*.pce
+*.sym
+*.lst
+*.map
+*.o
+*.s
+__pycache__/
