@@ -1,10 +1,8 @@
 ; Converted C64 room-$00 graphics assets.
-; C64 screen code 0 is blank; room tile slots 0..7 are installed as character
-; codes 1..8 exactly like Room.SetupTileGraphics in the refactored source.
-; Each C64 1bpp character becomes one PCE 4bpp tile using pixel indices 0/1.
-;
-; Phase 29 also uploads the exact solid-colour room-$00 decor characters for
-; types 0,1,3,4 at CHR_GAME+9. Pattern-colour decor types follow separately.
+; Base room chars 0..8 follow Room.SetupTileGraphics/PopulateColourRam.
+; Phase 30 also uploads exact room-$00 decor bitmaps for types 0..6 and uses a
+; compact shared BG-palette table so C64 per-character decor colours fit in the
+; PCE's 16 background palettes.
 
 CHR_ROOM00_DECOR = CHR_GAME + 9
 
@@ -22,12 +20,12 @@ upload_room00_patterns:
         lda #>(CHR_ROOM00_DECOR*16)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_decor_patterns,VDC_DL,640
+        tia room00_decor_patterns,VDC_DL,1024
         rts
 
 .data
 room00_patterns:
-        ; C64 character code 0: blank (SetupTileGraphics leaves it untouched).
+        ; C64 character code 0: blank.
         ds 32,0
         ; char 1 / room slot 0 <- C64 tile library $0A
         db $ee,$00,$44,$00,$11,$00,$bb,$00,$bb,$00,$11,$00,$c4,$00,$ef,$00
@@ -55,30 +53,34 @@ room00_patterns:
 room00_decor_patterns:
         incbin "room00-decor-patterns.dat"
 
-; BAT palette number follows the C64 screen character code. Code 0 is blank;
-; code N (1..8) uses room_colour_tbl[N-1], matching PopulateColourRam.
-room00_palettes:
-        ; code 0: blank/background
+; Compact BG palette allocation used by room_rle.py and room00_decor.py.
+; Each palette is 1bpp-style: entry 0 black, entry 1 the C64 foreground colour.
+; Slots 0..4 preserve the already-confirmed room-$00 colours. Slots 5..12 are
+; the additional C64 colours needed by the exact decor colour streams.
+room00_bg_palettes:
+        ; 0 background black
         dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; code 1: C64 brown $9 -> VCE $090
+        ; 1 C64 brown $09
         dw $000,$090,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; code 2: brown $9
-        dw $000,$090,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; code 3: red $2 -> $099
+        ; 2 C64 red $02
         dw $000,$099,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; code 4: cyan $3 -> $15D
+        ; 3 C64 cyan $03
         dw $000,$15d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; code 5: dark grey $B -> $092
+        ; 4 C64 dark grey $0b
         dw $000,$092,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; codes 6..8: black for room $00
-        dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-
-; Dedicated solid-colour decor palettes used by tools/room00_decor.py:
-; palette 9 = C64 medium grey $0c, palette 10 = C64 light grey $0f,
-; palette 11 = C64 white $01. Only pixel index 1 is used by these 1bpp chars.
-room00_decor_palettes:
+        ; 5 C64 medium grey $0c
         dw $000,$124,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 6 C64 light grey $0f
         dw $000,$16d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 7 C64 white $01
         dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 8 C64 yellow $07
+        dw $000,$0df,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 9 C64 light green $0d
+        dw $000,$06d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 10 C64 light red $0a
+        dw $000,$0bb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 11 C64 orange $08
+        dw $000,$0b0,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; 12 C64 green $05
+        dw $000,$048,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
