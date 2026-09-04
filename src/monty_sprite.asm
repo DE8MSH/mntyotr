@@ -17,9 +17,12 @@ monty_sprite_init:
  lda #1
  sta <monty_sprite_dirty
  bsr monty_upload_walk_frame
+ ; VDC register $13 points at the VRAM SATB source.
+ st0 #$13
+ st1 #<SAT_ADDR
+ st2 #>SAT_ADDR
  rts
 
-; Select frame pointer table from C64-facing state (0=right,$80=left).
 monty_upload_walk_frame:
  lda #<MONTY_SPR_VRAM
  sta <_di
@@ -75,6 +78,8 @@ monty_sprite_animate:
 .done:
  rts
 
+; Two 16x32 SATB entries. Attribute word $1080 = 32px high + foreground,
+; palette 0. Right half begins after two 16x16 cells = 256 bytes.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
@@ -95,7 +100,7 @@ monty_sprite_update_satb:
  sta VDC_DL
  lda #>(MONTY_SPR_VRAM>>5)
  sta VDC_DH
- lda #$00
+ lda #$80
  sta VDC_DL
  lda #$10
  sta VDC_DH
@@ -109,14 +114,18 @@ monty_sprite_update_satb:
  adc #80
  sta VDC_DL
  stz VDC_DH
- lda #<((MONTY_SPR_VRAM+128)>>5)
+ lda #<((MONTY_SPR_VRAM+256)>>5)
  sta VDC_DL
- lda #>((MONTY_SPR_VRAM+128)>>5)
+ lda #>((MONTY_SPR_VRAM+256)>>5)
  sta VDC_DH
- lda #$00
+ lda #$80
  sta VDC_DL
  lda #$10
  sta VDC_DH
+ ; Re-arm VRAM->internal SAT transfer for the updated table.
+ st0 #$13
+ st1 #<SAT_ADDR
+ st2 #>SAT_ADDR
  rts
 .data
 monty_l_ptr_lo: db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
