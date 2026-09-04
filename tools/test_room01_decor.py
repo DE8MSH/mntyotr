@@ -40,13 +40,21 @@ def main():
         assert (w & 0x0fff) == first[0x41] + i
 
     assets = (ROOT/'src/room01_assets.asm').read_text()
+    decor_assets = (ROOT/'src/room01_decor_assets.asm').read_text()
     loader = (ROOT/'src/room_loader.asm').read_text()
     decor_loader = (ROOT/'src/room01_decor_loader.asm').read_text()
     main_asm = (ROOT/'src/main.asm').read_text()
     room00_assets = (ROOT/'src/room00_assets.asm').read_text()
 
-    assert 'room01_decor_patterns:' in assets
-    assert 'incbin "room01-decor-patterns.dat"' in assets
+    # The 800-byte decor block must remain at the ROM tail. Putting it back in
+    # room01_assets shifts the already-confirmed physics/collision layout.
+    assert 'room01_decor_patterns:' not in assets
+    assert 'incbin "room01-decor-patterns.dat"' not in assets
+    assert 'room01_decor_patterns:' in decor_assets
+    assert 'incbin "room01-decor-patterns.dat"' in decor_assets
+    assert 'include "room01_decor_assets.asm"' in main_asm
+    assert main_asm.index('include "room01_decor_assets.asm"') > main_asm.index('include "monty_sprite.asm"')
+
     assert 'call    room01_upload_decor' in loader
     assert 'bsr     room01_upload_decor' not in loader
     assert 'include "room01_decor_loader.asm"' in main_asm
@@ -56,7 +64,7 @@ def main():
     assert 'call    upload_room00_patterns' in loader
     assert 'tia room00_decor_patterns,VDC_DL,1312' in room00_assets
 
-    print('OK: exact Room 01 decor + bank-safe upload + Room 00 decor restore')
+    print('OK: exact Room 01 decor + bank-safe upload + tail asset placement + Room 00 restore')
 
 
 if __name__ == '__main__':
