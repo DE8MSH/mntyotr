@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert authentic C64 Monty walk frames to native PCE sprite data."""
+"""Convert authentic C64 Monty frames to native PCE sprite data."""
 from pathlib import Path
 
 WALK_L = bytes.fromhex(
@@ -12,6 +12,11 @@ WALK_R = bytes.fromhex(
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 68 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 17 80 00 1b f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 60 00 3e 20 00 3f d0 00 3e d8 00 1f 38 00 3f 70 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 80 00 1d 68 00 3c 6c 00 3f b4 00 3d b4 00 3e 78 00 1f f0 00 0f c0 00 07 80 00 03 f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
+CLIMB = bytes.fromhex(
+"07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"07 80 00 0f c0 00 07 80 00 1f e0 00 3f e0 00 7f f0 00 7f b8 00 3f b8 00 7f c8 00 7f f0 00 4f f0 00 37 e0 00 7b c0 00 71 e0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"07 80 00 0f c0 00 07 80 00 1f e0 00 3f f0 00 7f f8 00 5f e8 00 3f f0 00 7f f8 00 7f f8 00 7f f8 00 3f f0 00 3c f0 00 18 60 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"07 80 00 0f c0 00 07 80 00 1f e0 00 1f f0 00 3f f8 00 77 f8 00 77 f0 00 4f f8 00 3f f8 00 3f c8 00 1f b0 00 0f 78 00 1e 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 FRAME_BYTES=64
 
 def c64_frame_pixels(frame):
@@ -43,14 +48,15 @@ def convert_frame(frame):
     return b''.join(chunks)
 
 def build(frames):
-    assert len(frames)==4*FRAME_BYTES
-    return b''.join(convert_frame(frames[i:i+64]) for i in range(0,len(frames),64))
+    assert len(frames)%FRAME_BYTES==0
+    return b''.join(convert_frame(frames[i:i+FRAME_BYTES]) for i in range(0,len(frames),FRAME_BYTES))
 
 def main():
     import argparse
-    ap=argparse.ArgumentParser(); ap.add_argument('--left',type=Path); ap.add_argument('--right',type=Path); a=ap.parse_args()
-    left,right=build(WALK_L),build(WALK_R)
+    ap=argparse.ArgumentParser(); ap.add_argument('--left',type=Path); ap.add_argument('--right',type=Path); ap.add_argument('--climb',type=Path); a=ap.parse_args()
+    left,right,climb=build(WALK_L),build(WALK_R),build(CLIMB)
     if a.left: a.left.write_bytes(left)
     if a.right: a.right.write_bytes(right)
-    print(f'Monty walk L/R: 8 authentic C64 frames -> {len(left)+len(right)} bytes PCE SPR')
+    if a.climb: a.climb.write_bytes(climb)
+    print(f'Monty walk/climb: 12 authentic C64 frames -> {len(left)+len(right)+len(climb)} bytes PCE SPR')
 if __name__=='__main__': main()
