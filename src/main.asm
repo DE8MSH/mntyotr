@@ -18,6 +18,7 @@
         include "monty_physics.asm"
         include "collision_banking.asm"
         include "world.asm"
+        include "room01_decor_loader.asm"
         include "room_loader.asm"
         include "monty_sprite.asm"
 
