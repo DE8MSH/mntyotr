@@ -21,9 +21,10 @@
         include "room01_decor_loader.asm"
         include "room_loader.asm"
         include "monty_sprite.asm"
-        ; Large banked decor data is appended after gameplay/runtime code so it
-        ; cannot shift the confirmed physics/collision layout merely by growing.
+        ; Large banked room/decor data is appended after gameplay/runtime code so
+        ; adding new content cannot move the confirmed physics/collision layout.
         include "room01_decor_assets.asm"
+        include "room02_assets_tail.asm"
 
 .zp
 main_jump_x_before_step:   ds 1
