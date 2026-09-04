@@ -1,5 +1,5 @@
 ; Monty on the Run - PC Engine port
-; Phase 6: 320px C64 canvas + native room graphics + PAL gameplay clock.
+; Native room graphics + PAL-rate gameplay + first C64 movement path.
 
         include "platform.inc"
         include "bare-startup.asm"
@@ -22,7 +22,6 @@ bare_main:
         call    init_256x224
         bsr     init_c64_video
 
-        ; Diagnostic font remains available for bring-up labels.
         stz     <_di + 0
         lda     #>(CHR_FONT * 16)
         sta     <_di + 1
@@ -59,7 +58,6 @@ bare_main:
         cly
         bsr     print_banner
 
-        ; Exact room-$00 geometry + original converted C64 character patterns.
         call    draw_room00_native
         call    game_clock_init
         call    monty_physics_init
@@ -69,9 +67,11 @@ main_loop:
         call    wait_vsync
         call    game_clock_step
         bcc     main_loop
-        ; C64-rate gameplay chain. Jump step is inert while grounded; once pad
-        ; fire starts a jump it follows the exact original per-tick delta table.
         inc     game_tick_counter
+
+        ; Preserve C64 order at bring-up level: read controls/move horizontally,
+        ; then advance the active vertical jump arc on the same logical tick.
+        call    monty_update_input
         call    monty_jump_step
         bra     main_loop
 
