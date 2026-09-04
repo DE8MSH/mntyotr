@@ -1,5 +1,5 @@
 ; Monty on the Run - PC Engine port
-; Phase 5: 320px C64 canvas + exact room geometry + converted room graphics.
+; Phase 6: 320px C64 canvas + native room graphics + PAL gameplay clock.
 
         include "platform.inc"
         include "bare-startup.asm"
@@ -12,7 +12,8 @@
         include "font.asm"
         include "joypad.asm"
         include "room00_assets.asm"
-        include "room00.asm"
+        include "room00_native.asm"
+        include "game_clock.asm"
 
         .code
 
@@ -20,7 +21,7 @@ bare_main:
         call    init_256x224
         bsr     init_c64_video
 
-        ; Diagnostic font.
+        ; Diagnostic font remains available for bring-up labels.
         stz     <_di + 0
         lda     #>(CHR_FONT * 16)
         sta     <_di + 1
@@ -36,14 +37,10 @@ bare_main:
         ldy     #^font_data
         call    dropfnt8x8_vdc
 
-        ; Room $00 now has its original C64 character bitmaps converted to
-        ; native PCE 4bpp patterns at CHR_GAME. The current room renderer still
-        ; displays tile IDs; the next renderer revision switches BAT entries to
-        ; these patterns after the transfer itself is verified.
+        ; Original C64 room-$00 8x8 bitmaps converted to native PCE 4bpp.
         call    upload_room00_patterns
 
-        ; Eight room palettes: one per logical C64 room tile. This preserves
-        ; C64's per-character foreground colour model without changing geometry.
+        ; One PCE BG palette per C64 room character slot.
         stz     <_al
         lda     #8
         sta     <_ah
@@ -63,26 +60,21 @@ bare_main:
         cly
         bsr     print_banner
 
-        ; Exact C64 room-$00 RLE expansion at C64 screen col 4 / row 3.
-        call    draw_room00_debug
-
-        lda     #<(27 * BAT_LINE)
-        sta     <_di + 0
-        lda     #>(27 * BAT_LINE)
-        sta     <_di + 1
-        call    vdc_di_to_mawr
-        cly
-        bsr     print_ruler
-
+        ; Exact C64 room-$00 geometry rendered with converted C64 patterns.
+        call    draw_room00_native
+        call    game_clock_init
         call    set_dspon
 
 main_loop:
         call    wait_vsync
+        call    game_clock_step
+        bcc     main_loop              ; no PAL game tick on this VBlank
+        ; Gameplay update chain is attached here. Keeping this gate explicit
+        ; prevents PCE display refresh from changing C64 movement physics.
+        inc     game_tick_counter
         bra     main_loop
 
 ; C64 VIC-II active matrix is 40x25 chars = 320x200 pixels.
-; PCE uses 40 8-pixel cells horizontally. Final porch/centering values remain
-; subject to emulator + hardware verification.
 init_c64_video:
         lda     #$01
         sta     VCE_CR
@@ -104,24 +96,8 @@ print_banner:
         bne     print_char_loop
         rts
 
-print_ruler_loop:
-        clc
-        adc     #<CHR_ASCII_ZERO
-        sta     VDC_DL
-        lda     #$00
-        adc     #>CHR_ASCII_ZERO
-        sta     VDC_DH
-        iny
-print_ruler:
-        lda     ruler_text, y
-        bne     print_ruler_loop
-        rts
-
 banner_text:
-        db      "MONTY PCE ROOM 00 - C64 DATA", 0
-
-ruler_text:
-        db      "1234567890123456789012345678901234567890", 0
+        db      "MONTY PCE ROOM 00 NATIVE", 0
 
         .data
         align   2
