@@ -22,6 +22,9 @@ monty_sprite_init:
  st2 #>SAT_ADDR
  rts
 
+; PCEAS block-transfer operands are absolute addresses.  The old code tried
+; `tia [_bp],...`, but TIA has no indirect-source addressing mode.  Dispatch
+; the small frame set first and assemble a real TIA for each source label.
 monty_upload_walk_frame:
  lda #<MONTY_SPR_VRAM
  sta <_di
@@ -33,28 +36,46 @@ monty_upload_walk_frame:
  tax
  lda <monty_facing
  bmi .left
- lda monty_r_ptr_lo,x
- sta <_bp
- lda monty_r_ptr_hi,x
- sta <_bp+1
- lda monty_r_ptr_bank,x
- bra .bank
+ cpx #0
+ beq .r0
+ cpx #1
+ beq .r1
+ cpx #2
+ beq .r2
+ tia monty_walk_r_3,VDC_DL,512
+ bra .uploaded
+.r0:
+ tia monty_walk_r_0,VDC_DL,512
+ bra .uploaded
+.r1:
+ tia monty_walk_r_1,VDC_DL,512
+ bra .uploaded
+.r2:
+ tia monty_walk_r_2,VDC_DL,512
+ bra .uploaded
 .left:
- lda monty_l_ptr_lo,x
- sta <_bp
- lda monty_l_ptr_hi,x
- sta <_bp+1
- lda monty_l_ptr_bank,x
-.bank:
- tay
- tia [_bp],VDC_DL,512
+ cpx #0
+ beq .l0
+ cpx #1
+ beq .l1
+ cpx #2
+ beq .l2
+ tia monty_walk_l_3,VDC_DL,512
+ bra .uploaded
+.l0:
+ tia monty_walk_l_0,VDC_DL,512
+ bra .uploaded
+.l1:
+ tia monty_walk_l_1,VDC_DL,512
+ bra .uploaded
+.l2:
+ tia monty_walk_l_2,VDC_DL,512
+.uploaded:
  stz <monty_sprite_dirty
  lda <monty_facing
  sta <monty_sprite_last_facing
  rts
 
-; Climb frames use the same four-frame / four-tick cadence as the C64.
-; This upload hook is ready for the UP/DOWN tile-state dispatcher.
 monty_upload_climb_frame:
  lda #<MONTY_SPR_VRAM
  sta <_di
@@ -64,13 +85,23 @@ monty_upload_climb_frame:
  lda <monty_anim_frame
  and #3
  tax
- lda monty_climb_ptr_lo,x
- sta <_bp
- lda monty_climb_ptr_hi,x
- sta <_bp+1
- lda monty_climb_ptr_bank,x
- tay
- tia [_bp],VDC_DL,512
+ cpx #0
+ beq .c0
+ cpx #1
+ beq .c1
+ cpx #2
+ beq .c2
+ tia monty_climb_3,VDC_DL,512
+ bra .cdone
+.c0:
+ tia monty_climb_0,VDC_DL,512
+ bra .cdone
+.c1:
+ tia monty_climb_1,VDC_DL,512
+ bra .cdone
+.c2:
+ tia monty_climb_2,VDC_DL,512
+.cdone:
  stz <monty_sprite_dirty
  rts
 
@@ -145,15 +176,6 @@ monty_sprite_update_satb:
  st2 #>SAT_ADDR
  rts
 .data
-monty_l_ptr_lo: db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
-monty_l_ptr_hi: db >monty_walk_l_0,>monty_walk_l_1,>monty_walk_l_2,>monty_walk_l_3
-monty_l_ptr_bank: db ^monty_walk_l_0,^monty_walk_l_1,^monty_walk_l_2,^monty_walk_l_3
-monty_r_ptr_lo: db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
-monty_r_ptr_hi: db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
-monty_r_ptr_bank: db ^monty_walk_r_0,^monty_walk_r_1,^monty_walk_r_2,^monty_walk_r_3
-monty_climb_ptr_lo: db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
-monty_climb_ptr_hi: db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
-monty_climb_ptr_bank: db ^monty_climb_0,^monty_climb_1,^monty_climb_2,^monty_climb_3
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
 monty_walk_l_1: incbin "monty-walk-l.dat",512,512
 monty_walk_l_2: incbin "monty-walk-l.dat",1024,512
