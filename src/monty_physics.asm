@@ -52,11 +52,46 @@ room00_get_tile_property:
         cla
         rts
 
+; Collision helpers in the C64 source operate on the full 40x25 character
+; screen, not directly on the packed 32x20 RLE playfield.  Map that screen
+; coordinate back into room00_collision_map exactly like Room.DrawRoomPlayfield
+; + CreatePlayfieldBorder:
+;   rows 3..22 -> logical rows 0..19
+;   cols 4..35 -> logical cols 0..31
+;   cols 2..3  -> mirrored logical col 0
+;   cols 36..37-> mirrored logical col 31
+; all other screen cells are empty for the current room-only collision model.
 room00_get_tile_xy:
-        cpx     #32
+        cpy     #3
+        bcc     .outside
+        cpy     #23
         bcs     .outside
-        cpy     #20
-        bcs     .outside
+        tya
+        sec
+        sbc     #3
+        tay
+
+        cpx     #2
+        bcc     .outside
+        cpx     #4
+        bcc     .left_gutter
+        cpx     #36
+        bcc     .playfield
+        cpx     #38
+        bcc     .right_gutter
+        bra     .outside
+.left_gutter:
+        ldx     #0
+        bra     .mapped
+.playfield:
+        txa
+        sec
+        sbc     #4
+        tax
+        bra     .mapped
+.right_gutter:
+        ldx     #31
+.mapped:
         stx     <collision_x
         tya
         tax
@@ -78,9 +113,8 @@ room00_get_property_xy:
         call    room00_get_tile_xy
         jmp     room00_get_tile_property
 
-; Scan Monty's 2x3 logical footprint for property 3, mirroring the C64
-; UpdateTileFlags state transition. This state enables UP/DOWN ladder/rope
-; movement and selects the authentic climb animation.
+; Scan Monty's 2x3 screen-character footprint for property 3, mirroring the
+; C64 UpdateTileFlags state transition.
 monty_update_tile_state:
         stz     <monty_tile_state
         lda     <monty_y
@@ -372,8 +406,6 @@ monty_update_input:
         bne .directions
         call monty_jump_start
 .directions:
-        ; C64 only accepts vertical player input while tile_state is active and
-        ; no jump action is in progress.
         lda <monty_jump_phase
         bne .horizontal
         lda <monty_tile_state
