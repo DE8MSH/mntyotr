@@ -41,9 +41,8 @@ world_get_room_xy:
         lda     #$ff
         rts
 
-; Phase 38 has real loaders for rooms $00, $01 and $02. Other valid world cells
-; stay blocked until their room data is ported, so map coordinates cannot drift
-; into an unloaded room while using the wrong collision map.
+; Phase 41 has real loaders for rooms $00..$03. Other valid world cells remain
+; blocked until their room data is ported.
 world_resolve_exit:
         stz     <world_transition_ready
         lda     <monty_room_exit
@@ -69,7 +68,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_left
-        cmp     #3
+        cmp     #4
         bcs     .blocked_left
         dec     <world_exit_col
         bra     .valid
@@ -82,7 +81,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_right
-        cmp     #3
+        cmp     #4
         bcs     .blocked_right
         inc     <world_exit_col
         bra     .valid
@@ -96,7 +95,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_up
-        cmp     #3
+        cmp     #4
         bcs     .blocked_up
         dec     <world_map_row
         bra     .valid
@@ -109,7 +108,7 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_down
-        cmp     #3
+        cmp     #4
         bcs     .blocked_down
         inc     <world_map_row
 .valid:
