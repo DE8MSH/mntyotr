@@ -41,8 +41,22 @@ world_get_room_xy:
         lda     #$ff
         rts
 
-; Phase 43 has real loaders for rooms $00..$04. Other valid world cells remain
-; blocked until their room data is ported.
+; A=room id. C=1 if this room currently has a real loader.
+; Phase 44 intentionally enables the original detour around Room $03's wall:
+; $03 down->$0E, $0E left->$0D, $0D up->$04.
+world_room_supported:
+        cmp     #5
+        bcc     .yes
+        cmp     #$0d
+        beq     .yes
+        cmp     #$0e
+        beq     .yes
+        clc
+        rts
+.yes:
+        sec
+        rts
+
 world_resolve_exit:
         stz     <world_transition_ready
         lda     <monty_room_exit
@@ -68,8 +82,8 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_left
-        cmp     #5
-        bcs     .blocked_left
+        jsr     world_room_supported
+        bcc     .blocked_left
         dec     <world_exit_col
         bra     .valid
 .right:
@@ -81,8 +95,8 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_right
-        cmp     #5
-        bcs     .blocked_right
+        jsr     world_room_supported
+        bcc     .blocked_right
         inc     <world_exit_col
         bra     .valid
 .up:
@@ -95,8 +109,8 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_up
-        cmp     #5
-        bcs     .blocked_up
+        jsr     world_room_supported
+        bcc     .blocked_up
         dec     <world_map_row
         bra     .valid
 .down:
@@ -108,8 +122,8 @@ world_resolve_exit:
         jsr     world_get_room_xy
         cmp     #$ff
         beq     .blocked_down
-        cmp     #5
-        bcs     .blocked_down
+        jsr     world_room_supported
+        bcc     .blocked_down
         inc     <world_map_row
 .valid:
         sta     <world_pending_room
@@ -132,6 +146,8 @@ world_resolve_exit:
         sta     <monty_y
         bra     .blocked
 .blocked_down:
+        lda     #$d9
+        sta     <monty_y
 .blocked:
         stz     <monty_room_exit
 .none:
