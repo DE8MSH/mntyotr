@@ -42,9 +42,15 @@ monty_physics_init:
         stz     <monty_climbing
         rts
 
+; Exact C64 GetTileFlag screen-code semantics for the room custom chars:
+; screen code 0 and codes >=9 have no room-tile property; codes 1..8 index
+; tile_property_tbl[code-1].  The previous port incorrectly treated code 0 as
+; slot 0/property 1, making blank space solid and stopping Monty almost at once.
 room00_get_tile_property:
-        cmp     #8
+        beq     .empty
+        cmp     #9
         bcs     .empty
+        dec     a
         tax
         lda     room00_tile_properties,x
         rts
@@ -52,15 +58,9 @@ room00_get_tile_property:
         cla
         rts
 
-; Collision helpers in the C64 source operate on the full 40x25 character
-; screen, not directly on the packed 32x20 RLE playfield.  Map that screen
-; coordinate back into room00_collision_map exactly like Room.DrawRoomPlayfield
-; + CreatePlayfieldBorder:
-;   rows 3..22 -> logical rows 0..19
-;   cols 4..35 -> logical cols 0..31
-;   cols 2..3  -> mirrored logical col 0
-;   cols 36..37-> mirrored logical col 31
-; all other screen cells are empty for the current room-only collision model.
+; X/Y here are C64 *screen* character coordinates, not raw 32x20 map indexes.
+; DrawRoomPlayfield places the logical room at screen cols 4..35, rows 3..22;
+; CreatePlayfieldBorder mirrors col4 into 2..3 and col35 into 36..37.
 room00_get_tile_xy:
         cpy     #3
         bcc     .outside
@@ -70,28 +70,23 @@ room00_get_tile_xy:
         sec
         sbc     #3
         tay
-
         cpx     #2
         bcc     .outside
-        cpx     #4
-        bcc     .left_gutter
-        cpx     #36
-        bcc     .playfield
         cpx     #38
-        bcc     .right_gutter
-        bra     .outside
-.left_gutter:
-        ldx     #0
-        bra     .mapped
-.playfield:
+        bcs     .outside
+        cpx     #4
+        bcs     .check_right
+        ldx     #4
+        bra     .to_room_col
+.check_right:
+        cpx     #36
+        bcc     .to_room_col
+        ldx     #35
+.to_room_col:
         txa
         sec
         sbc     #4
         tax
-        bra     .mapped
-.right_gutter:
-        ldx     #31
-.mapped:
         stx     <collision_x
         tya
         tax
@@ -113,8 +108,6 @@ room00_get_property_xy:
         call    room00_get_tile_xy
         jmp     room00_get_tile_property
 
-; Scan Monty's 2x3 screen-character footprint for property 3, mirroring the
-; C64 UpdateTileFlags state transition.
 monty_update_tile_state:
         stz     <monty_tile_state
         lda     <monty_y
