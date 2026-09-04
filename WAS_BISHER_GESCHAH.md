@@ -1,22 +1,25 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 19a
+Stand: 2026-09-04 — Phase 20
 
 ## Portierungsstand
 
-**Gesamtport: ca. 34 %**
+**Gesamtport: ca. 32 %**
 
-Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Toolchain-/Buildfixes allein erhoehen sie nicht.
+Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten PCE-Port benoetigten Systems. Der Stand wurde konservativ von 34 % auf 32 % korrigiert, weil Raumdarstellung und Monty-Sprite erst jetzt visuell gegen die C64-Referenz nachgezogen werden.
+
+## Verbindliche Referenz
+
+Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`. Diese Version ist die editierbare, subsystem-orientierte KickAssembler-Rekonstruktion und laut Upstream funktional identisch zum Original. `byte-perfect` wird nur als zusaetzliche Ground-Truth fuer Originaladressen/Opcodefragen herangezogen. PCE-spezifische Anpassungen duerfen Hardwaredetails aendern, nicht aber Spielregeln, Raumdaten oder Animationslogik ohne dokumentierten Grund.
 
 ## Ziel
 
-1:1-orientierter Port von *Monty on the Run* (C64) auf NEC PC Engine / HuCard. Referenz ist die kommentierte/refaktorierte 6502-Rekonstruktion von Dave-Agent.
+1:1-orientierter Port von *Monty on the Run* (C64) auf NEC PC Engine / HuCard.
 
 ## Bereits umgesetzt
 
 - Linux-Mint-22 Toolchain/Build/Run-Grundgeruest; GitHub-Actions-ROM-Build bleibt entfernt.
 - PCE VDC/VCE Bring-up, Palette, BAT und VSync.
-- Raum $00 mit echten konvertierten C64-Hintergrundtiles.
 - PAL-orientierter Gameplay-Scheduler.
 - Montys Sprungkurve, PCE-Pad, horizontale Bewegung, Step-Gate und erste Tile-Kollision.
 - C64-Raumkanten und statisches 6x23-Weltgrid.
@@ -25,33 +28,41 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 
 ## Phase 18i — erster erfolgreicher ROM-Build
 
-Vom Nutzer am 2026-09-04 bestaetigt: `./build.sh` erzeugt erfolgreich eine startende `.pce`; der Emulator zeigt den portierten Raum $00. Damit sind Toolchain, Regressionstests, PCEAS und ROM-Start end-to-end bestaetigt.
+Vom Nutzer am 2026-09-04 bestaetigt: `./build.sh` erzeugt erfolgreich eine startende `.pce`; der Emulator zeigt den damaligen Raum-$00-Zwischenstand. Toolchain, Regressionstests, PCEAS und ROM-Start sind damit end-to-end bestaetigt.
 
-## Phase 19 — Tile-State, UP/DOWN und Climb-Runtime
+## Phase 19/19a — Tile-State, UP/DOWN und Animation
 
-Die C64-Routine `Monty.UpdateTileFlags` wurde fuer den aktuellen logischen Raum uebertragen: Montys 2x3-Footprint wird auf Collision-Property 3 untersucht und daraus `monty_tile_state` gebildet. Vertikale Spielerbewegung wird nur zugelassen, wenn dieser Tile-State aktiv ist und kein Sprung laeuft. PCE-Pad UP/DOWN bewegt Monty unter Collision-Pruefung; `monty_climbing` schaltet auf die authentischen vier Climb-Frames.
+C64-orientierter Tile-State, vertikale Bewegung und Climb-Auswahl wurden angelegt. Der Animator wurde danach so korrigiert, dass Idle nicht permanent Walkframes durchschaltet.
 
-## Phase 19a — C64-Animationszustand statt Dauer-Walk
+## Phase 20 — sichtbare C64-Paritaet zuerst
 
-Der erste PCE-Animator liess die Walkframes auch im Stillstand alle vier logischen Ticks weiterlaufen. Das entspricht nicht `Monty.UpdateState` des C64. Der Runtime-Animator wurde deshalb korrigiert: Walkframes laufen nur bei `monty_is_moving`, Climbframes nur bei aktivem vertikalem Klettern, und waehrend eines Sprungs bleibt der Animationstakt aktiv. Ein Richtungs- oder Moduswechsel erzwingt weiterhin den notwendigen VRAM-Upload. Damit steht Monty im Idle auf seinem aktuellen Walkframe statt auf der Stelle zu laufen.
+Der Screenshot des laufenden ROMs zeigte zwei grundlegende Fehler im bisherigen Bring-up. Beide werden vor weiteren Gameplay-Features korrigiert:
 
-Die eigentlichen 12+12 Somersault-Grafiken fehlen noch; waehrend des Sprungs wird bis zu deren Port weiterhin der vorhandene Vierer-Animationspfad benutzt.
+1. **Room-Character-Off-by-one:** `Room.SetupTileGraphics` des refactored C64-Codes laesst Character 0 leer und installiert die acht Raum-Tiles als Screen-Codes 1..8. Der PCE-Port hatte dagegen Tile-Slot 0 auf Character 0 gelegt. `room00_assets.asm` besitzt jetzt einen expliziten Blank-Character 0 und legt die acht echten C64-Tiles auf PCE Characters 1..8. Die PCE-Paletten sind ebenfalls nach Screen-Code 0..8 verschoben, passend zu `PopulateColourRam`.
+2. **Unsichtbarer Monty:** Der Port lud bisher nur BG-Paletten. PCE-Sprites benutzen die separaten Paletten 16..31; Montys 1bpp-Konvertierung konnte deshalb schwarz/unsichtbar bleiben. SPR-Palette 0 wird jetzt explizit mit C64-Monty-Farbe 1 (weiss) geladen. Ausserdem wurde der PCE-SAT-X-Offset von +64 auf den Hardware-Offset +32 korrigiert; Y bleibt +64.
+
+Diese Phase ist hochgeladen, aber noch nicht durch den naechsten lokalen Build/Emulator-Screenshot bestaetigt.
 
 ## Verifikationsstatus
 
-Vom Nutzer bestaetigt: Phase 19 baut erfolgreich. Phase 19a ist hochgeladen, aber noch nicht durch den naechsten lokalen `./build.sh`-Lauf bestaetigt. Raum $00 besitzt keine Property-3-Kachel, daher ist der Climbpfad dort noch nicht sinnvoll visuell testbar.
+- HuC/PCEAS Host-Toolchain: bestaetigt.
+- Python-Regressionssuite: bestaetigt vor Phase 20.
+- Startendes `.pce`: bestaetigt.
+- Phase-20-Raumdarstellung: noch zu testen.
+- Sichtbarer/animierter Monty: noch zu testen.
+- Weitere Gameplay-Paritaet: erst nach dieser visuellen Baseline.
 
 ## Aktuell offen
 
-- Phase 19a bauen/regressionspruefen.
-- 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
-- `CheckTileBelow` fuer Properties 2/3/4 exakt nachziehen; insbesondere Property 4 setzt nach zwei Treffern den C64-Eventwert 5.
-- Raum $01 und generischen Room-State/Renderer anschliessen.
-- Collision-Abbildung zwischen C64-Screenkoordinaten und logischem 32x20-Raum exakt verifizieren.
-- Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
+- Phase 20 lokal bauen und Screenshot/Bewegung pruefen.
+- C64 `DrawRoomPlayfield`, `CreatePlayfieldBorder`, `PopulateColourRam` und PCE-BAT-Ausgabe Pixel/Code fuer Pixel gegeneinander verifizieren.
+- SATB-DMA/Sprite-Sichtbarkeit am laufenden ROM bestaetigen.
+- Collision-Abbildung zwischen C64-40-Spalten-Screenkoordinaten und logischem 32x20-Raum exakt verifizieren.
+- Danach 12+12 Somersault-/Jumpframes, generischer Room-Loader, Gegner, Mechanismen, Special Items, HUD/Gameflow und Audio.
 
 ## Referenzen
 
 - C64-Rekonstruktion: https://github.com/Dave-Agent/monty-on-the-run
+- Primaere Quelle: https://github.com/Dave-Agent/monty-on-the-run/tree/main/refactored/src
 - Zielprojekt: https://github.com/DE8MSH/mntyotr
 - HuC/PCEAS: https://github.com/pce-devel/huc
