@@ -50,6 +50,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room01_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room03.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
@@ -79,6 +80,10 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room03.py" \
   --map "$BUILD/room03-map.dat" \
   --screen-bat "$BUILD/room03-screen-bat.dat" \
   --patterns "$BUILD/room03-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room04.py" \
+  --map "$BUILD/room04-map.dat" \
+  --screen-bat "$BUILD/room04-screen-bat.dat" \
+  --patterns "$BUILD/room04-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 cd "$BUILD"
