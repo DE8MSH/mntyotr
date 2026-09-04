@@ -1,8 +1,9 @@
 ; Converted C64 room-$00 graphics assets.
 ; Base room chars 0..8 follow Room.SetupTileGraphics/PopulateColourRam.
-; Phase 30 also uploads exact room-$00 decor bitmaps for types 0..6 and uses a
-; compact shared BG-palette table so C64 per-character decor colours fit in the
-; PCE's 16 background palettes.
+; Phase 31 uploads the complete room-$00 decor bitmap set used by the room:
+; types 0..6 plus type $43 sad_flowers, for 41 generated 8x8 characters total.
+; Base room and decor share a compact BG palette map so all C64 per-character
+; colours fit in the PCE's 16 background palettes.
 
 CHR_ROOM00_DECOR = CHR_GAME + 9
 
@@ -20,7 +21,7 @@ upload_room00_patterns:
         lda #>(CHR_ROOM00_DECOR*16)
         sta <_di+1
         call vdc_di_to_mawr
-        tia room00_decor_patterns,VDC_DL,1024
+        tia room00_decor_patterns,VDC_DL,1312
         rts
 
 .data
@@ -55,8 +56,8 @@ room00_decor_patterns:
 
 ; Compact BG palette allocation used by room_rle.py and room00_decor.py.
 ; Each palette is 1bpp-style: entry 0 black, entry 1 the C64 foreground colour.
-; Slots 0..4 preserve the already-confirmed room-$00 colours. Slots 5..12 are
-; the additional C64 colours needed by the exact decor colour streams.
+; Slots 0..4 preserve the confirmed room-$00 colours. Slots 5..12 cover every
+; additional C64 colour used by the complete room-$00 decor set.
 room00_bg_palettes:
         ; 0 background black
         dw $000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
