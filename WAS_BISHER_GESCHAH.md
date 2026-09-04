@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 30a
+Stand: 2026-09-04 — Phase 31
 
 ## Portierungsstand
 
-**Gesamtport: ca. 41 %**
+**Gesamtport: ca. 42 %**
 
-Der Nutzer hat Phase 29 visuell bestaetigt. Phase 30 brachte die patterned Decors sichtbar ins Bild, danach trat beim Gehen nach rechts ein neuer Sprite-Grafikfehler auf. Phase 30a behebt diesen Datenzugriff ohne Gameplay-/Physik-Aenderung.
+Der Nutzer hat Phase 30a visuell bestaetigt: der Rechtslauf-Grafikfehler ist nach der bankfesten Vereinheitlichung wieder weg. Phase 31 vervollstaendigt nun den statischen Decor-Satz von Raum $00.
 
 ## Verbindliche Referenz
 
@@ -19,42 +19,47 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Montys Start-/SAT-Position passt weitgehend.
 - Gehen, Springen, Falling und Landen auf Plattformen funktionieren.
 - Die Hauswandoeffnung in Raum $00 ist passierbar.
-- Die 12+12 Somersault-/Jumpframes funktionieren nach dem bankfesten Phase-28e-Loader visuell korrekt.
-- Phase-29-Decors sind sichtbar korrekt; Phase 30 zeigt weitere Objekte.
+- Die 12+12 Somersault-/Jumpframes funktionieren visuell korrekt.
+- Walk links/rechts und Climb benutzen nun ebenfalls den bankfesten Far-Pointer-Pfad; der zwischenzeitliche Rechtslauf-Grafikfehler ist laut Nutzer wieder behoben.
+- Die Phase-29/30-Decors sind sichtbar; der Nutzer sieht bereits deutlich mehr Raumobjekte.
 
-## Phase 30 — patterned Raum-$00-Decor
+## Phase 31 — Raum-$00-Decor komplett
 
-Die C64-Decor-Engine arbeitet pro Zeichen mit einer Farbe. Phase 30 portiert Type 2 `street_lamp_lamp`, Type 5 `yellow_flower` und Type 6 `brown_flower` inklusive ihrer originalen C64-Farbstroeme. `tools/room00_decor.py` emittiert damit 32 PCE-Decor-Zeichen fuer Types 0..6.
+Der letzte noch fehlende statische Decor-Record in Raum $00 ist Type `$43` (`sad_flowers`) bei C64-Koordinate `$21,$0f`.
 
-## Phase 30a — Walk/Climb ebenfalls bankfest
+Die C64-Referenz definiert Type 67 als 3x3 Zeichen. Das exakte Bitmap umfasst 72 Byte = 9 Zeichen. Der originale Farbstrom ist:
 
-Nach dem groesseren Decor-Block meldete der Nutzer neue Grafikfehler beim Gehen nach rechts. Das passt zu einer bereits bekannten strukturellen Schwachstelle: Phase 28e hatte nur die grossen Somersaultframes auf den bankfesten Far-Pointer-Pfad umgestellt. Walk links/rechts und Climb wurden weiterhin per direktem `TIA monty_walk_*` / `TIA monty_climb_*` aus ROM geladen.
+`$05,$05,$05,$05,$05,$05,$07,$0a,$08`
 
-Durch weiteres ROM-Wachstum koennen auch diese 512-Byte-Frames an oder ueber einer 8-KiB-HuCard-Bankgrenze liegen. Dann ist ein direkter TIA-Zugriff auf ein Label nicht mehr verlaesslich, obwohl die Daten selbst korrekt sind.
+`tools/room00_decor.py` enthaelt jetzt auch diesen Typ und emittiert damit alle neun Raum-$00-Records in Quellreihenfolge:
 
-Phase 30a vereinheitlicht deshalb alle Monty-Framefamilien:
+- `$00,$24,$10,$00`
+- `$00,$24,$0c,$01`
+- `$00,$24,$08,$01`
+- `$00,$22,$06,$02`
+- `$00,$17,$08,$03`
+- `$00,$03,$08,$04`
+- `$00,$0e,$0a,$05`
+- `$00,$0c,$0c,$06`
+- `$00,$21,$0f,$43`
 
-- Walk links: 4 Far-Pointer mit `BANK(...)`
-- Walk rechts: 4 Far-Pointer mit `BANK(...)`
-- Climb: 4 Far-Pointer mit `BANK(...)`
-- Somersault links/rechts: weiterhin 12+12 Far-Pointer
+Die PCE-Decor-Allokation waechst von 32 auf 41 Zeichen. `src/room00_assets.asm` laedt daher 1312 Byte Decor-Patterns nach VRAM. Die vorhandene kompakte Palettentabelle reicht aus, weil `sad_flowers` nur bereits vorhandene C64-Farben `$05,$07,$0a,$08` benutzt.
 
-Alle benutzen jetzt denselben `monty_upload_far_512`-Pfad mit `map_bp_to_mpr34`. Direkte `TIA monty_walk_*`, `TIA monty_climb_*` und `TIA monty_sault_*` sind aus dem Runtime-Code entfernt.
-
-`tools/test_sprite_banking.py` prueft nun alle fünf Framefamilien und bricht ab, falls eine davon wieder auf direkten TIA-Zugriff zurueckfaellt.
+`tools/test_room00_decor.py` prueft jetzt zusaetzlich die komplette 3x3-Position, Zeichenfolge und den exakten Farbstrom von Type `$43`. Der Build benutzt diesen Test bereits ueber den bestehenden `build.sh`-Aufruf.
 
 ## Verifikationsstatus
 
-- Phase 30a ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Phase 30a ist vom Nutzer visuell bestaetigt.
+- Phase 31 ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
 - Als naechstes `git pull && ./build.sh`.
-- Danach Walk links/rechts und Jump links/rechts pruefen; besonders der neu gemeldete Rechtslauf-Grafikfehler sollte verschwunden sein.
-- Die neuen Raum-$00-Decors bleiben unveraendert aktiv.
+- Danach in Raum $00 besonders das letzte 3x3-Blumenobjekt bei der rechten Raumseite pruefen.
+- Physik, Collision und Monty-Animation wurden in Phase 31 nicht veraendert.
 
 ## Naechste Portschritte
 
-1. Phase 30a lokal bauen und Rechtslauf verifizieren.
-2. Type `$43` `sad_flowers` mit eindeutig gepinntem Original-Farbstrom nachziehen.
-3. Danach generischen Room-Loader und echte Raumwechsel anbinden.
+1. Phase 31 lokal bauen und komplettes Raum-$00-Decor visuell bestaetigen.
+2. Danach generischen Room-Loader aus `room.asm` portieren, damit die vorhandene Weltkarte echte Raumwechsel laden kann.
+3. Weitere Raumdaten/Tile-Sets/Decor dann ueber denselben generischen Pfad anbinden.
 4. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
