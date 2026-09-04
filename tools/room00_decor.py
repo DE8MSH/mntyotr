@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Overlay the first exact C64 room-$00 decoration types onto the PCE BAT.
+"""Overlay exact C64 room-$00 decorations onto the PCE BAT.
 
 Primary reference: refactored/src/subsystems/decor_data.asm.
-This phase ports the solid-colour decoration records used by room $00:
-types 0,1,3,4 (lamp base/pole, window, MPL ST sign). Pattern-colour types
-2,5,6,67 are intentionally left for the next decor phase.
+Phase 30 ports room-$00 types 0,1,2,3,4,5,6 exactly, including the C64
+per-character colour streams for the lamp head and the two flower variants.
+Type $43 (sad flowers) remains the only room-$00 decor record not yet emitted.
 """
 from __future__ import annotations
 
@@ -18,9 +18,18 @@ ROOM_Y0 = 3
 SCREEN_X0 = 2
 CHR_DECOR = CHR_GAME + 9
 
-# C64 colour -> dedicated PCE BG palette index for this phase.
-# type 0/1 use $0c, type 3 uses $0f, type 4 uses $01.
-PAL_BY_C64 = {0x0C: 9, 0x0F: 10, 0x01: 11}
+# Compact PCE palette allocation. 0..4 are used by the base room; decor uses
+# 5..12. Values are C64 colour numbers, not PCE colour values.
+PAL_BY_C64 = {
+    0x0C: 5,  # medium grey
+    0x0F: 6,  # light grey
+    0x01: 7,  # white
+    0x07: 8,  # yellow
+    0x0D: 9,  # light green
+    0x0A: 10, # light red
+    0x08: 11, # orange
+    0x05: 12, # green
+}
 
 # Exact 8-byte C64 character bitmaps, concatenated in row-major character order.
 TYPE_BITMAPS = {
@@ -33,6 +42,14 @@ TYPE_BITMAPS = {
         "18 18 18 18 18 18 18 18 "
         "18 18 18 18 18 18 18 18 "
         "18 18 18 18 18 18 18 18"
+    ),
+    2: bytes.fromhex(
+        "00 00 00 00 03 06 0c 1f "
+        "00 00 00 00 ff fc fe ff "
+        "00 00 00 00 c0 e0 70 30 "
+        "00 0f 1f 0c 07 00 00 00 "
+        "00 fe ff 06 fc 00 00 00 "
+        "30 30 30 18 18 18 18 18"
     ),
     3: bytes.fromhex(
         "7f ff ff e0 ee e8 e8 e0 "
@@ -52,29 +69,45 @@ TYPE_BITMAPS = {
         "ff ff 84 bf 87 f7 87 ff "
         "fe ff 1f 7f 7f 7f 77 fe"
     ),
+    5: bytes.fromhex(
+        "00 00 00 2a 5d 3e 36 08 "
+        "99 d3 6e 10 d3 6e 0c 08 "
+        "ff df df 6e 6e 7e 3c 3c"
+    ),
+    6: bytes.fromhex(
+        "00 00 00 2a 5d 3e 36 08 "
+        "99 d3 6e 10 d3 6e 0c 08 "
+        "ff df df 6e 6e 7e 3c 3c"
+    ),
 }
 
-# width, height, solid C64 colour
+# width, height, either a solid C64 colour int or an exact per-character stream.
 TYPE_PROPS = {
     0: (1, 2, 0x0C),
     1: (1, 4, 0x0C),
+    2: (3, 2, bytes.fromhex("0c 0c 0c 07 07 0c")),
     3: (3, 3, 0x0F),
     4: (5, 1, 0x01),
+    5: (1, 3, bytes.fromhex("07 0d 0a")),
+    6: (1, 3, bytes.fromhex("08 05 0a")),
 }
 
-# Exact room-$00 records from Decor.room_list for the solid subset.
+# Exact room-$00 records from Decor.room_list, except type $43 which follows in
+# the next phase once its colour stream is pinned from source.
 ROOM00_RECORDS = [
     (0x24, 0x10, 0),
     (0x24, 0x0C, 1),
     (0x24, 0x08, 1),
+    (0x22, 0x06, 2),
     (0x17, 0x08, 3),
     (0x03, 0x08, 4),
+    (0x0E, 0x0A, 5),
+    (0x0C, 0x0C, 6),
 ]
 
 
 def c64_char_to_pce_tile(char: bytes) -> bytes:
     assert len(char) == 8
-    # PCE 8x8 4bpp tile: planes 0/1 interleaved for 8 rows, then planes 2/3.
     return b"".join(bytes((b, 0)) for b in char) + bytes(16)
 
 
@@ -82,7 +115,7 @@ def build_patterns() -> tuple[bytes, dict[int, int]]:
     out = bytearray()
     first_char: dict[int, int] = {}
     next_char = CHR_DECOR
-    for type_id in (0, 1, 3, 4):
+    for type_id in (0, 1, 2, 3, 4, 5, 6):
         raw = TYPE_BITMAPS[type_id]
         w, h, _ = TYPE_PROPS[type_id]
         assert len(raw) == w * h * 8
@@ -93,26 +126,39 @@ def build_patterns() -> tuple[bytes, dict[int, int]]:
     return bytes(out), first_char
 
 
+def colours_for(type_id: int) -> list[int]:
+    w, h, colour = TYPE_PROPS[type_id]
+    count = w * h
+    if isinstance(colour, int):
+        return [colour] * count
+    if len(colour) != count:
+        raise ValueError(f"decor type {type_id} colour stream has {len(colour)} bytes, expected {count}")
+    return list(colour)
+
+
 def overlay_screen_bat(base: bytes) -> bytes:
     if len(base) != SCREEN_W * 20 * 2:
         raise ValueError(f"room screen BAT has {len(base)} bytes, expected 1440")
     words = list(struct.unpack("<" + "H" * (len(base)//2), base))
     _, first_char = build_patterns()
     for c64_x, c64_y, type_id in ROOM00_RECORDS:
-        w, h, colour = TYPE_PROPS[type_id]
+        w, h, _ = TYPE_PROPS[type_id]
         local_x = c64_x - SCREEN_X0
         local_y = c64_y - ROOM_Y0
         if not (0 <= local_x < SCREEN_W and 0 <= local_y < 20):
             raise ValueError(f"decor type {type_id} starts outside room window")
         char = first_char[type_id]
-        pal = PAL_BY_C64[colour]
+        colours = colours_for(type_id)
+        ci = 0
         for dy in range(h):
             for dx in range(w):
                 x, y = local_x + dx, local_y + dy
                 if not (0 <= x < SCREEN_W and 0 <= y < 20):
                     raise ValueError(f"decor type {type_id} extends outside room window")
+                pal = PAL_BY_C64[colours[ci]]
                 words[y*SCREEN_W+x] = (pal << 12) | char
                 char += 1
+                ci += 1
     return struct.pack("<" + "H" * len(words), *words)
 
 
@@ -128,7 +174,7 @@ def main() -> None:
     patterns, _ = build_patterns()
     args.screen_bat.write_bytes(decorated)
     args.patterns.write_bytes(patterns)
-    print(f"room 00 decor: {len(ROOM00_RECORDS)} solid records, {len(patterns)//32} chars")
+    print(f"room 00 decor: {len(ROOM00_RECORDS)} records, {len(patterns)//32} chars")
 
 
 if __name__ == "__main__":
