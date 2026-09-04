@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 28e
+Stand: 2026-09-04 — Phase 29
 
 ## Portierungsstand
 
-**Gesamtport: ca. 39 %**
+**Gesamtport: ca. 40 %**
 
-Phase 28e korrigiert den Datenzugriff der bereits portierten Sprunganimation. Die Prozentzahl bleibt unveraendert, bis die 12+12 Somersaultframes lokal visuell bestaetigt sind.
+Die Phase-28e-Sprunganimation ist vom Nutzer jetzt visuell bestaetigt. Phase 29 beginnt den echten C64-Decor-Pfad fuer Raum $00.
 
 ## Verbindliche Referenz
 
@@ -20,62 +20,63 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Gehen, Springen und unsupported Falling funktionieren.
 - Landen auf Plattformen funktioniert.
 - Die Hauswandoeffnung in Raum $00 ist passierbar.
-- Nach Phase 28d wird die Jump-Animation angesprochen, ist laut Nutzer aber weiterhin grafisch defekt.
+- Die 12+12 Somersault-/Jumpframes funktionieren nach dem bankfesten Phase-28e-Loader jetzt visuell korrekt.
 
-## Phase 28 — Original-Somersaultdaten
+## Phase 28e — Jump-Sprite-Banking bestaetigt
 
-Die C64-Referenz benutzt 12 Somersaultframes pro Richtung. `sault_l_spr` liegt bei `$5700-$59ff`, `sault_r_spr` bei `$5a00-$5cff`; jeder VIC-Slot ist 64 Byte gross, davon 63 sichtbare Bitmapbytes plus Padding.
+Die grossen Somersaultdaten werden nicht mehr mit bankunsicheren direkten `TIA monty_sault_*`-Transfers gelesen. Der Jump-Loader benutzt Far-Pointer-Tabellen und `map_bp_to_mpr34`, sodass auch Frames in spaeteren ROM-Banks und ueber Bankgrenzen hinweg korrekt nach VRAM geladen werden.
 
-`tools/monty_somersault_source.asm` enthaelt die festen Originalbloecke. `tools/monty_somersault.py` wandelt jeden festen 64-Byte-Slot in ein PCE-Spriteframe um.
+Der Nutzer hat danach bestaetigt: die Sprunganimation passt.
 
-## Phase 28c — PCE-Spritegruppe
+## Phase 29 — Raum-$00-Decor, erster echter Teil
 
-Der C64->PCE-Converter schreibt die 32x32-Gruppe als `TL,TR,BL,BR`. Die rechte 16x32-Monty-Haelfte zeigt auf `MONTY_SPR_VRAM+64` VRAM-Woerter. Diese Geometrie bleibt aktiv.
+Die C64-Referenz `decor_data.asm` enthaelt fuer Raum $00 acht Decor-Records. Die Decor-Engine interpretiert sie als `room_id,x,y,type_id`, laedt pro Type Breite/Hoehe und allokiert dessen Zeichen nur einmal pro Raum.
 
-## Phase 28e — eigentliche Ursache des verbleibenden Jump-Grafikfehlers
+Phase 29 portiert zunaechst die **solid-colour** Decor-Typen aus Raum $00 exakt aus den C64-Daten:
 
-Die neue Sprunganimation ist wesentlich groesser als Walk/Climb:
+- Type 0 `street_lamp_base`, 1x2 Zeichen, C64 Farbe $0c
+- Type 1 `street_lamp_pole`, 1x4 Zeichen, C64 Farbe $0c; wird in Raum $00 zweimal verwendet
+- Type 3 `window`, 3x3 Zeichen, C64 Farbe $0f
+- Type 4 `mpl_st_sign`, 5x1 Zeichen, C64 Farbe $01
 
-- Walk links: 2048 Byte PCE-Daten
-- Walk rechts: 2048 Byte
-- Climb: 2048 Byte
-- Somersault links: 6144 Byte
-- Somersault rechts: 6144 Byte
+Dazu sind die exakten C64-8x8-Bitmaps in `tools/room00_decor.py` uebernommen. Der Generator wandelt jedes C64-Zeichen in ein PCE-8x8-4bpp-Tile, allokiert 20 PCE-Zeichen ab `CHR_GAME+9` und legt die C64-Raumkoordinaten auf das bestehende 36x20-Fenster (C64 Spalten 2..37, Zeilen 3..22) um.
 
-Damit liegen die Somersaultlabels hinter rund 6 KiB anderer Spritedaten und verteilen sich im ROM ueber mehrere 8-KiB-PCE-Banks.
+Die entsprechenden Raum-$00-Records sind:
 
-Der bisherige Dispatcher benutzte fuer jeden Jumpframe direkt `TIA monty_sault_...,VDC_DL,512`. `TIA` besitzt aber keinen Far-Pointer-/Bankwechsel. Es liest nur die CPU-Adresse aus der aktuell gemappten ROM-Bank. Dadurch kann ein Label in einer anderen Bank zwar korrekt assembliert sein, zur Laufzeit aber Daten aus der falschen gemappten Bank liefern. Das passt zum beobachteten Fehlerbild: Bewegung/Sprung funktionieren, aber die neu hinzugekommenen grossen Jump-Grafikbloecke erscheinen defekt.
+- `$00,$24,$10,$00`
+- `$00,$24,$0c,$01`
+- `$00,$24,$08,$01`
+- `$00,$17,$08,$03`
+- `$00,$03,$08,$04`
 
-Phase 28e entfernt deshalb alle direkten `TIA monty_sault_*`-Transfers. Fuer jeden der 12 Frames pro Richtung gibt es jetzt compile-time Tabellen mit Lowbyte, Highbyte und `BANK(label)`.
+`build.sh` erzeugt nach dem Basis-RLE nun `room00-decor-patterns.dat` und ueberschreibt `room00-screen-bat.dat` mit dem Decor-Overlay. `src/room00_assets.asm` laedt die 20 neuen Zeichen sowie drei dedizierte BG-Paletten fuer C64 $0c/$0f/$01. `src/main.asm` laedt diese Paletten in BG-Slots 9..11.
 
-`monty_upload_jump_frame` waehlt daraus den echten Far-Pointer. `monty_upload_far_512` verwendet anschliessend HuCs `map_bp_to_mpr34`: die Quellbank wird in MPR3 und die Folge-Bank in MPR4 eingeblendet. Danach werden exakt 512 Byte nach `MONTY_SPR_VRAM` geschrieben. Dadurch funktioniert auch ein einzelner Frame, der eine 8-KiB-ROM-Bankgrenze kreuzt. MPR3, MPR4 und Interruptstatus werden nach dem Transfer wiederhergestellt.
+Neu ist `tools/test_room00_decor.py`. Es prueft die 20-Zeichen-Allokation, die 3x3-Fensterposition, das 5x1-MPL-ST-Schild sowie die Wiederverwendung derselben Type-1-Zeichen fuer beide Lampenmast-Records.
 
-Walk/Climb bleiben vorerst beim bisherigen direkten Transfer, weil der aktuelle konkrete Fehler nur bei den spaeter liegenden Jumpframes sichtbar ist. Wenn Phase 28e bestaetigt ist, kann derselbe bankfeste Pfad anschliessend vereinheitlicht werden.
+## Noch offen im Raum-$00-Decor
 
-## Regressionstest
+Vier Raum-$00-Records benutzen patterned colour streams und sind bewusst noch nicht vorgetaescht worden:
 
-Neu ist `tools/test_sprite_banking.py`. Der Build bricht jetzt ab, falls:
+- Type 2 `street_lamp_lamp`
+- Type 5 `yellow_flower`
+- Type 6 `brown_flower`
+- Type 67 `sad_flowers`
 
-- wieder ein direktes `TIA monty_sault_*` auftaucht,
-- `map_bp_to_mpr34` aus dem Jump-Transfer verschwindet,
-- nicht genau 12 `BANK(...)`-Eintraege je Richtung vorhanden sind,
-- die Phase-28c-Patternadresse `MONTY_SPR_VRAM+64` verloren geht.
-
-`build.sh` fuehrt diesen Test zusaetzlich zu `tools/test_port.py` aus.
+Diese kommen als naechster Decor-Schritt mit ihren originalen Farbstroemen. Danach ist Raum-$00-Decor vollstaendig genug fuer den Vergleich mit dem C64-Raum.
 
 ## Verifikationsstatus
 
-- Phase 28e ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
-- Als naechstes `git pull && ./build.sh`.
-- Danach Sprung nach links und rechts visuell pruefen.
-- Physik, Kollision, Startposition und Raumgrafik wurden in Phase 28e nicht veraendert.
+- Phase 29 ist hochgeladen.
+- Lokal muss `git pull && ./build.sh` ausgefuehrt werden.
+- Danach sollte Raum $00 sichtbar zusaetzliche feste Objekte zeigen: MPL-ST-Schild, Fenster und Teile der Strassenlampe.
+- Physik, Collision, Startposition und die bestaetigte Jump-Animation wurden nicht veraendert.
 
 ## Naechste Portschritte
 
-1. Phase 28e lokal bauen und Jump-L/R pruefen.
-2. Bei bestaetigter Grafik Walk/Climb ebenfalls auf feste Original-Slots plus bankfesten Loader umstellen.
-3. Danach Room-$00-Decor portieren.
-4. Generischen Room-Loader und echte Raumwechsel anbinden.
+1. Phase 29 lokal bauen und die neuen Raum-$00-Decors pruefen.
+2. Patterned Decor Types 2/5/6/67 inklusive originaler Colour-Streams portieren.
+3. Walk/Climb auf denselben bankfesten Original-Slot-Pfad wie Somersault umstellen.
+4. Danach generischer Room-Loader und echte Raumwechsel.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
