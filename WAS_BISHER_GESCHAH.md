@@ -1,6 +1,6 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 18h
+Stand: 2026-09-04 — Phase 18i
 
 ## Portierungsstand
 
@@ -23,22 +23,21 @@ Die Prozentzahl bezeichnet den Anteil des fuer einen spielbaren 1:1-orientierten
 - Echte Monty-Walkgrafik fuer beide Blickrichtungen.
 - Echte Monty-Climbgrafik als PCE-Spriteasset und VRAM-Uploadpfad.
 
-## Phase 18h — erster echter PCEAS-Lauf
+## Phase 18i — PCEAS final-pass / Branch-Reichweite
 
-Der Nutzerbuild passiert jetzt die Python-Regressionschecks und erreicht erstmals PCEAS. Dabei wurden zwei echte Buildfehler sichtbar und im Port korrigiert:
+Der Nutzerbuild kommt jetzt sauber durch alle Python-Regressionschecks und durch PCEAS Pass 1 und Pass 2. In Pass 3 wurden zwei getrennte Probleme sichtbar.
 
-1. `tia [_bp],VDC_DL,512` war ungueltig. HuC6280 TIA ist ein Blocktransfer mit absoluten Quell-/Zieloperanden, nicht mit indirektem Quellzeiger. Der Monty-Upload dispatcht nun den Frame und verwendet pro Frame einen statisch assemblierbaren `tia frame_label,VDC_DL,512`.
-2. `font8x8-ascii-bold-short.dat` war eine nicht mitkopierte externe Elmer-Beispieldatei. Der Debug-Banner samt Font-Upload wurde entfernt, weil er fuer das Spiel nicht benoetigt wird. Damit ist der ROM-Build nicht mehr von diesem externen Debug-Fontasset abhaengig.
+Erstens waren mehrere lokale `bsr`-Aufrufe im inzwischen groesser gewordenen Monty-Code ausserhalb der relativen BSR-Reichweite. Diese Aufrufe wurden auf die bereits im Projekt und in der HuC-Library verwendete `call`-Form umgestellt. Das betrifft die Collision-/Movement-Helfer in `monty_physics.asm` sowie den verbliebenen Walk-Upload-Aufruf in `monty_sprite.asm`.
 
-Die Sprite-Regressionschecks selbst laufen im Nutzerlog bereits erfolgreich: room00=640, jump=22/17, clock=5/6, world=6x23 und 12 authentische Walk/Climb-Frames.
+Zweitens meldete die aktuelle HuC `include/hucc/vdc.asm` bei ihrer HuCard-RAM-Phase (`tia_to_vram_rom .phase tia_to_vram_ram`) in Pass 3 instabile Symboladressen. Das offizielle aktuelle Elmer-HuCard-Beispiel assembliert genau diese Bibliotheksfamilie mit `--newproc --strip -m -l 2 -S -gA --raw`. `build.sh` verwendet nun dieselbe PCEAS-Flagkombination statt nur `-S -gA -l 3`.
 
 ## Verifikationsstatus
 
-HuC/pceas und die Split-Include-Pfade werden korrekt gefunden. Die lokalen Python-Porttests laufen im Nutzerlog erfolgreich. PCEAS startet und hat die oben dokumentierten ersten Assemblerfehler gemeldet. Die Korrekturen fuer diese Fehler sind committed; ein erneuter Nutzerlauf steht aus. `build/monty.pce` ist daher noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
+Vom Nutzer bestaetigt: HuC/pceas wird gefunden, Split-Include-Pfade funktionieren, alle lokalen Regressionstests laufen durch, PCEAS erreicht Pass 3. Phase 18i behebt die konkret gemeldeten BSR-Reichweitenfehler und gleicht die PCEAS-Aufrufparameter an das aktuelle offizielle Elmer-HuCard-Beispiel an. Ein erfolgreicher kompletter Pass 3 und `build/monty.pce` sind noch nicht bestaetigt. GitHub Actions bleibt auf Wunsch entfernt.
 
 ## Aktuell offen
 
-- Erneuten `./build.sh` ausfuehren und verbleibende PCEAS-Fehler iterativ beseitigen, bis `build/monty.pce` entsteht.
+- Erneuten lokalen `./build.sh`-Lauf bis zur ROM-Erzeugung bringen und verbleibende PCEAS-Fehler direkt beheben.
 - UP/DOWN sowie Leiter-/Seil-Tile-State portieren und `monty_upload_climb_frame` aktivieren.
 - 12+12 Somersault-/Jumpframes portieren und an `monty_jump_phase` koppeln.
 - Raum $01 und generischen Room-State/Renderer anschliessen.
