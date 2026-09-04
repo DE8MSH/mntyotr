@@ -71,6 +71,10 @@ bare_main:
         call    game_clock_init
         call    monty_physics_init
         call    world_init
+        ; Phase 33b: cache room-$00 collision geometry/properties in work RAM.
+        ; The ROM source can move between HuCard banks as data is added, but
+        ; per-frame physics now reads this stable RAM copy only.
+        call    room_collision_load_pending
         call    monty_sprite_init
         call    monty_sprite_update_satb
         call    set_dspon
