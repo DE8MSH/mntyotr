@@ -1,14 +1,14 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 36a bestaetigt
+Stand: 2026-09-04 — Phase 37
 
 ## Portierungsstand
 
-**Gesamtport: ca. 46 %**
+**Gesamtport: ca. 47 %**
 
-Phase 36a ist vom Nutzer lokal bestaetigt. Monty steht wieder korrekt auf dem Boden, bleibt steuerbar und die bestaetigte Bewegungs-/Sprung-/Raumwechsel-Logik funktioniert weiterhin, waehrend die originalen Room-$01-Decors aktiv bleiben.
+Phase 36a ist vom Nutzer lokal bestaetigt: Monty steht korrekt auf dem Boden, Gehen/Springen/Landen und Raum $00 <-> $01 funktionieren, und die originalen Room-$01-Decors bleiben aktiv. Damit ist das Tail-Asset-Schema als verbindlicher Weg fuer weiteres ROM-Wachstum bestaetigt.
 
-Damit ist der konkrete Ausloeser der Phase-36-Regressionsserie eingegrenzt: nicht die 800 Byte Decorpattern selbst waren falsch, sondern ihre fruehe Position im Include-/ROM-Layout vor dem Runtime-Bereich. Durch die Verlagerung des grossen Decor-Datenblocks ans ROM-Ende bleibt der bestaetigte Gameplay-/Collision-Bereich stabil.
+Phase 37 portiert jetzt die Basisdaten von Raum $02 exakt aus der kommentierten C64-Rekonstruktion, aber noch **ohne** den Raum in die aktive Welt-Navigation einzuschalten. So koennen die neuen Daten zuerst als reiner ROM-Tail-Wachstumstest gebaut werden, ohne den bestaetigten Gameplay-Pfad zu veraendern.
 
 ## Verbindliche Referenz
 
@@ -22,61 +22,57 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 - Raum $00 -> $01 links funktioniert beim Gehen und Springen.
 - Raum $01 -> $00 rechts funktioniert.
 - Raum $00 rechts ist im Original `$ff` und bleibt gesperrt.
-- Phase 35 Collision-Mapping bleibt aktiv und funktioniert im bestaetigten Layout.
-- Room $01 zeigt wieder die originalen `purple_flowers` und `bunch_flower`.
-- Room-$01-Decor verursacht in der Tail-Asset-Platzierung keine Fall-durch-Boden-Regression mehr.
+- Room $01 zeigt `purple_flowers` und `bunch_flower`.
+- Grosse banked Assets am ROM-Ende verursachen keine Fall-durch-Boden-Regression.
 
-## Phase 36 — Regression durch ROM-Layout
+## Phase 36a — Tail-Asset-Schema bestaetigt
 
-Room $01 besitzt original zwei Decor-Eintraege:
+Die 800 Byte Room-$01-Decorpattern wurden aus dem fruehen Include-Bereich an das ROM-Ende verschoben. Der Nutzer hat bestaetigt, dass damit Gameplay und Collision wieder korrekt laufen. Ab jetzt werden grosse neue Raum-/Grafikdaten deshalb in separaten Tail-Asset-Dateien abgelegt und ueber explizite `BANK(...)`-Pfade geladen.
 
-- `$01,$03,$11,$42` -> `purple_flowers`, 4x4 Zeichen
-- `$01,$1d,$07,$41` -> `bunch_flower`, 3x3 Zeichen
+## Phase 37 — Raum $02 Basisdaten exakt portiert
 
-Die Daten und BAT-Overlays waren korrekt, aber die 800 Byte Decorpattern wurden zunaechst direkt in `src/room01_assets.asm` eingebunden. Diese Datei liegt im Include-Strom vor `monty_physics.asm`, `collision_banking.asm` und weiteren Runtime-Daten. Der reine Grafikblock verschob damit den zuvor bestaetigten Gameplay-/Collision-Bereich im ROM und Monty fiel wieder durch den Boden.
+Neu ist `tools/room02.py`. Der Generator enthaelt den exakten Room-$02-RLE-Stream aus `Room.Data.tilemap.rm_02` und dekodiert ihn zu 640 C64-Screen-Codes (32x20). Die sichtbare PCE-BAT wird wie bei Raum $00/$01 auf 36x20 erweitert, indem die beiden linken/rechten Border-Spalten die jeweiligen Randzeichen spiegeln.
 
-## Phase 36a — grosse banked Assets ans ROM-Ende
+Room-$02-Definition:
 
-Der Decor-Datenblock wurde aus dem fruehen `room01_assets.asm` entfernt und in `src/room01_decor_assets.asm` verschoben. Diese Datei wird in `main.asm` erst nach `monty_sprite.asm` eingebunden.
+- Tile-IDs: `$02,$01,$27,$60,$3d,$42,$77,$55`
+- C64-Farben: `$05,$04,$07,$04,$06,$01,$06,$06`
+- Tile-Properties: `1,1,2,3,2,2,0,4`
 
-Damit gilt jetzt:
+Die acht Bitmaps sind exakt aus `Tiles.tile_library` uebernommen. Besonders die neuen Eintraege `$27`, `$60`, `$3d`, `$42` und `$77` werden im neuen Regressionstest explizit geprueft.
 
-- die 800 Byte Room-$01-Decorpattern wachsen am ROM-Ende,
-- der bestaetigte Physics-/Collision-Code davor wird durch diesen Grafikblock nicht mehr verschoben,
-- `room01_upload_decor` bleibt bankfest und referenziert weiterhin `BANK(room01_decor_patterns)`,
-- die exakten `purple_flowers`/`bunch_flower`-Daten und BAT-Overlays bleiben unveraendert,
-- Room $00 stellt beim Rueckweg weiterhin seine eigenen Decorpatterns wieder her.
+`src/room02_assets_tail.asm` bindet die generierten Dateien erst im ROM-Tail ein:
 
-`tools/test_room01_decor.py` prueft explizit, dass die grossen Decorpatterns nicht wieder in `room01_assets.asm` landen und dass `room01_decor_assets.asm` im Include-Strom hinter `monty_sprite.asm` liegt.
+- `room02-patterns.dat` — blank char 0 + acht Room-Custom-Chars
+- `room02-map.dat` — 640 Collision/Screen-Codes
+- `room02-screen-bat.dat` — 36x20 sichtbare PCE-BAT
+- `room02_tile_properties` — acht Property-Werte
 
-## Commits Phase 36a
+`src/main.asm` bindet diesen neuen Datenblock erst hinter `monty_sprite.asm` und hinter dem bereits bestaetigten Room-$01-Tail-Assetblock ein. Der aktuelle World-/Physics-/Room-Loader wird in Phase 37 noch nicht auf Raum $02 umgestellt; damit soll dieser Schritt spielerisch zunaechst nichts veraendern.
 
-- `892726565aca770a5c275459d4671e14ea02f428` — Room-$01-Decorpatterns aus dem fruehen Assetblock entfernt
-- `08a775d72def2434d95fd48dd5ecd35df198b781` — neuer ROM-Tail-Assetblock fuer die 800 Decorbytes
-- `241219f653c00fe41a6aff2a845a5679f39e5157` — Tail-Assetblock nach dem Runtime-Code eingebunden
-- `f32e6069d14a37221f13e97153b7ee1bc84a2ca6` — Regressionstest fuer die Asset-Platzierung
+Neu ist `tools/test_room02.py`. Der Test prueft RLE-Laenge/Decode, Tile-IDs, Farben, Properties, mehrere kritische Tile-Bitmaps, Patternlaenge, Border-Spiegelung, Palette/BAT-Zuordnung und die Tail-Platzierung hinter dem Runtime-Code.
 
-## Verifikationsstatus
+`build.sh` fuehrt `test_room02.py` aus und erzeugt danach die drei Room-$02-Datendateien vor dem PCEAS-Lauf.
 
-**Phase 36a ist lokal bestaetigt.**
+## Commits Phase 37
 
-Bestaetigt sind damit gleichzeitig:
+- `96e88b0710a2fb8e625886dd8eb650c296586bd2` — exakter Room-$02-Generator
+- `0bf2a6905b1ce89fe4dba66f010ac985c5221563` — Room-$02-Daten als ROM-Tail-Assets
+- `6b40d30d66aadea142093e80fc9355596b0d7937` — Room-$02-Regressionstest
+- `366e0fbac63a3fdaccaad2688f364b56ee673e6e` — Build erzeugt/testet Room $02
+- `13e57b20ebde1ac808c37b5d4832495fdc8f19b2` — Tail-Asset-Include in `main.asm`
 
-1. Start/Boden/Steuerung funktionieren.
-2. Springen und Landen funktionieren.
-3. Raum $00 <-> $01 funktioniert inklusive Sprungwechsel.
-4. Raum $00 rechts bleibt korrekt gesperrt.
-5. Room-$01-Decor ist sichtbar und verursacht keine Collision-Regression mehr.
+## Erwartetes Resultat
 
-## Technische Konsequenz fuer weitere Assets
+Nach `git pull && ./build.sh` soll Phase 37 **noch exakt wie Phase 36a spielen**: Start/Boden, Gehen, Springen, Landen, Room $00 <-> $01 und Room-$01-Decor muessen unveraendert bleiben. Raum $02 ist in diesem Zwischenstand bewusst noch nicht betretbar.
 
-Grosse banked Grafik-/Datenbloecke werden ab jetzt nicht mehr unkontrolliert zwischen bereits bestaetigtem Runtime-Code platziert. Sie kommen in klar getrennte Tail-/Banked-Assetbereiche und werden ueber explizite `BANK(...)`-/Mapper-Pfade geladen. Dadurch bleibt der getestete Runtime-Bereich stabil, waehrend der ROM weiter wachsen kann.
+Wenn dieser reine Tail-Wachstumstest stabil bleibt, folgt Phase 37b: Collision-Banking, Physics-Property-Auswahl, World-Gate und Room-Loader werden gemeinsam auf drei aktive Raeume erweitert. Danach wird Raum $02 von Raum $01 aus nach links wirklich betretbar gemacht.
 
 ## Naechste Portschritte
 
-1. Raum $02 mit exaktem RLE, Tiles, Farben und Tile-Properties portieren.
-2. Room-$02-Decors ebenfalls als banked Tail-Assets anbinden.
-3. World-/Room-Loader von 2 auf 3 echte Raeume erweitern.
+1. Phase 37 lokal als regressionsfreien Tail-Wachstumstest bestaetigen.
+2. Phase 37b: Raum $02 in Collision/Physics/World/Loader aktivieren.
+3. Danach die exakten Room-$02-Decors portieren.
 4. Danach weitere Welt-Raeume schrittweise portieren.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
 
