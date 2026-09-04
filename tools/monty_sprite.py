@@ -2,16 +2,20 @@
 """Convert authentic C64 Monty frames to native PCE sprite data.
 
 Primary gameplay/art reference: Dave-Agent/monty-on-the-run refactored/src.
-C64 VIC-II sprites contain 24x21 visible 1bpp pixels (63 bytes) in a 64-byte
-slot. PCE 16x16 sprite cells use paired/interleaved bitplanes: planes 0/1 for
-all 16 rows, then planes 2/3. Monty is composed from two 16x32 PCE sprites.
+The reference sprite labels are aligned to 256-byte animation blocks: each
+animation here has four 64-byte VIC slots. A VIC slot contains 63 visible
+bitmap bytes plus one unused/pointer padding byte. PCE 16x16 sprite cells use
+paired/interleaved bitplanes. Monty is composed from two 16x32 PCE sprites.
 """
 from pathlib import Path
 
+# Exact $5400-$56ff blocks transcribed from refactored/src/subsystems/monty_spr.asm.
+# The source listing's apparent zero runs are part of the fixed 64-byte VIC slots;
+# do not locate frames by searching for pixel markers (a marker can occur in data).
 WALK_L = bytes.fromhex(
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
-"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 06 b8 00 04 7c 00 0b fc 00 1b 7c 00 1c f8 00 0e fc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 21 b8 00 76 b8 00 76 2c 00 6f ec 00 1f 6c 00 1f 98 00 0f bc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 16 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e8 00 0f d8 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
+"02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 06 b8 00 04 7c 00 0b fc 00 1b 7c 00 1c f8 00 0e fc 00 6f 7c 00 3e 38 00 1c f0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
 "02 00 00 1d c0 00 7d c0 00 7f a0 00 1e 70 00 01 b8 00 16 b8 00 36 3c 00 2d fc 00 2d bc 00 1e 7c 00 0f f8 00 03 f0 00 01 e0 00 0f c0 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00")
 WALK_R = bytes.fromhex(
 "00 40 00 03 f8 00 03 fe 00 05 fe 00 0e 78 00 1d 84 00 1d 6e 00 34 6e 00 37 f6 00 36 f8 00 19 f8 00 3d f0 00 3e f6 00 1c 7c 00 0f 38 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 "
@@ -29,25 +33,23 @@ VIC_FRAME_BYTES = 64
 FRAME_BYTES = BITMAP_BYTES
 
 
-def _extract_bitmap_frames(blob, marker, count=4):
-    starts = [i for i in range(len(blob)-len(marker)+1) if blob[i:i+len(marker)] == marker]
-    assert len(starts) == count, f'expected {count} frame starts, found {len(starts)}'
-    frames=[]
-    for n,i in enumerate(starts):
-        end = starts[n+1] if n+1 < len(starts) else len(blob)
-        slot = blob[i:end]
-        # The checked-in transcription omits only zero padding at the very end
-        # of an animation block. Visible VIC data is 63 bytes; restore omitted
-        # trailing zeroes instead of rejecting the authentic final frame.
-        if len(slot) < BITMAP_BYTES:
-            assert n == count-1 and all(b == 0 for b in slot[-8:]), 'unexpected truncated C64 sprite frame'
-            slot += bytes(BITMAP_BYTES-len(slot))
-        frames.append(slot[:BITMAP_BYTES])
-    return b''.join(frames)
+def _split_vic_slots(blob, count=4):
+    """Return 63-byte visible bitmaps from fixed 64-byte VIC sprite slots.
 
-WALK_L = _extract_bitmap_frames(WALK_L, bytes.fromhex('02 00 00 1d c0'))
-WALK_R = _extract_bitmap_frames(WALK_R, bytes.fromhex('00 40 00 03 f8'))
-CLIMB = _extract_bitmap_frames(CLIMB, bytes.fromhex('07 80 00 0f c0'))
+    The final zero padding bytes were omitted in the earlier hand transcription,
+    so pad the animation block to its known 4*64 byte size. Frame boundaries are
+    positional, exactly as they are in C64 sprite RAM; never infer them from a
+    repeated bitmap prefix.
+    """
+    expected = count * VIC_FRAME_BYTES
+    assert len(blob) <= expected, f'C64 sprite block too large: {len(blob)} > {expected}'
+    blob = blob + bytes(expected - len(blob))
+    return b''.join(blob[n*VIC_FRAME_BYTES:n*VIC_FRAME_BYTES+BITMAP_BYTES] for n in range(count))
+
+WALK_L = _split_vic_slots(WALK_L)
+WALK_R = _split_vic_slots(WALK_R)
+CLIMB = _split_vic_slots(CLIMB)
+
 
 def c64_frame_pixels(frame):
     assert len(frame) in (BITMAP_BYTES,VIC_FRAME_BYTES); frame=frame[:BITMAP_BYTES]
@@ -57,8 +59,10 @@ def c64_frame_pixels(frame):
         rows.append([(v>>(23-x))&1 for x in range(24)])
     return rows
 
+
 def _plane_word(tile,plane,y):
     return sum((((tile[y][x]>>plane)&1)<<(15-x)) for x in range(16))
+
 
 def pce_16x16(tile):
     out=bytearray()
@@ -68,6 +72,7 @@ def pce_16x16(tile):
             out += bytes((w0&255,w0>>8,w1&255,w1>>8))
     assert len(out)==128
     return out
+
 
 def convert_frame(frame):
     pix=c64_frame_pixels(frame); chunks=[]
@@ -81,9 +86,11 @@ def convert_frame(frame):
             chunks.append(pce_16x16(tile))
     return b''.join(chunks)
 
+
 def build(frames):
     assert len(frames)%BITMAP_BYTES==0
     return b''.join(convert_frame(frames[i:i+BITMAP_BYTES]) for i in range(0,len(frames),BITMAP_BYTES))
+
 
 def main():
     import argparse
