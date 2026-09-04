@@ -1,12 +1,12 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 33a
+Stand: 2026-09-04 — Phase 33b
 
 ## Portierungsstand
 
 **Gesamtport: ca. 45 %**
 
-Phase 32b ist vom Nutzer praktisch bestaetigt: Raum $00 -> $01 nach links funktioniert, und aus Raum $01 kommt Monty nach rechts wieder korrekt in Raum $00 zurueck. Dass man aus Raum $00 nicht nach rechts in einen weiteren Raum gelangt, ist kein Fehler: im originalen 6x23-Weltgitter ist rechts neben Raum $00 (`row 2, col $16`) `$ff`, also eine Wand/kein Raum.
+Phase 32b ist vom Nutzer bestaetigt: Raum $00 -> $01 nach links funktioniert, und aus Raum $01 kommt Monty nach rechts wieder korrekt in Raum $00 zurueck. Phase 33 portierte die zwei Original-Decors fuer Raum $01. Nach dem dadurch gewachsenen ROM meldete der Nutzer eine neue schwere Regression: Monty faellt fortlaufend von oben nach unten durchs Bild und ist waehrenddessen nicht steuerbar.
 
 ## Verbindliche Referenz
 
@@ -15,12 +15,10 @@ Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `
 ## Bestaetigt
 
 - Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- Raum $00 Basisgrafik und alle neun statischen Decor-Records sind sichtbar; `sad_flowers` wurde bestaetigt.
-- Gehen, Springen, Falling, Plattform-Landung und Hauseingang funktionieren.
+- Raum $00 Basisgrafik und alle neun statischen Decor-Records sind sichtbar.
+- Raumwechsel $00 -> $01 und Rueckweg $01 -> $00 funktionieren grundsaetzlich.
 - 12+12 Somersaultframes sowie Walk/Climb laufen ueber bankfeste ROM-Uploads.
-- Der echte Raumwechsel $00 -> $01 nach links funktioniert.
-- Der Rueckweg $01 -> $00 nach rechts funktioniert.
-- Rechts von Raum $00 liegt laut Original-Weltkarte `$ff`; dort darf kein weiterer Raum geladen werden.
+- Room-$01-RLE, Tiles, Farben, Properties und beide Decor-Records werden von den Python-Regressionstests exakt geprueft.
 
 ## Phase 33 — Original-Decors fuer Raum $01
 
@@ -29,57 +27,40 @@ Die C64-`Decor.room_list` enthaelt fuer Raum $01 exakt zwei statische Records:
 - `$01,$03,$11,$42` — Type 66 `purple_flowers`, 4x4 Zeichen
 - `$01,$1d,$07,$41` — Type 65 `bunch_flower`, 3x3 Zeichen
 
-`tools/room01_decor.py` portiert beide direkt aus `refactored/src/subsystems/decor_data.asm`.
+`tools/room01_decor.py` portiert beide direkt aus `refactored/src/subsystems/decor_data.asm` inklusive Bitmap- und Farbstroemen.
 
-### Type $42 `purple_flowers`
+## Phase 33a — PCEAS Reichweitenfix
 
-- 4x4 = 16 C64-Zeichen
-- exaktes 128-Byte-Bitmap aus `chr_data.purple_flowers`
-- Farbstrom: `$04,$04,$04,$04,$04,$05,$05,$04,$05,$05,$05,$05,$08,$08,$08,$08`
+Der erste lokale Phase-33-Build stoppte nach erfolgreichen Python-Tests an einem zu weit entfernten `BSR room01_draw_native`. Alle drei Room-$01-Aufrufe wurden deshalb auf absolute `JSR` umgestellt. Diese Aenderung betraf nur Assembler-Reichweite.
 
-### Type $41 `bunch_flower`
+## Phase 33b — Collision aus banked ROM in stabiles Work-RAM
 
-- 3x3 = 9 C64-Zeichen
-- exaktes 72-Byte-Bitmap aus `chr_data.bunch_flower`
-- Farbstrom: `$07,$08,$03,$0a,$05,$04,$08,$02,$00`
+Nach Phase 33a startete das ROM, aber Monty fiel dauerhaft durchs Bild. Die Ursache ist strukturell dieselbe Fehlerklasse, die zuvor die Spritegrafik beschaedigt hatte: die Collision-Routinen lasen `room00_collision_map`, `room01_collision_map` und die Tile-Property-Tabellen direkt ueber ROM-Adressen. Durch weiteres ROM-Wachstum koennen diese Daten in andere HuCard-Banks wandern, waehrend die per-frame Physics keine passende MPR-Umschaltung durchfuehrt. Dann liest `CheckTileBelow` falsche/zufaellige Bytes, erkennt keinen Boden und bleibt im unsupported-fall-Pfad; dieser kehrt vor der normalen Eingabebehandlung zurueck, weshalb Monty waehrend des Falls praktisch unsteuerbar erscheint.
 
-Zusammen erzeugt Phase 33 25 PCE-Decor-Zeichen = 800 Byte. Sie beginnen wie die Raum-$00-Decors bei `CHR_GAME+9`; ein Raumwechsel darf diese gemeinsamen Decor-Slots bewusst ueberschreiben.
+Phase 33b entfernt diese Abhaengigkeit komplett:
 
-Die vorhandenen PCE-Paletten reichen aus. Purple `$04` verwendet Room-$01-Slot 13; die restlichen Farben sind bereits durch Raum $00 bzw. die Basisraumfarben vorhanden.
+- `src/room_loader.asm` reserviert 640 Byte Work-RAM fuer die aktive 32x20 Collision-Map und 8 Byte fuer die aktive C64-Tile-Property-Tabelle.
+- `room_collision_load_pending` mappt die jeweilige ROM-Quelle bankfest mit `map_bp_to_mpr34` und kopiert Map + Properties in RAM.
+- Das passiert beim Start fuer Raum $00 und bei jedem Raumwechsel fuer $00/$01.
+- `src/monty_physics.asm` liest per-frame nur noch `room_collision_map_ram` und `room_tile_properties_ram`; direkte ROM-Pointer auf die Raum-Collision-Daten sind dort entfernt.
+- Damit kann weiteres ROM-Wachstum die Boden-/Wandcollision nicht mehr durch Bankverschiebung zerstoeren.
 
-## Phase 33a — PCEAS Reichweitenfix im Room-Loader
-
-Beim ersten lokalen Phase-33-Build liefen alle Python-Regressionstests erfolgreich durch, inklusive Room-$01-Decor. PCEAS stoppte danach in `src/room_loader.asm` bei:
-
-`bsr room01_draw_native` — Branch address out of range.
-
-Die Room-$01-Routine ist durch den neuen 800-Byte-Decor-Upload inzwischen zu gross fuer relative `BSR`-Aufrufe aus `room_load_pending`. Phase 33a stellt deshalb alle drei Room-$01-Subroutine-Aufrufe auf absolute `JSR` um:
-
-- `room01_upload_patterns`
-- `room01_upload_decor`
-- `room01_draw_native`
-
-Die Loader-, Grafik- und Raumwechsel-Semantik bleibt unveraendert; nur die HuC6280-Reichweitenabhaengigkeit ist entfernt.
-
-## Loader/Build
-
-`src/room01_assets.asm` bindet `room01-decor-patterns.dat` ein. `src/room_loader.asm` laedt beim Eintritt in Raum $01 zuerst die neun Custom-Tiles und danach die 25 Decor-Zeichen bankfest ueber `map_bp_to_mpr34`. Der von `tools/room01.py` erzeugte 36x20-BAT wird vor dem Assemblieren durch `tools/room01_decor.py` mit den beiden Original-Records ueberlagert.
-
-`tools/test_room01_decor.py` prueft beide Originalpositionen, die komplette Zeichenreihenfolge und jeden Eintrag der beiden C64-Farbstroeme. `build.sh` fuehrt den Test aus und erzeugt die Decor-Patterns vor PCEAS.
+Neu ist `tools/test_collision_ram.py`. Er sichert ab, dass Physics nicht wieder auf direkte ROM-Collision-Pointer zurueckfaellt und dass Startup/Roomloader den RAM-Cache benutzen. `tools/test_room01.py` wurde an diese bankfeste Architektur angepasst; `build.sh` fuehrt den neuen Test automatisch aus.
 
 ## Verifikationsstatus
 
-- Phase 32b Raumwechsel $00 <-> $01 ist vom Nutzer bestaetigt.
-- Beim ersten Phase-33-Lauf liefen alle Python-Tests durch; PCEAS stoppte nur am relativen `BSR room01_draw_native`.
-- Phase 33a behebt diesen Assemblerfehler und ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS verifiziert.
-- Nach `git pull && ./build.sh` in Raum $01 besonders nach `purple_flowers` und `bunch_flower` schauen.
-- Physik, Weltkoordinaten und Monty-Animation wurden in Phase 33/33a nicht geaendert.
+- Die dauerhafte Fall-Regression ist vom Nutzer auf dem Phase-33a-ROM gemeldet.
+- Phase 33b ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS gebaut.
+- Als naechstes `git pull && ./build.sh`.
+- Danach zuerst Start in Raum $00 pruefen: Monty muss wieder auf dem Boden landen und steuerbar sein.
+- Danach $00 -> $01, dort Boden/Plattformen/Gehen/Springen pruefen und wieder nach $00 zurueck.
+- Die neuen Raum-$01-Decors bleiben aktiv; Sprite-/Jump-Code wurde in Phase 33b nicht veraendert.
 
 ## Naechste Portschritte
 
-1. Phase 33a lokal bauen und die zwei Raum-$01-Decors visuell bestaetigen.
-2. Raum $02 mit seinem exakten RLE, room_defs-Tileset, Farben und Collision in den Loader aufnehmen.
-3. Danach Room-$02-Decors anbinden und die temporaere Loader-Schranke auf `$00..$02` erweitern.
+1. Phase 33b lokal bauen und die wiederhergestellte Collision/Steuerung bestaetigen.
+2. Danach Raum $02 mit exaktem RLE, room_defs-Tileset, Farben, Collision und Decor in denselben Loader aufnehmen.
+3. Die temporaere Loader-Schranke auf `$00..$02` erweitern.
 4. Den Room-Loader weiter verallgemeinern.
 5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen auf dem Mehrraum-Unterbau.
 
