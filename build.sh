@@ -3,9 +3,28 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 rm -rf "$BUILD"; mkdir -p "$BUILD"
-PCEAS="${PCEAS:-$(command -v pceas || true)}"
-[ -n "$PCEAS" ] || { echo "pceas not found. Run ./install.sh first." >&2; exit 1; }
+
 HUC_HOME="${HUC_HOME:-$HOME/.local/opt/huc}"
+# Do not require the install shell to have refreshed PATH. Prefer an explicit
+# PCEAS override, then PATH, then the known locations used by current/older HuC.
+if [ -n "${PCEAS:-}" ] && [ -x "$PCEAS" ]; then
+  :
+elif command -v pceas >/dev/null 2>&1; then
+  PCEAS="$(command -v pceas)"
+elif [ -x "$HUC_HOME/src/mkit/as/pceas" ]; then
+  PCEAS="$HUC_HOME/src/mkit/as/pceas"
+elif [ -x "$HUC_HOME/src/bin/pceas" ]; then
+  PCEAS="$HUC_HOME/src/bin/pceas"
+elif [ -x "$HUC_HOME/bin/pceas" ]; then
+  PCEAS="$HUC_HOME/bin/pceas"
+else
+  echo "ERROR: pceas not found." >&2
+  echo "Checked PATH and HuC under: $HUC_HOME" >&2
+  echo "Run ./install.sh, or invoke as: PCEAS=/full/path/to/pceas ./build.sh" >&2
+  exit 1
+fi
+echo "Using pceas: $PCEAS"
+
 ELMER_INC="$HUC_HOME/examples/asm/elmer/include"; HUCC_INC="$HUC_HOME/include/hucc"
 for f in "$ELMER_INC/bare-startup.asm" "$HUCC_INC/common.asm" "$HUCC_INC/vdc.asm" "$HUCC_INC/font.asm" "$HUCC_INC/joypad.asm"; do test -f "$f" || { echo "ERROR: missing CORE include: $f" >&2; exit 1; }; done
 export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
