@@ -1,4 +1,4 @@
-; Native PCE sprite bridge for Monty: authentic C64 walk L/R frames.
+; Native PCE sprite bridge for Monty: authentic C64 walk L/R and climb frames.
 MONTY_SPR_VRAM=$3000
 MONTY_SAT_LEFT=SAT_ADDR
 MONTY_SAT_RIGHT=SAT_ADDR+4
@@ -17,7 +17,6 @@ monty_sprite_init:
  lda #1
  sta <monty_sprite_dirty
  bsr monty_upload_walk_frame
- ; VDC register $13 points at the VRAM SATB source.
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
@@ -54,6 +53,27 @@ monty_upload_walk_frame:
  sta <monty_sprite_last_facing
  rts
 
+; Climb frames use the same four-frame / four-tick cadence as the C64.
+; This upload hook is ready for the UP/DOWN tile-state dispatcher.
+monty_upload_climb_frame:
+ lda #<MONTY_SPR_VRAM
+ sta <_di
+ lda #>MONTY_SPR_VRAM
+ sta <_di+1
+ call vdc_di_to_mawr
+ lda <monty_anim_frame
+ and #3
+ tax
+ lda monty_climb_ptr_lo,x
+ sta <_bp
+ lda monty_climb_ptr_hi,x
+ sta <_bp+1
+ lda monty_climb_ptr_bank,x
+ tay
+ tia [_bp],VDC_DL,512
+ stz <monty_sprite_dirty
+ rts
+
 monty_sprite_animate:
  lda <monty_facing
  cmp <monty_sprite_last_facing
@@ -78,8 +98,6 @@ monty_sprite_animate:
 .done:
  rts
 
-; Two 16x32 SATB entries. Attribute word $1080 = 32px high + foreground,
-; palette 0. Right half begins after two 16x16 cells = 256 bytes.
 monty_sprite_update_satb:
  lda #<MONTY_SAT_LEFT
  sta <_di
@@ -122,7 +140,6 @@ monty_sprite_update_satb:
  sta VDC_DL
  lda #$10
  sta VDC_DH
- ; Re-arm VRAM->internal SAT transfer for the updated table.
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
@@ -134,6 +151,9 @@ monty_l_ptr_bank: db ^monty_walk_l_0,^monty_walk_l_1,^monty_walk_l_2,^monty_walk
 monty_r_ptr_lo: db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
 monty_r_ptr_hi: db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
 monty_r_ptr_bank: db ^monty_walk_r_0,^monty_walk_r_1,^monty_walk_r_2,^monty_walk_r_3
+monty_climb_ptr_lo: db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
+monty_climb_ptr_hi: db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
+monty_climb_ptr_bank: db ^monty_climb_0,^monty_climb_1,^monty_climb_2,^monty_climb_3
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
 monty_walk_l_1: incbin "monty-walk-l.dat",512,512
 monty_walk_l_2: incbin "monty-walk-l.dat",1024,512
@@ -142,3 +162,7 @@ monty_walk_r_0: incbin "monty-walk-r.dat",0,512
 monty_walk_r_1: incbin "monty-walk-r.dat",512,512
 monty_walk_r_2: incbin "monty-walk-r.dat",1024,512
 monty_walk_r_3: incbin "monty-walk-r.dat",1536,512
+monty_climb_0: incbin "monty-climb.dat",0,512
+monty_climb_1: incbin "monty-climb.dat",512,512
+monty_climb_2: incbin "monty-climb.dat",1024,512
+monty_climb_3: incbin "monty-climb.dat",1536,512
