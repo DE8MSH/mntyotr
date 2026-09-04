@@ -12,10 +12,9 @@ monty_saved_left:       ds 1
 monty_saved_right:      ds 1
 monty_room:             ds 1
 monty_room_exit:        ds 1           ; 0=none, 1=left, 2=right, 3=up, 4=down
-monty_tile_state:       ds 1
+monty_tile_state:       ds 1           ; C64: standing in/on property-3 ladder/rope tiles
 monty_is_moving:        ds 1
 monty_climbing:         ds 1
-monty_falling:          ds 1           ; C64 monty_jumping_flag2 proxy: unsupported fall
 collision_x:            ds 1
 collision_y:            ds 1
 collision_count:        ds 1
@@ -41,9 +40,12 @@ monty_physics_init:
         stz     <monty_tile_state
         stz     <monty_is_moving
         stz     <monty_climbing
-        stz     <monty_falling
         rts
 
+; Exact C64 GetTileFlag screen-code semantics for the room custom chars:
+; screen code 0 and codes >=9 have no room-tile property; codes 1..8 index
+; tile_property_tbl[code-1].  The previous port incorrectly treated code 0 as
+; slot 0/property 1, making blank space solid and stopping Monty almost at once.
 room00_get_tile_property:
         beq     .empty
         cmp     #9
@@ -56,6 +58,9 @@ room00_get_tile_property:
         cla
         rts
 
+; X/Y here are C64 *screen* character coordinates, not raw 32x20 map indexes.
+; DrawRoomPlayfield places the logical room at screen cols 4..35, rows 3..22;
+; CreatePlayfieldBorder mirrors col4 into 2..3 and col35 into 36..37.
 room00_get_tile_xy:
         cpy     #3
         bcc     .outside
@@ -339,8 +344,6 @@ monty_toggle_step_gate:
 monty_jump_start:
         lda <monty_jump_phase
         bne .done
-        lda <monty_falling
-        bne .done
         lda #1
         sta <monty_jump_phase
         stz <monty_jump_index
@@ -383,44 +386,16 @@ monty_check_room_edges:
         rts
 
 ; PCE bits after HuC joypad transform: I=$01 UP=$10 RIGHT=$20 DOWN=$40 LEFT=$80.
-; The order mirrors C64 UpdateMovement: refresh tile state, start an unsupported
-; fall before processing live controls, then set monty_is_moving as soon as a
-; directional move is accepted (before ToggleStepGate changes the coordinate).
 monty_update_input:
         stz <monty_is_moving
         stz <monty_climbing
         call monty_update_tile_state
-
-        ; C64 $14D1-$14EF: if not on a property-3 surface, not in a jump action,
-        ; and there is no tile below, enter the separate falling state.
-        lda <monty_tile_state
-        bne .not_falling
-        lda <monty_jump_phase
-        bne .not_falling
-        lda <monty_falling
-        bne .fall_step
-        call monty_check_tile_below
-        bcs .not_falling
-        lda #1
-        sta <monty_falling
-.fall_step:
-        call monty_check_tile_below
-        bcs .land_from_fall
-        inc <monty_y
-        lda #1
-        sta <monty_is_moving
-        call monty_check_room_edges
-        rts
-.land_from_fall:
-        stz <monty_falling
-.not_falling:
-
         lda joynow
         and #$01
         beq .directions
         lda <monty_jump_phase
         bne .directions
-        lda <monty_falling
+        lda <monty_tile_state
         bne .directions
         call monty_jump_start
 .directions:
@@ -474,22 +449,22 @@ monty_update_input:
         bcs .done
         lda #$80
         sta <monty_facing
-        lda #1
-        sta <monty_is_moving
         call monty_toggle_step_gate
         beq .done
         dec <monty_x
+        lda #1
+        sta <monty_is_moving
         call monty_check_room_edges
 .done:  rts
 .right:
         call monty_check_tile_right
         bcs .done_right
         stz <monty_facing
-        lda #1
-        sta <monty_is_moving
         call monty_toggle_step_gate
         bne .done_right
         inc <monty_x
+        lda #1
+        sta <monty_is_moving
         call monty_check_room_edges
 .done_right:
         rts
