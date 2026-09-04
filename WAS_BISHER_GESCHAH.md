@@ -1,72 +1,66 @@
 # Was bisher geschah
 
-Stand: 2026-09-04 — Phase 33c
+Stand: 2026-09-04 — Phase 33d
 
 ## Portierungsstand
 
-**Gesamtport: ca. 45 %**
+**Gesamtport: ca. 44 %**
 
-Phase 32b ist vom Nutzer bestaetigt: Raum $00 -> $01 nach links funktioniert, und aus Raum $01 kommt Monty nach rechts wieder korrekt in Raum $00 zurueck. Phase 33 portierte die zwei Original-Decors fuer Raum $01. Danach trat eine schwere Collision-Regression auf: Monty fiel endlos durch den Boden und war waehrend des Fallzustands nicht steuerbar.
+Nach Phase 33/33b/33c trat eine schwere Gameplay-Regression auf: Monty startete falsch bzw. im Boden, sprang unplausibel hoch und fiel durch den Boden. Deshalb wurde der aktive Runtime-Pfad bewusst auf den zuletzt vom Nutzer bestaetigten Stand Phase 32b zurueckgesetzt. Korrektheit geht hier vor neuem Content.
 
 ## Verbindliche Referenz
 
 Primaere Portierungsreferenz ist `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` dient nur als zusaetzliche Ground-Truth.
 
-## Bestaetigt
+## Letzter sicher bestaetigter Runtime-Stand
 
-- Linux-Mint-22 HuC/PCEAS Toolchain und startendes `.pce`.
-- Raum $00 Basisgrafik und alle neun statischen Decor-Records sind sichtbar.
-- Raumwechsel $00 -> $01 und Rueckweg $01 -> $00 funktionieren grundsaetzlich.
-- 12+12 Somersaultframes sowie Walk/Climb laufen ueber bankfeste ROM-Uploads.
-- Room-$01-RLE, Tiles, Farben, Properties und beide Decor-Records werden durch Regressionstests geprueft.
+Phase 32b wurde vom Nutzer praktisch bestaetigt:
 
-## Phase 33 — Original-Decors fuer Raum $01
+- Monty startet an der brauchbaren C64-nahen Position.
+- Gehen, Springen, Falling und Plattform-Landung funktionieren.
+- Der Hauseingang in Raum $00 ist passierbar.
+- Walk/Climb und die 12+12 Somersaultframes funktionieren visuell.
+- Raum $00 -> $01 nach links funktioniert.
+- Raum $01 -> $00 nach rechts funktioniert.
+- Rechts neben Raum $00 liegt in der originalen Weltkarte `$ff`; dort gibt es keinen Zielraum.
 
-Die C64-`Decor.room_list` enthaelt fuer Raum $01 exakt zwei statische Records:
+## Phase 33 — Versuch Room-$01-Decor
 
-- `$01,$03,$11,$42` — Type 66 `purple_flowers`, 4x4 Zeichen
-- `$01,$1d,$07,$41` — Type 65 `bunch_flower`, 3x3 Zeichen
+Die zwei originalen Room-$01-Decors wurden als Daten/Generatoren portiert:
 
-`tools/room01_decor.py` portiert beide inklusive Bitmap- und Farbstroemen.
+- Type `$42` `purple_flowers`
+- Type `$41` `bunch_flower`
 
-## Phase 33a — PCEAS Reichweitenfix
+Die Generator- und Testdateien bleiben im Repository erhalten, sind nach dem Rollback aber nicht mehr Teil des aktiven Build-/Runtime-Pfads. Sie werden erst wieder zugeschaltet, wenn der Mehrraum-/Banking-Pfad ohne Gameplay-Regression abgesichert ist.
 
-Der erste Phase-33-Build stoppte an einem zu weit entfernten `BSR room01_draw_native`. Die drei Room-$01-Aufrufe wurden auf absolute `JSR` umgestellt.
+## Phase 33b/33c — verworfener Collision-RAM-Cache
 
-## Phase 33b — Collision-Cache in Work-RAM
+Der Versuch, die aktive 640-Byte-Collision-Map und 8 Tile-Properties in einen neuen Work-RAM-Cache zu kopieren, hat die Regression nicht behoben und den Runtime-Zustand weiter destabilisiert. Der komplette Cache-Pfad wurde deshalb aus der aktiven Runtime entfernt.
 
-Um per-frame direkte Zugriffe auf banked ROM zu vermeiden, wurde die aktive 640-Byte-Collision-Map plus 8 Tile-Properties beim Raumladen in Work-RAM kopiert. Die Physics liest seitdem nur diesen RAM-Cache.
+Insbesondere wurden wieder auf den Phase-32b-Stand gesetzt:
 
-Der Nutzer meldete jedoch nach Phase 33b weiterhin eine schwere Regression: Monty startet zu tief bzw. im Boden und faellt anschliessend endlos von oben nach unten durchs Bild; normale Steuerung ist dabei nicht moeglich.
+- `src/main.asm`
+- `src/monty_physics.asm`
+- `src/room_loader.asm`
+- `src/room01_assets.asm`
+- `build.sh`
+- `tools/test_room01.py`
 
-## Phase 33c — eigentliche Ursache im Mapper-Aufruf
-
-Die RAM-Cache-Idee war richtig, aber der erste Loader benutzte in den beiden Copy-Routinen `jsr map_bp_to_mpr34`. Das unterscheidet sich vom bereits bewaehrten Sprite-Far-Loader, der den HuC-Mapper explizit mit `call map_bp_to_mpr34` aufruft.
-
-`map_bp_to_mpr34` ist eine HuC-Hilfsroutine, deren Erreichbarkeit selbst nicht von der aktuellen Codebank abhaengen darf. Ein normales `JSR` ist hier bei wachsendem ROM nicht robust. Wenn der Mapper nicht korrekt erreicht wird, bleibt `_bp` auf der falschen ROM-Abbildung, die RAM-Collision wird mit falschen Bytes gefuellt und `CheckTileBelow` erkennt dauerhaft keinen Boden.
-
-Phase 33c korrigiert deshalb beide Collision-Copy-Pfade auf denselben bewaehrten Aufruf wie die Sprite- und Room-Grafikloader:
-
-- `room_collision_copy640`: `call map_bp_to_mpr34`
-- `room_collision_copy_props`: `call map_bp_to_mpr34`
-
-`tools/test_collision_ram.py` verbietet jetzt explizit `jsr map_bp_to_mpr34` im Loader und verlangt die bankfesten `call`-Aufrufe.
+Der Restore-Commit ist `0bc77d50c66d7766cc1a925cda1237a182396dcd`.
 
 ## Verifikationsstatus
 
-- Die Phase-33b-RAM-Cache-Version ist vom Nutzer als weiterhin defekt gemeldet.
-- Phase 33c ist hochgeladen, aber noch nicht lokal mit dem Nutzer-PCEAS/Mednafen verifiziert.
-- Als naechstes `git pull && ./build.sh`.
-- Danach zuerst nur Raum $00 pruefen: Monty muss wieder korrekt auf dem Boden landen, stehen bleiben und steuerbar sein.
-- Erst danach Raum $01 und Rueckweg testen.
+Phase 33d ist bewusst ein Stabilitaets-Rollback auf den zuletzt bestaetigten Runtime-Code. Er wurde hier nicht lokal mit PCEAS ausgefuehrt. Als naechstes muss der Nutzer `git pull && ./build.sh` ausfuehren und zuerst nur Raum $00 testen: Startposition, Boden, normaler Sprung, Landung und Steuerung. Danach $00 -> $01 -> $00.
+
+Wenn dieser bekannte Stand wieder korrekt laeuft, wird Room-$01-Decor nicht einfach erneut hineingeschoben. Stattdessen wird zuerst der ROM-/Room-Datenpfad so umgebaut, dass neue Daten keine bereits funktionierende Physics/Sprite-/Collision-Logik mehr verschieben oder beeinflussen koennen.
 
 ## Naechste Portschritte
 
-1. Phase 33c lokal verifizieren und die Collision/Steuerung wieder stabilisieren.
-2. Danach Raum $02 mit exaktem RLE, room_defs-Tileset, Farben, Collision und Decor aufnehmen.
-3. Die temporaere Loader-Schranke auf `$00..$02` erweitern.
-4. Den Room-Loader weiter verallgemeinern.
-5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen.
+1. Phase-32b-Runtime erneut visuell bestaetigen.
+2. ROM-/Room-Datenlayout und Banking isoliert absichern, ohne Physics zu veraendern.
+3. Danach die bereits vorhandenen Room-$01-Decor-Daten kontrolliert wieder aktivieren.
+4. Erst danach Raum $02 und weitere Welt-Raeume anbinden.
+5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio folgen danach.
 
 ## Referenzen
 
