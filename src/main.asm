@@ -27,6 +27,7 @@
         include "room02_decor_loader.asm"
         include "room_loader.asm"
         include "room050c_loader.asm"
+        include "game_life.asm"
         include "monty_sprite.asm"
         include "debug_room.asm"
         include "debug_footer_visible.asm"
@@ -127,6 +128,7 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
+        call    game_life_init
         call    debug_room_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
@@ -207,6 +209,13 @@ main_loop:
         call    rising_bollard_update
         call    moving_lift_update
 
+        ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
+        ; death reloads the same room at its saved entry point and skips topology.
+        call    game_life_check
+        bcc     .no_death
+        call    game_life_reload
+        bra     .no_room_change
+.no_death:
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending_extended
@@ -215,6 +224,7 @@ main_loop:
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
+        call    game_life_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
