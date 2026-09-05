@@ -34,6 +34,8 @@ enemy_skate_count:      ds 1
 enemy_skate_anim:       ds 1
 enemy_skate_frame:      ds 1
 
+        include "enemy_room00_collision.asm"
+
 .code
 
 ; Cold-start palettes plus both authentic 2 KiB sprite payloads.
@@ -179,6 +181,10 @@ enemy_skate_frame:      ds 1
 ; Exact C64 MoveVertical for both Room-$00 records. Enemies.Tick itself is
 ; called only on odd frame_toggle; game_tick_counter bit0 reproduces that.
 .proc enemy_smiley_update
+        ; C64 ProcessSprites latches sprite collisions before Enemies.Tick.
+        ; Do the same against the positions/frame that were visible last frame.
+        call    enemy_room00_collision_update
+
         lda     <game_tick_counter
         and     #$01
         bne     .tick
