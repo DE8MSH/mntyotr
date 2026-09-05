@@ -1,112 +1,146 @@
 # Was bisher geschah
 
-Stand: 2026-09-05 — Phase 44b
+Stand: 2026-09-05 — Phase 45
 
 ## Portierungsstand
 
-**Gesamtport: ca. 55 %**
+**Gesamtport: ca. 57 %**
 
 Primaere Referenz bleibt `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` ist nur zusaetzliche Ground-Truth.
 
-## Bestaetigter Stand vor Phase 44
+## Bestaetigter Stand
 
 - Raum $00/$01: Boden, Gehen, Springen, Landen und Animationen funktionieren.
 - Raum $01: Original-Decors aktiv.
-- Raum $02: spielbar, fuenf Original-Decors aktiv.
+- Raum $02: spielbar, fuenf Original-Decors aktiv; vollstaendige Traversal/Mechanismen sind noch nicht fertig.
 - Raum $03: spielbar und lokal bestaetigt.
+- Raum $04, $0D und $0E: als aktive Basisraeume integriert.
 - Gemeinsamer 648-Byte-RAM-Collision-Cache fuer Tail-Raeume ist bewaehrt.
 - `monty_physics.asm` bleibt die empfindliche, bestaetigte Physics-Basis.
+- Phase 44b baut beim Nutzer mit PCEAS ohne Fehler.
 
-## Echte Route von $03 nach $04
+## Phase 44 — vertikale Weltkante und $0D/$0E
 
-Die grosse Wand in Raum $03 ist original und muss nicht direkt ueberwunden werden. Aus der 6x23-Weltkarte ergibt sich:
+Phase 44 portierte den fehlenden unteren Raumrand aus `Monty.UpdateMovement_down`: bei Y=$DA wird ein Down-Exit ausgeloest und Monty erscheint bei einem gueltigen Ziel oben auf Y=$4C.
+
+Damit wurde zunaechst die Weltkartenverbindung
 
 `$03 DOWN -> $0E LEFT -> $0D UP -> $04`
 
-Dafuer portiert Phase 44 den fehlenden unteren Raumrand aus `Monty.UpdateMovement_down`: bei Y=$DA wird ein Down-Exit ausgeloest und Monty erscheint im Zielraum oben bei Y=$4C. `src/vertical_world_edges.asm` kapselt diesen Teil; `world_resolve_exit` macht den originalen Weltkarten-Lookup.
+aktiviert. Room $0D und $0E werden als Tail-Raeume geladen; ihre 640 Collision-Bytes plus 8 Properties werden in den gemeinsamen `room02_*`-RAM-Cache kopiert.
 
-## Phase 44 — Room $0D/$0E
+### Phase 44a — Room-$0D-RLE repariert
 
-Room $0D und $0E wurden als Tail-Raeume integriert. Patterns/BAT werden bankfest geladen, Collision-Map plus 8 Properties werden in den bestehenden `room02_*`-RAM-Cache kopiert. `world_room_supported` erlaubt aktuell gezielt `$00-$04`, `$0D` und `$0E`; die Weltkarte selbst bleibt unveraendert.
+Der erste lokale Phase-44-Build stoppte mit `decoded 624 cells, expected 640`. In `tools/room0d.py` fehlte ein `$f0`-Run. Die Primaerquelle enthaelt an dieser Stelle fuenf aufeinanderfolgende `$f0`-Bytes. Der Stream ist jetzt 66 Bytes lang und dekodiert wieder exakt 640 Zellen.
 
-Room $0D:
+Commits:
 
-- Tile-IDs `$05,$0f,$4f,$19,$00,$00,$00,$00`
-- Farben `$0d,$05,$02,$00,$00,$00,$00,$00`
-- Properties `1,1,4,1,1,1,1,1`
+- `ae6ee6fd1d305cbdf947f7c9c6646597d639fa7a` — fehlenden `$f0`-Run wiederhergestellt
+- `8631166c1ba3b4ba623d616a2732a133fbd97212` — Regressionstest fuer die `$f0`-Sequenz
+- `3d70cbf8b10fd67d29d3f608e7c4d15046e81d4e` — 66-Byte-Stream im Test festgeschrieben
 
-Room $0E:
+### Phase 44b — PCEAS-Branch-Reichweite repariert
 
-- Tile-IDs `$05,$0f,$6a,$36,$60,$3a,$26,$4f`
-- Farben `$0d,$05,$01,$03,$07,$04,$07,$02`
-- Properties `1,1,3,2,3,2,1,4`
+Nach Phase 44a erreichte der Build PCEAS und stoppte in `src/world.asm` mit `Branch address out of range`. Der entfernte Fallback von `world_resolve_exit` lag inzwischen 130 Bytes hinter einem `BRA`; erlaubt sind nur -128..+127. Der Sprung ist deshalb jetzt ein absoluter `JMP`.
 
-## Phase 44a — lokaler RLE-Buildfehler behoben
+Commits:
 
-Der erste lokale Phase-44-Build stoppte in `tools/test_room0d0e.py` mit:
+- `6e7e8b8d15a6b81dfaa7f32c980c5e501980f704` — `bra .blocked` -> `jmp .blocked`
+- `87050f173643ae23d678ca5b1f533eeb8764e9fe` — Regressionstest fuer den Long Jump
+- `3d2daa0a4649a14d3dba186c29e064c635813971` — Phase 44b dokumentiert
 
-`ValueError: decoded 624 cells, expected 640`
+Der Nutzer hat Phase 44b lokal gebaut: **kein Assemblerfehler mehr**.
 
-Die Ursache lag in `tools/room0d.py`: Beim Uebertragen von `Room.Data.tilemap.rm_0d` fehlte exakt **ein `$f0`-RLE-Byte**. In der Primaerquelle stehen an dieser Stelle fuenf aufeinanderfolgende `$f0`-Runs:
+## Phase 45 — Freeze im Loch von Room $01 erklaert
 
-`... $f0,$f0,$f0,$f0,$f0,$22 ...`
+Der anschliessende Runtime-Test zeigte zwei wichtige Dinge:
 
-Im Port standen nur vier. Ein `$f0` bedeutet 16 Wiederholungen von Tile 0; genau deshalb fehlten 16 Zellen: 624 statt 640.
+1. Beim Fallen in das Loch von Room $01 fror das Spiel am unteren Rand ein.
+2. Der Abstecher in Room $02 fuehrte sichtbar nicht auf dem erwarteten Vorwaertsweg weiter.
 
-Phase 44a stellt den fehlenden Run wieder her. Der Room-$0D-Stream ist jetzt 66 Bytes lang und dekodiert exakt 640 Zellen. `tools/test_room0d0e.py` pinnt zusaetzlich die Sequenz `f0 f0 f0 f0 f0 22`, damit dieser Fehler nicht wieder unbemerkt auftaucht.
+Der Freeze war kein akzeptabler Endzustand, sondern ein World-Gate-Fehler des noch unvollstaendigen Ports. `monty_check_down_room_edge` erzeugte bei Y=$DA korrekt einen Down-Exit. Die C64-Weltkarte hat unter Room $01 aber **Room $0A**. Da `$0A` noch keinen Loader hatte, blockierte `world_resolve_exit` den Wechsel und setzte Monty auf Y=$D9 zurueck. Im naechsten Fall-Tick wurde wieder Y=$DA erreicht: ein endloser `$D9 <-> $DA`-Loop, der wie ein Freeze aussieht.
 
-Dass Mednafen danach `build/monty.pce` nicht fand, war nur eine Folge des vorher abgebrochenen Builds: PCEAS wurde wegen des Python-Fehlers gar nicht mehr erreicht und konnte deshalb keine ROM-Datei erzeugen.
+Der erneute Abgleich mit der originalen 6x23-Weltkarte zeigt den viel wichtigeren unteren Hausweg:
 
-## Commits Phase 44a
+`$00 LEFT -> $01`
 
-- `ae6ee6fd1d305cbdf947f7c9c6646597d639fa7a` — fehlenden `$f0`-Run in Room-$0D-RLE wiederhergestellt
-- `8631166c1ba3b4ba623d616a2732a133fbd97212` — Regressionstest fuer die exakte `$f0`-Sequenz ergaenzt
-- `3d70cbf8b10fd67d29d3f608e7c4d15046e81d4e` — korrekten 66-Byte-Stream im Test festgeschrieben
+`$01 DOWN -> $0A LEFT -> $0B LEFT -> $0E LEFT -> $0D UP -> $04`
 
-## Phase 44b — PCEAS-Branch-Reichweite repariert
+Danach zeigt die Weltkarte von `$04` nach links auf `$05`, das noch nicht portiert ist.
 
-Nach Phase 44a liefen die Python-Checks bis PCEAS durch. Der Assembler stoppte danach in `src/world.asm` beim Dispatch von `world_resolve_exit` mit:
+Room $02/$03 bilden weiterhin gueltige Weltzellen und bleiben als Seiten-/Alternativzweig aktiv. Dass Room $02 nicht einfach durchlaufen werden kann, ist in diesem Stadium nicht derselbe Fehler wie der Freeze: die originale Room-$02-Geometrie enthaelt unter anderem einen Piledriver/Zerstampfer, dessen Mechanik im PC-Engine-Port noch fehlt. Fuer den aktuellen Vorwaertstest ist Room $02 nicht noetig; wichtig ist, dass man von dort weiterhin nach rechts nach `$01` zurueck kann.
 
-`Error: Branch address out of range!`
+## Phase 45 — Room $0A/$0B
 
-Betroffen war der Fallback nach den Exit-Typen 1..4:
+Room $0A und $0B wurden aus `refactored/src/subsystems/room_data.asm` und `tiles.asm` exakt als neue Tail-Raeume uebernommen.
 
-`bra .blocked`
+Room $0A:
 
-Durch das Anwachsen des Resolvers auf die aktiven Raeume `$00-$04`, `$0D` und `$0E` lag `.blocked` inzwischen 130 Bytes hinter dem relativen Branch. HuC6280/PCEAS kann `BRA` dort nur mit einem signed 8-bit Offset (-128..+127) kodieren. Der Sprung wurde deshalb bewusst als absoluter Long Jump formuliert:
+- RLE: 116 Bytes -> exakt 640 Zellen
+- Tile-IDs `$0c,$65,$43,$3a,$00,$00,$00,$00`
+- Farben `$09,$05,$03,$04,$02,$00,$00,$00`
+- Properties `1,3,2,2,1,1,1,1`
 
-`jmp .blocked`
+Room $0B:
 
-Das entspricht dem bereits in Phase 32b verwendeten Muster fuer gewachsene World-Routinen. Ein Regressionstest in `tools/test_port.py` pinnt den Long Jump jetzt fest. Nach der Aenderung liegt der groesste verbleibende relative Branch in `world_resolve_exit` bei ca. +104 Bytes und damit wieder innerhalb der PCEAS-Reichweite.
+- RLE: 124 Bytes -> exakt 640 Zellen
+- Tile-IDs `$05,$47,$65,$3b,$36,$62,$03,$51`
+- Farben `$0a,$03,$07,$04,$01,$05,$0d,$08`
+- Properties `1,1,3,2,2,3,1,4`
 
-Der Abgleich mit der C64-Referenz bestaetigt ausserdem den gueltigen vertikalen Uebergang: `Monty.UpdateMovement_down` prueft bei Y=$DA den Raum unterhalb und setzt bei Erfolg den Eintritt im Zielraum auf Y=$4C. Die aktuelle PC-Engine-Route `$03 -> $0E -> $0D -> $04` bleibt damit semantisch korrekt.
+Alle benoetigten Farben liegen bereits in den vorhandenen BG-Palettenslots. Neue Paletteintraege sind fuer diese beiden Basisraeume nicht erforderlich.
 
-## Commits Phase 44b
+`world_room_supported` erlaubt jetzt `$00-$04`, `$0A`, `$0B`, `$0D` und `$0E`. Beide neuen Raeume benutzen denselben 648-Byte-RAM-Collision-Cache wie die bisherigen Tail-Raeume.
 
-- `6e7e8b8d15a6b81dfaa7f32c980c5e501980f704` — `world_resolve_exit` verwendet fuer den entfernten `.blocked`-Fallback `JMP`
-- `87050f173643ae23d678ca5b1f533eeb8764e9fe` — Regressionstest fuer den Long Jump ergaenzt
+Weil `room_loader.asm` durch zwei weitere Raeume deutlich waechst, wurden dessen wachsende Selector-Spruenge gleichzeitig branch-range-sicher gemacht: Dispatch, Collision-Cache-Auswahl, Pattern-Upload und BAT-Draw benutzen an entfernten gemeinsamen Zielen absolute `JMP`s statt riskanter `BRA`s.
 
-## Erwarteter lokaler Test
+## Phase-45-Commits
 
-Nach `git pull && ./build.sh` sollen zuerst alle Python-Regressionstests durchlaufen. PCEAS soll anschliessend `world.asm` ohne Branch-Range-Fehler assemblieren und `build/monty.pce` erzeugen.
+- `b0e208b955127ac87a273d0a2acaddad2c480840` — exakter Room-$0A-Generator
+- `4edab57b53bdcd44df471f5c04496be116ea0f7d` — exakter Room-$0B-Generator
+- `119e0d64f3e39b70da72fe6b433e5537092d0328` — Room-$0A-Tail-Assets
+- `955547e165320f0f7cfbd7ad0b36182ce100390c` — Room-$0B-Tail-Assets
+- `0dfe6dd227415948b3c735269731e151f2439492` — `$0A/$0B` im World-Gate aktiviert
+- `7d3de5923e1286c45e1c388d564396ca45101c6a` — Loader/Cache/Upload/Draw fuer `$0A/$0B`, Long-Jump-sicher
+- `35d2564f3c913d28dde11f416ebac52acde662bc` — Tail-Assets in `main.asm` eingebunden
+- `14a3ee9da7e4fd23cfa3852634330f4f7ac148f0` — exakter `$0A/$0B`- und Topologie-Test
+- `57563a4c11087fccb4d9a2e3a69d2feeb0fc29bb` — Build erzeugt/testet `$0A/$0B`
+- `bc3b12fac65c9d363d9560ba8a1a86bd09f12425` — Collision-Cache-Test erweitert
+- `140c6fb0c923df2bb764042c658eb259376d35bd` — Vertical-Route-Test auf unteren Hausweg erweitert
+- `eaf809f139ab8c507096f05f7e93e16cdad90561` — Collision-Banking-Dokumentation aktualisiert
 
-Danach:
+## Erwarteter lokaler Test fuer Phase 45
 
-`mednafen build/monty.pce`
+Nach:
 
-Im Spiel ist die wichtige Route:
+`git pull && ./build.sh`
 
-`$03 -> unten -> $0E -> links -> $0D -> oben -> $04`
+sollen alle Python-Regressionstests einschliesslich
 
-In `$0D/$0E/$04` muessen Gehen, Springen, Fallen und Collision stabil bleiben. Besonders zu beobachten sind die Spawn-/Wrap-Koordinaten an den vertikalen Kanten. Room-$03/$04-Decors und Gegner sind noch nicht Teil dieses Schritts.
+`OK: exact Room 0A/0B assets + lower-house route wiring`
+
+laufen und PCEAS wieder `build/monty.pce` erzeugen.
+
+Danach in Mednafen gezielt testen:
+
+1. `$00 -> links -> $01`.
+2. In `$01` in das Loch fallen: **kein Freeze mehr**, stattdessen muss `$0A` geladen werden.
+3. In `$0A` nach links -> `$0B`.
+4. In `$0B` nach links -> `$0E`.
+5. `$0E` links -> `$0D`.
+6. `$0D` oben -> `$04`.
+7. Rueckwege ebenfalls testen, insbesondere `$0A` oben -> `$01` und `$0B` rechts -> `$0A`.
+8. Room `$02` darf weiterhin betreten und nach rechts verlassen werden; seine noch fehlenden Mechanismen sind ein separater Portschritt.
+
+Room-$0A/$0B-Decors, Gegner und Piledriver-Mechanismen sind in Phase 45 noch nicht enthalten. Zuerst soll der echte untere Raumweg stabil werden.
 
 ## Naechste Portschritte
 
-1. Phase 44b lokal mit echtem PCEAS-Build bestaetigen.
-2. Echten `$03 -> $0E -> $0D -> $04`-Weg in Mednafen testen und Spawn/Vertical-Exit gegen die C64-Routine abgleichen.
-3. Original-Decors fuer `$03/$0E/$0D/$04` portieren.
-4. Danach den naechsten tatsaechlich erreichbaren Weltzweig portieren.
-5. Gegner, Mechanismen, Items, HUD/Gameflow und Audio schrittweise ergaenzen.
+1. Phase 45 lokal bauen und den unteren Hausweg in Mednafen bestaetigen.
+2. Falls `$0A/$0B` Traversal stabil ist: Room `$05` als naechste Zelle links von `$04` portieren.
+3. Original-Decors fuer die neu aktiven Raeume nachziehen.
+4. Piledriver/Zerstampfer und weitere Mechanismen portieren; damit auch Room-$02/$03 vollstaendig gegen das C64-Verhalten pruefen.
+5. Gegner, Items, HUD/Gameflow und Audio schrittweise ergaenzen.
 
 ## Referenzen
 
