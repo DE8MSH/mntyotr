@@ -58,7 +58,7 @@ def main():
     # Room01 reaches the right-hand section; normal jumping is not supposed to
     # turn this into a direct Room01->Room03 corridor.
     for y in range(9, 16):
-        assert cells[y*32 + 17:y*32 + 22] == [2,2,2,2,2]
+        assert cells[y*32 + 16:y*32 + 21] == [2,2,2,2,2]
     for y in range(12, 18):
         assert cells[y*32 + 25] == 4       # right-hand property-3 climb strip
 
