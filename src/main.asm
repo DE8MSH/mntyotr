@@ -58,12 +58,6 @@ main_y_before_step:        ds 1
         .code
 
 bare_main:
-        ; PCEAS --newproc places far-call trampolines in _call_bank at $8000.
-        ; The standard HuC startup maps this bank into MPR4; bare-startup does
-        ; not, so do it explicitly before any relocated .proc is called.
-        lda     #_call_bank
-        tam4
-
         call    init_352x224
         call    init_c64_video
 
@@ -163,13 +157,22 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
+
+        ; PCEAS far-call stubs live in _call_bank at MPR4/$8000. Bare startup
+        ; does not pin that bank, so restore it immediately before every enemy
+        ; .proc entry. Enemy GFX upload saves/restores this exact mapping.
+        lda     #_call_bank
+        tam4
         call    enemy_smiley_init
+
         call    game_life_init
         call    debug_room_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
+        lda     #_call_bank
+        tam4
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
         call    set_dspon
@@ -247,6 +250,8 @@ main_loop:
         call    rising_cloud_update
         call    rising_bollard_update
         call    moving_lift_update
+        lda     #_call_bank
+        tam4
         call    enemy_smiley_update
 
         ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
@@ -264,6 +269,8 @@ main_loop:
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
+        lda     #_call_bank
+        tam4
         call    enemy_smiley_room_sync
         call    game_life_room_sync
         call    debug_room_draw
@@ -272,6 +279,8 @@ main_loop:
         call    monty_sprite_update_satb
         ; SAT order: lift, Smiley, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
+        lda     #_call_bank
+        tam4
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
         jmp     main_loop
