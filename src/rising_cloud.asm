@@ -1,4 +1,4 @@
-; Phase 50: Room $01 rising cloud collision + rider carry.
+; Phase 50: Room $01 rising cloud collision + stateless moving-platform push.
 ;
 ; C64 SpecialItems.UpdateRisingCloud:
 ;   - active only in Room $01
@@ -7,9 +7,12 @@
 ;   - writes screen code $08 (Room01 tile $64 / property 3) into its row
 ;   - clears the row below as the cloud rises
 ;
-; Phase50 rider rule: landing is detected separately by rising_cloud_contact.asm.
-; Carry then uses an explicit riding flag and exact cloud-top geometry rather
-; than the broad property-3/tile-state heuristic that could make Monty feel glued.
+; The PCE port keeps the authentic mutable property-3 strip, plus one small
+; pixel-precision support pass: when Monty is standing exactly on cloud_y-$10,
+; horizontally overlaps the cloud, is not jumping/falling, and has free space
+; above, the same odd tick that moves the cloud up also moves Monty up by 1px.
+; There is deliberately NO persistent rider/attach state, so normal walking and
+; jumping can never be cancelled or re-applied by the cloud.
 
 CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12
@@ -22,8 +25,7 @@ rising_cloud_last_room: ds 1
 rising_cloud_y:         ds 1
 rising_cloud_tick:      ds 1
 rising_cloud_row:       ds 1
-rising_cloud_carry:     ds 1
-rising_cloud_riding:    ds 1
+rising_cloud_push:      ds 1
 rising_cloud_tmp_row:   ds 1
 rising_cloud_top_y:     ds 1
 
@@ -36,8 +38,7 @@ rising_cloud_init:
         lda     #$d9
         sta     <rising_cloud_y
         stz     <rising_cloud_tick
-        stz     <rising_cloud_carry
-        stz     <rising_cloud_riding
+        stz     <rising_cloud_push
         rts
 
 rising_cloud_room_sync:
@@ -47,8 +48,7 @@ rising_cloud_room_sync:
         rts
 .changed:
         sta     <rising_cloud_last_room
-        stz     <rising_cloud_riding
-        stz     <rising_cloud_carry
+        stz     <rising_cloud_push
         cmp     #1
         beq     .enter_room01
         lda     #$ff
@@ -115,66 +115,52 @@ rising_cloud_update:
         lda     <monty_room
         cmp     #1
         beq     .room01
-        stz     <rising_cloud_riding
         rts
 .room01:
         inc     <rising_cloud_tick
         lda     <rising_cloud_tick
         and     #1
         bne     .move_tick
-        ; Even ticks still validate attachment so walking/jumping releases
-        ; immediately instead of waiting for the next cloud movement tick.
-        call    rising_cloud_detect_carry
         rts
 .move_tick:
-        call    rising_cloud_detect_carry
+        call    rising_cloud_detect_push
         dec     <rising_cloud_y
-        lda     <rising_cloud_carry
+        lda     <rising_cloud_push
         beq     .refresh
+        ; The cloud is pushing Monty upward by one pixel. Check ceiling first.
+        ; If blocked, the cloud continues upward but Monty stays put and support
+        ; naturally separates on the next tick instead of clipping or sticking.
+        call    monty_check_tile_above
+        bcs     .refresh
         dec     <monty_y
         lda     #1
         sta     <monty_is_moving
 .refresh:
         jmp     rising_cloud_refresh_row
 
-; Carry only a rider created by rising_cloud_contact_update, and only while the
-; player still stands exactly on cloud_y-$10. Jumping/falling or leaving the
-; horizontal footprint clears the attachment immediately. No tile_state test is
-; used here, so the moving room character cannot re-attach Monty by itself.
-rising_cloud_detect_carry:
-        stz     <rising_cloud_carry
-        lda     <rising_cloud_riding
-        bne     .check_motion
-        rts
-.check_motion:
+; Stateless support test. This does not modify jump/fall/input state and stores
+; no attachment. Walking changes X before this routine runs; jumping changes
+; jump_phase before this routine runs, so either action releases automatically.
+rising_cloud_detect_push:
+        stz     <rising_cloud_push
         lda     <monty_jump_phase
-        beq     .check_fall
-        stz     <rising_cloud_riding
-        rts
-.check_fall:
+        bne     .done
         lda     <monty_falling
-        beq     .check_x
-        stz     <rising_cloud_riding
-        rts
-.check_x:
+        bne     .done
         lda     <monty_x
         cmp     #$36
-        bcc     .release
+        bcc     .done
         cmp     #$49
-        bcs     .release
-
+        bcs     .done
         lda     <rising_cloud_y
         sec
         sbc     #$10
         sta     <rising_cloud_top_y
         cmp     <monty_y
-        bne     .release
-
+        bne     .done
         lda     #1
-        sta     <rising_cloud_carry
-        rts
-.release:
-        stz     <rising_cloud_riding
+        sta     <rising_cloud_push
+.done:
         rts
 
 rising_cloud_refresh_row:
