@@ -2,10 +2,12 @@
 ; Original spawn record: 05 b8 8f 04 19 02 25
 ; SetupRoom -> X=$78, Y=$6a, vertical speed 2, range $25, initial dir forward.
 ;
-; Runtime uses PCEAS .proc relocation.  With the project's CALL pseudo, PCEAS
-; automatically maps a relocated proc through MPR5 ($A000-$BFFF), calls it,
-; then restores the previous MPR5 mapping.  Large sprite art is still handled
-; independently through the proven MPR3/MPR4 data-upload path used by lift/cloud.
+; Runtime uses PCEAS --newproc relocation.  Newproc thunks live at the end of
+; MPR7, save MPR6, map the target proc bank into $C000-$DFFF, then JMP to it.
+; Therefore every exit from a relocated .proc MUST use PCEAS "leave" so the
+; generated leave_proc helper restores MPR6 before RTS.  Raw RTS is invalid.
+; Large sprite art remains independent and uses the proven MPR3/MPR4 upload
+; path used by lift/cloud, with both mappings saved/restored around the upload.
 
 ENEMY_SMILEY_VRAM  = $3800
 ENEMY_SMILEY_SAT_L = SAT_ADDR+32      ; SAT entry 8
@@ -67,9 +69,9 @@ enemy_smiley_frame:     ds 1
         tam3
         plp
 
-        ; This may be in another proc bank; CALL supplies the PCEAS far wrapper.
+        ; Nested proc CALL is safe: its thunk saves the current MPR6 mapping.
         call    enemy_smiley_room_sync
-        rts
+        leave
 .endp
 
 ; Re-seed the original Room-$00 enemy record on room entry.
@@ -77,13 +79,13 @@ enemy_smiley_frame:     ds 1
         lda     <monty_room
         cmp     enemy_smiley_last_room
         bne     .changed
-        rts
+        leave
 .changed:
         sta     enemy_smiley_last_room
         cmp     #$00
         beq     .room00
         stz     enemy_smiley_active
-        rts
+        leave
 .room00:
         lda     #1
         sta     enemy_smiley_active
@@ -93,14 +95,14 @@ enemy_smiley_frame:     ds 1
         sta     enemy_smiley_flags
         stz     enemy_smiley_count
         stz     enemy_smiley_anim
-        rts
+        leave
 .endp
 
 ; Exact C64 MoveVertical state for record 05 b8 8f 04 19 02 25.
 .proc enemy_smiley_update
         lda     enemy_smiley_active
         bne     .active
-        rts
+        leave
 .active:
         lda     enemy_smiley_flags
         bmi     .up
@@ -134,7 +136,7 @@ enemy_smiley_frame:     ds 1
         sta     enemy_smiley_y
 .anim:
         inc     enemy_smiley_anim
-        rts
+        leave
 .endp
 
 ; Writes SAT entries 8/9 only.  The cloud routine remains the final SAT-DMA
@@ -163,7 +165,7 @@ enemy_smiley_frame:     ds 1
         sta     VDC_DH
         dex
         bne     .hide_loop
-        rts
+        leave
 
 .show:
         lda     enemy_smiley_anim
@@ -224,5 +226,5 @@ enemy_smiley_frame:     ds 1
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
-        rts
+        leave
 .endp
