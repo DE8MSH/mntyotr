@@ -14,8 +14,9 @@
 ; cannot behave like a climb/ladder surface while still suppressing auto-fall.
 ;
 ; Before a 1px upward push the COMPLETE prospective 2x3/3x3 tile footprint is
-; checked for property-1 solids. This prevents the cloud from pushing Monty into
-; a ceiling/wall that enters the middle of his footprint.
+; checked for property-1 solids. The moving cloud is also forbidden from pushing
+; Monty itself across the C64 top-room threshold: Y=$4C is the highest position
+; reachable by cloud support, and only Monty's own movement may create an UP exit.
 
 CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12
@@ -166,6 +167,14 @@ rising_cloud_update:
         dec     <rising_cloud_y
         lda     <rising_cloud_push
         beq     .refresh
+
+        ; A moving platform may support Monty up to the room boundary, but may
+        ; never create the UP exit itself. $4D->$4C is allowed; at $4C the next
+        ; pixel would be $4B and is therefore blocked before any Y write occurs.
+        lda     <monty_y
+        cmp     #$4d
+        bcc     .refresh
+
         call    rising_cloud_can_push_up
         bcs     .refresh
         dec     <monty_y
