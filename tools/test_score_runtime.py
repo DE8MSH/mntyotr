@@ -28,6 +28,20 @@ assert "call    score_init" in main
 assert main.index('include "score_runtime.asm"') < main.index("bare_main:")
 assert main.index("call    score_init") < main.index("main_loop:")
 
+# Score integration must not delete the local video timing helper used by startup.
+assert "call    init_c64_video" in main
+assert "init_c64_video:" in main
+assert main.index("init_c64_video:") > main.index("main_loop:")
+for needle in (
+    "st0     #$0a",
+    "st1     #<VDC_HSR_320",
+    "st2     #>VDC_HSR_320",
+    "st0     #$0b",
+    "st1     #<VDC_HDR_320",
+    "st2     #>VDC_HDR_320",
+):
+    assert needle in main, needle
+
 # Five display-ready ASCII digits, exactly as original $0294-$0298.
 digits = [0x30] * 5
 
@@ -53,4 +67,4 @@ assert bytes(digits) == b"00250"
 increase(8, 3)          # +80 -> 00330
 assert bytes(digits) == b"00330"
 
-print("OK: authentic five-ASCII-digit C64 score arithmetic + startup init")
+print("OK: authentic five-ASCII-digit C64 score arithmetic + startup/video init")
