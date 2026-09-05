@@ -1,16 +1,8 @@
         include "standard_piledriver.asm"
-        include "standard_piledriver_assets_tail.asm"
 
+; Standard piledrivers are original-style dynamic BG charset tiles, not sprites.
+; They reuse the already-loaded C64 grey BG palette slots 6/5/4, so no extra
+; palette or sprite asset upload is required.
 .code
 piledriver_palette_init:
-        lda     #19
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<piledriver_sprite_palette
-        sta     <_bp
-        lda     #>piledriver_sprite_palette
-        sta     <_bp+1
-        ldy     #BANK(piledriver_sprite_palette)
-        call    load_palettes
-        jmp     xfer_palettes
+        rts
