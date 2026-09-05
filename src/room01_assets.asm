@@ -10,13 +10,13 @@
 room01_patterns:
         incbin "room01-patterns.dat"
 
-; Two C64 colours not already present in the room-$00 shared BG palette set.
-; Loaded into PCE BG palette slots 13 and 14.
+; Two C64 colours not already present in the shared BG palette set.
+; Raw PCE CRAM format is GGGRRRBBB; values match the unified C64 quantization.
 room01_extra_palettes:
-        ; slot 13: C64 purple $04
-        dw $000,$10b,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-        ; slot 14: C64 blue $06
-        dw $000,$120,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; slot 13: C64 purple $04 -> $0a4
+        dw $000,$0a4,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        ; slot 14: C64 blue $06 -> $04c
+        dw $000,$04c,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 
 room01_tile_properties:
         ; source tiles $02,$63,$01,$0a,$40,$05,$55,$64 classified by
