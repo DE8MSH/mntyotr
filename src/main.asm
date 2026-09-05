@@ -250,10 +250,9 @@ main_loop:
         call    enemy_smiley_room_sync
         call    game_life_room_sync
         call    debug_room_draw
-        call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; SAT order: lift, Room00 enemies, cloud. Cloud remains final DMA writer.
+        ; SAT order: lift, enemies, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
