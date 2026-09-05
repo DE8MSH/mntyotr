@@ -50,6 +50,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_enemy_room00_runtime.py"
 
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
