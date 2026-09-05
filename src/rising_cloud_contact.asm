@@ -1,8 +1,9 @@
-; Phase 50: explicit moving-platform contact for the Room $01 rising cloud.
+; Phase 50: explicit one-way landing contact for the Room $01 rising cloud.
 ;
-; This routine only detects the landing event. Once landed it sets the dedicated
-; rising_cloud_riding flag. rising_cloud.asm then validates exact top geometry,
-; horizontal overlap and jump/fall state every tick before carrying Monty.
+; The cloud itself moves at pixel precision, while the room collision map is
+; character based. This pass only catches the crossing event when Monty descends
+; onto the cloud top. It performs no persistent attachment and never touches
+; input state after the landing tick.
 
 .zp
 rising_cloud_contact_y: ds 1
@@ -27,8 +28,7 @@ rising_cloud_contact_update:
         cmp     #$49
         bcs     .done
 
-        ; Landing is one-way and event-driven. Never re-snap a rider who is
-        ; already standing/walking on the cloud.
+        ; One-way platform: only falling or jump descent may land.
         lda     <monty_jump_phase
         cmp     #1
         beq     .done
@@ -43,6 +43,8 @@ rising_cloud_contact_update:
         sbc     #$10
         sta     <rising_cloud_contact_y
 
+        ; Accept a tiny swept crossing window around the top. This catches the
+        ; 1..2 px descent steps without allowing contact from well below.
         lda     <monty_y
         sec
         sbc     <rising_cloud_contact_y
@@ -65,6 +67,5 @@ rising_cloud_contact_update:
         lda     #1
         sta     <monty_tile_state
         sta     <monty_is_moving
-        sta     <rising_cloud_riding
 .done:
         rts
