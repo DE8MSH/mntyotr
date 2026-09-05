@@ -123,10 +123,14 @@ piledriver_exact_update:
 piledriver_exact_check_tiles:
         lda     <pile_static_index
         cmp     #$ff
-        beq     .done
+        bne     .index_ok
+        jmp     .done
+.index_ok:
         lda     <pile_static_state
         cmp     #2
-        beq     .done
+        bne     .state_ok
+        jmp     .done
+.state_ok:
 
         ; C64 screen column = (monty_x-$0c)>>2.
         lda     <monty_x
