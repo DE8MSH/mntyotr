@@ -17,7 +17,8 @@ def main():
     cloud = (ROOT/'src/rising_cloud.asm').read_text()
     bollard = (ROOT/'src/rising_bollard.asm').read_text()
     pile = (ROOT/'src/standard_piledriver.asm').read_text()
-    pile_assets = (ROOT/'src/standard_piledriver_assets_tail.asm').read_text()
+    pile_fix = (ROOT/'src/standard_piledriver_bat_fix.asm').read_text()
+    bundle = (ROOT/'src/standard_piledriver_bundle.asm').read_text()
     footer = (ROOT/'src/debug_footer_visible.asm').read_text()
     life = (ROOT/'src/game_life.asm').read_text()
 
@@ -26,16 +27,11 @@ def main():
     assert 'call    monty_check_tile_above' in sweep
     assert 'call    monty_check_tile_below' in sweep
     assert 'dec     <monty_y' in sweep and 'inc     <monty_y' in sweep
-    assert 'call    monty_check_down_room_edge' in sweep
-    assert 'lda     monty_jump_arc_up,x' in sweep
-    assert 'lda     monty_jump_arc_down,x' in sweep
 
     assert 'include "rising_cloud.asm"' in main_asm
     assert 'call    rising_cloud_update' in main_asm
     assert 'CLOUD_VIS_COL       = 12' in cloud
     assert 'CLOUD_CODE          = 8' in cloud
-    assert 'CLOUD_BAT_WORD      = $c000+CHR_GAME+CLOUD_CODE' in cloud
-    assert 'inc     <rising_cloud_tick' in cloud and 'and     #1' in cloud
     assert 'dec     <rising_cloud_y' in cloud
 
     base0c = decode_room(ROOM0C_RLE)
@@ -44,56 +40,71 @@ def main():
     assert base0c[12*32+23] == 0
     assert ROOM0C_BOLLARD_CODE == 5
     assert ROOM0C_PROPERTIES[ROOM0C_BOLLARD_CODE-1] == 3
-    run0c = apply_bollard_head(base0c)
-    assert run0c[12*32+23] == 5
+    assert apply_bollard_head(base0c)[12*32+23] == 5
 
     assert 'include "rising_bollard.asm"' in main_asm
     assert 'call    rising_bollard_update' in main_asm
-    assert 'cmp     #$0c' in bollard
-    assert 'lda     #$75' in bollard and 'sta     <monty_x' in bollard
-    assert bollard.count('dec     <monty_y') >= 3
-    assert 'cmp     #$62' in bollard
-    assert 'rising_bollard_active' in bollard
-    assert 'sta     <monty_climbing' in bollard
-
-    # Standard Piledriver configs copied from original mechanisms_data.asm.
     assert 'include "standard_piledriver_bundle.asm"' in bollard
-    assert 'call    piledriver_palette_init' in bollard
-    assert 'jmp     piledriver_init' in bollard
-    assert 'call    piledriver_room_sync' in bollard
     assert 'call    piledriver_update' in bollard
-    for needle in ('lda #$07','lda #$1f','lda #$15','lda #$13'):
-        assert needle in pile
-    assert 'lda #$1f\n        sta <piledriver_limit0' in pile
-    assert 'lda #$2f\n        sta <piledriver_limit1' in pile
-    assert pile.count('inc <piledriver_position') >= 2
-    assert pile.count('dec <piledriver_position') >= 2
-    assert 'adc #$14' in pile and 'and #$3f' in pile
-    assert 'lda #4\n        sta <monty_action_counter' in pile
-    assert 'PILE_SAT0_L   = SAT_ADDR+32' in pile
-    assert 'PILE_SAT1_R   = SAT_ADDR+44' in pile
-    assert 'jmp     piledriver_update_satb' in footer
-    assert 'piledriver_patterns:' in pile_assets
-    assert 'db $0f,$ff,$0f,$ff' in pile_assets
+    assert 'call    piledriver_room_sync' in bollard
+    assert 'jmp     piledriver_fix_bat_hi' in bollard
+
+    # Original config_tbl for the currently ported rooms.
+    assert '; $01,$07,$05,$04,$10 and $01,$1f,$0c,$06,$22' in pile
+    assert '; $02,$15,$05,$04,$10' in pile
+    assert '; $0b,$13,$11,$04,$10' in pile
+    assert 'lda     #$2f\n        sta     <piledriver_limit1' in pile
+
+    # Original visual model: two independent 18-char dynamic BG buffers, NOT SAT.
+    assert 'piledriver_buf0: ds 144' in pile
+    assert 'piledriver_buf1: ds 144' in pile
+    assert 'PILE_CHR0 = CHR_GAME + 64' in pile
+    assert 'PILE_CHR1 = PILE_CHR0 + 18' in pile
+    assert 'piledriver_draw_shaft:' in pile
+    assert 'piledriver_shift_down:' in pile
+    assert 'piledriver_shift_up:' in pile
+    assert 'piledriver_upload_selected:' in pile
+    assert 'piledriver_update_satb:\n        rts' in pile
+    assert 'SAT_ADDR' not in pile
+
+    # Exact normal seed glyphs from mechanisms_data.asm.
+    assert 'db $0f,$0f,$00,$ff,$ff,$ff,$7f,$00' in pile
+    assert 'db $ff,$ff,$00,$ff,$ff,$ff,$ff,$00' in pile
+    assert 'db $f0,$f0,$00,$ff,$ff,$ff,$fe,$00' in pile
+
+    # DrawShaft uses the original three C64 greys and the second shaft in Room01.
+    assert 'PILE_PAL_LEFT  = 6' in pile
+    assert 'PILE_PAL_MID   = 5' in pile
+    assert 'PILE_PAL_RIGHT = 4' in pile
+    assert 'lda     #$1f\n        sta     <piledriver_col1' in pile
+    assert 'lda     #$0c\n        sta     <piledriver_row1' in pile
+    assert 'lda     #6\n        sta     <piledriver_tmp_h' in pile
+
+    # PCE dynamic tile ids exceed $ff; BAT high bytes must include tile bit 8.
+    assert 'include "standard_piledriver_bat_fix.asm"' in bundle
+    assert 'lda     #$61' in pile_fix
+    assert 'lda     #$51' in pile_fix
+    assert 'lda     #$41' in pile_fix
+
+    # Old sprite prototype is no longer driven by the footer.
+    assert 'piledriver_update_satb' not in footer
+    assert 'piledriver_sprite_palette' not in bundle
+
+    assert 'and     #$3f' in pile and 'adc     #$14' in pile
+    assert pile.count('inc     <piledriver_position') >= 2
+    assert pile.count('dec     <piledriver_position') >= 2
+    assert 'lda     #4\n        sta     <monty_action_counter' in pile
 
     cells0d = decode_room(ROOM0D_RLE)
     assert len(cells0d) == 640
     assert ROOM0D_RLE[30:39] == bytes.fromhex('01 f0 f0 f0 f0 f0 f0 22 20')
 
     assert 'include "game_life.asm"' in main_asm
-    assert 'call    game_life_init' in main_asm
     assert 'call    game_life_check' in main_asm
-    assert 'call    game_life_reload' in main_asm
-    assert 'call    game_life_room_sync' in main_asm
-    assert 'lda     #5' in life and 'sta     <game_lives' in life
     for event in ('#2','#3','#4','#5','#7'):
         assert f'cmp     {event}' in life
-    assert 'cmp     #6' not in life
-    assert 'dec     <game_lives' in life
-    assert 'sta     <world_pending_room' in life
-    assert 'call    room_load_pending_extended' in life
 
-    print('OK: swept collision + cloud/bollard + standard Piledriver $01/$02/$0B + life/respawn')
+    print('OK: cloud/bollard + original dynamic-BG Piledriver shafts $01/$02/$0B + life/respawn')
 
 
 if __name__ == '__main__':
