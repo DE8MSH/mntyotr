@@ -456,12 +456,17 @@ monty_check_room_edges:
 
 ; PCE bits after HuC joypad transform: I=$01 UP=$10 RIGHT=$20 DOWN=$40 LEFT=$80.
 ; Order mirrors the C64 UpdateMovement subset: UpdateTileFlags, unsupported-fall
-; detection, fire/jump, then directional movement.
+; detection, fire/jump, then directional movement. Room01's moving cloud gets a
+; separate support signal so its dynamic property-3 strip cannot force climb
+; semantics or suppress normal jump/left/right input.
 monty_update_input:
         stz <monty_is_moving
         stz <monty_climbing
         call monty_update_tile_state
+        call rising_cloud_support_update
 
+        lda <rising_cloud_support
+        bne .after_fall
         lda <monty_tile_state
         bne .after_fall
         lda <monty_jump_phase
