@@ -7,12 +7,12 @@
 ;   - writes screen code $08 (Room01 tile $64 / property 3) into its row
 ;   - clears the row below as the cloud rises
 ;
-; The PCE port keeps the authentic mutable property-3 strip, plus one small
-; pixel-precision support pass: when Monty is standing exactly on cloud_y-$10,
-; horizontally overlaps the cloud, is not jumping/falling, and has free space
-; above, the same odd tick that moves the cloud up also moves Monty up by 1px.
-; There is deliberately NO persistent rider/attach state, so normal walking and
-; jumping can never be cancelled or re-applied by the cloud.
+; The PCE port keeps the authentic mutable property-3 strip. The visual sprite
+; follows rising_cloud_y separately. A small stateless push keeps a player who
+; is exactly on the cloud top aligned with its 1px motion. Before that push the
+; COMPLETE prospective 2x3/3x3 tile footprint is checked for property-1 solids;
+; this prevents the cloud from pushing Monty through a ceiling/wall that enters
+; the middle of his footprint before the normal aligned CheckTileAbove can see it.
 
 CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12
@@ -21,13 +21,18 @@ CLOUD_PAL           = 12
 CLOUD_BAT_WORD      = $c000+CHR_GAME+CLOUD_CODE
 
 .zp
-rising_cloud_last_room: ds 1
-rising_cloud_y:         ds 1
-rising_cloud_tick:      ds 1
-rising_cloud_row:       ds 1
-rising_cloud_push:      ds 1
-rising_cloud_tmp_row:   ds 1
-rising_cloud_top_y:     ds 1
+rising_cloud_last_room:  ds 1
+rising_cloud_y:          ds 1
+rising_cloud_tick:       ds 1
+rising_cloud_row:        ds 1
+rising_cloud_push:       ds 1
+rising_cloud_tmp_row:    ds 1
+rising_cloud_top_y:      ds 1
+rising_cloud_probe_x:    ds 1
+rising_cloud_probe_y:    ds 1
+rising_cloud_probe_cols: ds 1
+rising_cloud_probe_rows: ds 1
+rising_cloud_probe_ctr:  ds 1
 
 .code
 
@@ -85,24 +90,24 @@ rising_cloud_copy_room01_map:
 
         ldx     #2
         cly
-.page:
+.copy_page:
         lda     [_bp],y
         sta     [_di],y
         iny
-        bne     .page
+        bne     .copy_page
         inc     <_bp+1
         inc     <_di+1
         dex
-        bne     .page
+        bne     .copy_page
 
         cly
         ldx     #128
-.tail:
+.copy_tail:
         lda     [_bp],y
         sta     [_di],y
         iny
         dex
-        bne     .tail
+        bne     .copy_tail
 
         pla
         tam4
@@ -127,10 +132,7 @@ rising_cloud_update:
         dec     <rising_cloud_y
         lda     <rising_cloud_push
         beq     .refresh
-        ; The cloud is pushing Monty upward by one pixel. Check ceiling first.
-        ; If blocked, the cloud continues upward but Monty stays put and support
-        ; naturally separates on the next tick instead of clipping or sticking.
-        call    monty_check_tile_above
+        call    rising_cloud_can_push_up
         bcs     .refresh
         dec     <monty_y
         lda     #1
@@ -138,9 +140,9 @@ rising_cloud_update:
 .refresh:
         jmp     rising_cloud_refresh_row
 
-; Stateless support test. This does not modify jump/fall/input state and stores
-; no attachment. Walking changes X before this routine runs; jumping changes
-; jump_phase before this routine runs, so either action releases automatically.
+; Stateless support test. Walking changes X before this routine runs; jumping
+; changes jump_phase before this routine runs, so either action releases without
+; any persistent attach state.
 rising_cloud_detect_push:
         stz     <rising_cloud_push
         lda     <monty_jump_phase
@@ -163,6 +165,65 @@ rising_cloud_detect_push:
 .done:
         rts
 
+; C=1 if moving Monty upward by one pixel would make ANY tile in his complete
+; prospective footprint overlap a property-1 solid. Unlike CheckTileAbove this
+; deliberately does not depend on an 8px alignment gate. This is needed for a
+; moving platform because a ceiling row can enter the middle of the footprint.
+rising_cloud_can_push_up:
+        lda     <monty_y
+        sec
+        sbc     #1
+        sec
+        sbc     #$32
+        lsr     a
+        lsr     a
+        lsr     a
+        sta     <rising_cloud_probe_y
+
+        lda     <monty_x
+        sec
+        sbc     #$0c
+        pha
+        lsr     a
+        lsr     a
+        sta     <rising_cloud_probe_x
+        pla
+        and     #$03
+        beq     .two_cols
+        lda     #3
+        bra     .store_cols
+.two_cols:
+        lda     #2
+.store_cols:
+        sta     <rising_cloud_probe_cols
+        lda     #3
+        sta     <rising_cloud_probe_rows
+
+.row_loop:
+        lda     <rising_cloud_probe_cols
+        sta     <rising_cloud_probe_ctr
+        ldx     <rising_cloud_probe_x
+        ldy     <rising_cloud_probe_y
+.col_loop:
+        phx
+        phy
+        call    room00_get_property_xy
+        ply
+        plx
+        cmp     #$01
+        beq     .blocked
+        inx
+        dec     <rising_cloud_probe_ctr
+        bne     .col_loop
+        inc     <rising_cloud_probe_y
+        dec     <rising_cloud_probe_rows
+        bne     .row_loop
+        clc
+        rts
+.blocked:
+        sec
+        rts
+
 rising_cloud_refresh_row:
         lda     <rising_cloud_y
         cmp     #$da
@@ -183,11 +244,11 @@ rising_cloud_refresh_row:
 .no_new_row:
         lda     <rising_cloud_row
         cmp     #$ff
-        beq     .done
+        beq     .row_done
         call    rising_cloud_clear_row
         lda     #$ff
         sta     <rising_cloud_row
-.done:
+.row_done:
         rts
 
 .replace_row:
