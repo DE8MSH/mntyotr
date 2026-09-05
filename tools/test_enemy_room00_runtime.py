@@ -24,7 +24,7 @@ for needle in (
 ):
     assert needle in src, needle
 
-# Exact C64 spawn streams currently active for rooms 00, 01 and 02.
+# Exact C64 spawn streams active for rooms 00..03.
 for needle in (
     "db $05,$b8,$8f,$04,$19,$02,$25",
     "db $03,$78,$37,$03,$09,$03,$13",
@@ -35,8 +35,14 @@ for needle in (
     "db $07,$68,$27,$03,$14,$02,$3c",
     "db $06,$a8,$57,$02,$09,$01,$1f",
     "db $05,$28,$67,$03,$19,$04,$0e",
+    "db $07,$70,$2f,$03,$1b,$02,$1a",
+    "db $06,$58,$2f,$01,$0a,$01,$20",
+    "db $05,$60,$97,$02,$0e,$02,$48",
+    "db $03,$30,$a7,$04,$1d,$01,$20",
 ):
     assert needle in src, needle
+assert "cmp     #$03" in src
+assert "#<.room03_records" in src
 
 # SetupRoom transforms and reverse-direction initial step=range.
 for needle in (
@@ -88,6 +94,15 @@ for needle in (
     "ora     #$80",
 ):
     assert needle in src, needle
+
+# Room03 graphics must be selected in both uploader and exact collision source.
+for needle in (
+    "enemy_type0a_patterns",
+    "enemy_type1b_patterns",
+    "enemy_type1d_patterns",
+):
+    assert needle in src, needle
+    assert needle in collision, needle
 
 # Collision still iterates all four slots and selects the same current 0..7
 # type frame, but it must reject by coordinates before paying for banked masks.
@@ -160,4 +175,4 @@ for arg in (
 # Any death reload reruns the C64 SetupRoom enemy pass, not only enemy deaths.
 assert "sta     enemy_smiley_last_room" in life
 
-print("OK: exact four-slot C64 enemies Rooms00-02 + Room03-05 art + broadphase collision")
+print("OK: exact four-slot C64 enemies Rooms00-03 + Room04-05 art + broadphase collision")
