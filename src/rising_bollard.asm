@@ -36,7 +36,10 @@ rising_bollard_room_sync:
         ; RoomInit too, matching the C64 room-entry reset.
         lda     #$ff
         sta     <piledriver_last_room
-        jmp     piledriver_room_sync
+        call    piledriver_room_sync
+        ; Dynamic piledriver tiles live above $ff; redraw the static shaft BAT
+        ; words with their tile-high bit after DrawShaft has established geometry.
+        jmp     piledriver_fix_bat_hi
 
 ; Run after normal movement with the real room id restored. Standard piledriver
 ; animation/collision advances first, then the special Room0C bollard behaviour.
