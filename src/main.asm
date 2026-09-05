@@ -259,3 +259,12 @@ main_loop:
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
         jmp     main_loop
+
+init_c64_video:
+        st0     #$0a
+        st1     #<VDC_HSR_320
+        st2     #>VDC_HSR_320
+        st0     #$0b
+        st1     #<VDC_HDR_320
+        st2     #>VDC_HDR_320
+        rts
