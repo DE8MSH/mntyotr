@@ -23,6 +23,7 @@
         include "room02_decor_loader.asm"
         include "room_loader.asm"
         include "monty_sprite.asm"
+        include "debug_room.asm"
         ; Large banked room/decor data is appended after gameplay/runtime code so
         ; adding new content cannot move the confirmed physics/collision layout.
         include "room01_decor_assets.asm"
@@ -96,6 +97,7 @@ bare_main:
         call    game_clock_init
         call    monty_physics_init
         call    world_init
+        call    debug_room_init
         call    monty_sprite_init
         call    monty_sprite_update_satb
         call    set_dspon
@@ -173,6 +175,8 @@ main_loop:
         bcc     .no_room_change
         call    room_load_pending
 .no_room_change:
+        ; Persistent runtime diagnostic: two-digit hexadecimal current room id.
+        call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
         bra     main_loop
