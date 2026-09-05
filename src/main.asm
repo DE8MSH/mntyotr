@@ -22,6 +22,7 @@
         include "room01_decor_loader.asm"
         include "room02_decor_loader.asm"
         include "room_loader.asm"
+        include "room050c_loader.asm"
         include "monty_sprite.asm"
         include "debug_room.asm"
         ; Large banked room/decor data is appended after gameplay/runtime code so
@@ -30,8 +31,10 @@
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
         include "room04_assets_tail.asm"
+        include "room05_assets_tail.asm"
         include "room0a_assets_tail.asm"
         include "room0b_assets_tail.asm"
+        include "room0c_assets_tail.asm"
         include "room0d_assets_tail.asm"
         include "room0e_assets_tail.asm"
 
@@ -113,23 +116,13 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Active route now includes the lower house cells $01->$0A and
-        ; $02->$0B->$0E->$0D->$04. Room $04 left still points at unloaded $05,
-        ; and Room $00 right is the original $ff outside cell.
+        ; Phase 46 opens the original continuation $04 left->$05. Only the
+        ; confirmed outer edge at Room $00 right is special-cased here; all
+        ; other unsupported targets are rejected by world_resolve_exit itself.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
-        beq     .guard_room00_right
-        cmp     #4
         bne     .after_unsupported_jump_edge
-        lda     <monty_room_exit
-        cmp     #1
-        bne     .after_unsupported_jump_edge
-        lda     #$15
-        sta     <monty_x
-        stz     <monty_room_exit
-        bra     .after_unsupported_jump_edge
-.guard_room00_right:
         lda     <monty_room_exit
         cmp     #2
         bne     .after_unsupported_jump_edge
@@ -166,14 +159,14 @@ main_loop:
 .after_jump_exit_guard:
 
         ; The original movement engine emits a down-room exit at Y=$DA.
-        ; Besides the $03->$0E detour, this is required for the visible floor
-        ; openings $01->$0A and $02->$0B discovered by runtime testing.
+        ; Active floor openings now include $01->$0A, $02->$0B, $03->$0E and
+        ; the Phase-46 continuation $05->$0C.
         call    monty_check_down_room_edge
         call    collision_bank_exit
 
         call    world_resolve_exit
         bcc     .no_room_change
-        call    room_load_pending
+        call    room_load_pending_extended
 .no_room_change:
         ; Persistent runtime diagnostic: two-digit hexadecimal current room id.
         call    debug_room_draw
