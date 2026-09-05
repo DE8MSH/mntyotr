@@ -15,9 +15,6 @@
 
 PILE_STATIC_CHR0 = CHR_GAME + 64
 PILE_STATIC_CHR1 = PILE_STATIC_CHR0 + 18
-PILE_STATIC_PAL_LEFT  = 6
-PILE_STATIC_PAL_MID   = 5
-PILE_STATIC_PAL_RIGHT = 4
 
 .zp
 pile_static_col:      ds 1
@@ -27,7 +24,6 @@ pile_static_base_lo:  ds 1
 pile_static_i:        ds 1
 pile_static_tile:     ds 1
 pile_static_seed_sel: ds 1
-pile_static_tmp:      ds 1
 
 .code
 
@@ -85,8 +81,6 @@ piledriver_static_room_sync:
         sta     <pile_static_base_lo
         jmp     piledriver_static_draw
 
-; Upload two identical 18-tile initial charset blocks. Each PCE tile is 16 VDC
-; words. Plane 0 carries the C64 1bpp bitmap, all other planes are zero.
 piledriver_static_upload_set0:
         lda     #<(PILE_STATIC_CHR0*16)
         sta     <_di
@@ -128,12 +122,11 @@ piledriver_static_upload_common:
         lda     <pile_static_seed_sel
         cmp     #$ff
         beq     .zero_row
-        tax
         lda     <pile_static_i
         tay
-        cpx     #0
+        lda     <pile_static_seed_sel
         beq     .get_left
-        cpx     #1
+        cmp     #1
         beq     .get_mid
         lda     piledriver_static_seed_right,y
         bra     .put_row
@@ -184,30 +177,27 @@ piledriver_static_draw:
         sta     <_di+1
         call    vdc_di_to_mawr
 
-        ; left tile = base + row, palette 6. Tile ids are >$ff so bit 8 is set.
         lda     <pile_static_base_lo
         clc
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$60+>((PILE_STATIC_CHR0)&$100)
+        lda     #$61
         sta     VDC_DH
 
-        ; middle tile = base + 6 + row, palette 5.
         lda     <pile_static_base_lo
         clc
         adc     #6
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$50+>((PILE_STATIC_CHR0)&$100)
+        lda     #$51
         sta     VDC_DH
 
-        ; right tile = base + 12 + row, palette 4.
         lda     <pile_static_base_lo
         clc
         adc     #12
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$40+>((PILE_STATIC_CHR0)&$100)
+        lda     #$41
         sta     VDC_DH
 
         inc     <pile_static_i
