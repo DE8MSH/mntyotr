@@ -434,7 +434,8 @@ enemy_tmp_xhi:            ds 1
 .animate:
         ldy     enemy_tmp_slot
         lda     enemy_anim_timer_tbl,y
-        ina
+        clc
+        adc     #1
         sta     enemy_anim_timer_tbl,y
         rts
 
