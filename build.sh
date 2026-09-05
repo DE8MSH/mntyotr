@@ -51,10 +51,15 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_enemy_room00_runtime.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_enemy_room0608.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_score_runtime.py"
 
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
+# Extend only the build copy of the stable shared collision routine. This keeps
+# the current source layout small while enabling exact masks for the three enemy
+# types first encountered in Rooms $06/$08.
+python3 "$ROOT/tools/patch_enemy_collision_0608.py" "$BUILD/enemy_room00_collision.asm"
 
 COMMIT_HEX="$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || printf '0000000')"
 COMMIT_HEX="$(printf '%s' "$COMMIT_HEX" | tr '[:lower:]' '[:upper:]')"

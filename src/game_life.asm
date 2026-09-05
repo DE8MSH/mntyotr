@@ -5,10 +5,10 @@
 ; sequence are still pending, but hazards, lift squash and enemies now share the
 ; correct gameplay consequence instead of leaving Monty in a softlocked state.
 
-        ; Room07 can already use the generic enemy renderer/collision unchanged
-        ; because all four original enemies are Bubble type $15. Keep the small
-        ; room seed shim here until Rooms06-08 move into one generic selector.
+        ; Rooms06-08 use small exact seed shims while the shared enemy engine
+        ; continues to own movement, SAT rendering and pixel collision.
         include "enemy_room07_runtime.asm"
+        include "enemy_room0608_runtime.asm"
 
 .zp
 game_lives:             ds 1
@@ -33,8 +33,9 @@ game_life_init:
 ; position to which a life loss in that room should return.
 game_life_room_sync:
         ; enemy_smiley_room_sync runs immediately before this routine in the
-        ; main loop. It clears unsupported legacy slots on Room07 entry/reload;
-        ; seed the exact four Bubble records before checking the life checkpoint.
+        ; main loop. It clears unsupported legacy slots on Rooms06-08 entry;
+        ; seed the exact C64 records before checking the life checkpoint.
+        call    enemy_room0608_room_sync
         call    enemy_room07_room_sync
         lda     <monty_room
         cmp     <game_life_last_room
@@ -50,10 +51,9 @@ game_life_room_sync:
         rts
 
 ; C=1 if a death was consumed and the caller must skip normal world resolution.
-; Current action_counter values used by the port/reference:
-;   2 enemy hit/alive, 3 lift squash, 4 piledriver, 5 property-4 hazard,
-;   7 enemy hit/dead.  Event 6 is completion in the C64 dispatch and is NOT death.
-game_life_check:
+; This routine is --newproc-relocated so Bank 0 keeps enough thunk space for
+; subsequent rooms/systems.
+.proc game_life_check
         lda     <monty_action_counter
         cmp     #2
         beq     .death
@@ -66,7 +66,7 @@ game_life_check:
         cmp     #7
         beq     .death
         clc
-        rts
+        leave
 .death:
         stz     <monty_action_counter
         lda     <game_lives
@@ -101,7 +101,8 @@ game_life_check:
         lda     #1
         sta     <game_respawn_pending
         sec
-        rts
+        leave
+.endp
 
 ; Reload graphics/collision/mechanisms after game_life_check returns C=1.
 game_life_reload:
