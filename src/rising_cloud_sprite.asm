@@ -1,7 +1,7 @@
 ; Phase 50: visible authentic rising-cloud sprite for Room $01.
-; Collision continues to be maintained by rising_cloud.asm. This module only
-; renders the original C64 frames $98/$99/$9A with the 4-step wobble cycle
-; $98,$99,$9A,$99 while following rising_cloud_y pixel-for-pixel.
+; Collision continues to be maintained by rising_cloud.asm. This module renders
+; the original C64 frames $98/$99/$9A with the wobble cycle $98,$99,$9A,$99
+; while following rising_cloud_y pixel-for-pixel.
 
 CLOUD_SPR_VRAM = $3400
 CLOUD_SAT_LEFT = SAT_ADDR+24          ; SAT entry 6
@@ -10,8 +10,6 @@ CLOUD_SAT_X    = 128                  ; screen col $0C (96px) + PCE SAT origin 3
 
 .zp
 rising_cloud_sprite_frame: ds 1
-rising_cloud_sprite_pat_lo: ds 1
-rising_cloud_sprite_pat_hi: ds 1
 
 .code
 
@@ -57,8 +55,7 @@ rising_cloud_sprite_upload:
         plp
         rts
 
-; Original frame selector: (cloud_tick & $0c)>>2 gives 0,1,2,3 and table is
-; $98,$99,$9A,$99 => frame offsets 0,1,2,1.
+; Original selector: (cloud_tick & $0c)>>2 -> 0,1,2,3 and frame cycle 0,1,2,1.
 rising_cloud_sprite_select_frame:
         lda     <rising_cloud_tick
         and     #$0c
@@ -67,13 +64,6 @@ rising_cloud_sprite_select_frame:
         tax
         lda     rising_cloud_sprite_cycle,x
         sta     <rising_cloud_sprite_frame
-        ; Each converted frame consumes $100 VDC words (512 source bytes).
-        lda     #>CLOUD_SPR_VRAM
-        clc
-        adc     <rising_cloud_sprite_frame
-        sta     <rising_cloud_sprite_pat_hi
-        lda     #<CLOUD_SPR_VRAM
-        sta     <rising_cloud_sprite_pat_lo
         rts
 
 rising_cloud_sprite_update_satb:
@@ -84,11 +74,14 @@ rising_cloud_sprite_update_satb:
 .room01:
         lda     <rising_cloud_y
         cmp     #$da
-        bcs     rising_cloud_sprite_hide
+        bcc     .check_top
+        jmp     rising_cloud_sprite_hide
+.check_top:
         cmp     #$40
-        bcc     rising_cloud_sprite_hide
+        bcs     .visible
+        jmp     rising_cloud_sprite_hide
+.visible:
         call    rising_cloud_sprite_select_frame
-
         lda     #<CLOUD_SAT_LEFT
         sta     <_di
         lda     #>CLOUD_SAT_LEFT
@@ -105,26 +98,17 @@ rising_cloud_sprite_update_satb:
         sta     VDC_DL
         lda     #>CLOUD_SAT_X
         sta     VDC_DH
-        lda     <rising_cloud_sprite_pat_lo
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
+        ldx     <rising_cloud_sprite_frame
+        lda     rising_cloud_pat_left_lo,x
         sta     VDC_DL
-        lda     <rising_cloud_sprite_pat_hi
+        lda     rising_cloud_pat_left_hi,x
         sta     VDC_DH
-        lda     #$82                   ; sprite palette 2
+        lda     #$82                   ; sprite palette index 2 (palette slot 18)
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
 
-        ; right 16x32 half; pattern base is +$40 VDC words.
+        ; right 16x32 half
         lda     <rising_cloud_y
         clc
         adc     #15
@@ -134,33 +118,10 @@ rising_cloud_sprite_update_satb:
         sta     VDC_DL
         lda     #>(CLOUD_SAT_X+16)
         sta     VDC_DH
-        ; Reconstruct frame base then add $40 words before >>5.
-        lda     #<CLOUD_SPR_VRAM
-        sta     <rising_cloud_sprite_pat_lo
-        lda     #>CLOUD_SPR_VRAM
-        clc
-        adc     <rising_cloud_sprite_frame
-        sta     <rising_cloud_sprite_pat_hi
-        lda     <rising_cloud_sprite_pat_lo
-        clc
-        adc     #$40
-        sta     <rising_cloud_sprite_pat_lo
-        lda     <rising_cloud_sprite_pat_hi
-        adc     #0
-        sta     <rising_cloud_sprite_pat_hi
-        lda     <rising_cloud_sprite_pat_lo
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
-        lsr     <rising_cloud_sprite_pat_hi
-        ror     a
+        ldx     <rising_cloud_sprite_frame
+        lda     rising_cloud_pat_right_lo,x
         sta     VDC_DL
-        lda     <rising_cloud_sprite_pat_hi
+        lda     rising_cloud_pat_right_hi,x
         sta     VDC_DH
         lda     #$82
         sta     VDC_DL
@@ -179,7 +140,7 @@ rising_cloud_sprite_hide:
         cla
         sta     VDC_DL
         lda     #1
-        sta     VDC_DH
+        sta     VDC_DH              ; Y=$0100 off-screen
         cla
         sta     VDC_DL
         sta     VDC_DH
@@ -199,3 +160,13 @@ rising_cloud_sprite_sat_dma:
 .data
 rising_cloud_sprite_cycle:
         db 0,1,2,1
+; CLOUD_SPR_VRAM=$3400. PCE SAT pattern units are 32 VDC words; converted frames
+; consume $100 words each and the right half begins +$40 words.
+rising_cloud_pat_left_lo:
+        db $a0,$a8,$b0
+rising_cloud_pat_left_hi:
+        db $01,$01,$01
+rising_cloud_pat_right_lo:
+        db $a2,$aa,$b2
+rising_cloud_pat_right_hi:
+        db $01,$01,$01
