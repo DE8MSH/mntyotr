@@ -132,18 +132,6 @@ bare_main:
         sta     <_bp + 1
         ldy     #^rising_cloud_sprite_palette
         call    load_palettes
-
-        ; Sprite palette 19: authentic Room00 Smiley, C64 cyan $03.
-        lda     #19
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<enemy00_smiley_palette
-        sta     <_bp + 0
-        lda     #>enemy00_smiley_palette
-        sta     <_bp + 1
-        ldy     #BANK(enemy00_smiley_palette)
-        call    load_palettes
         call    xfer_palettes
 
         call    draw_room00_native
@@ -157,6 +145,7 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
+        ; Banked Room00 enemy init owns sprite palettes 19/20 and both GFX sets.
         call    enemy_smiley_init
         call    game_life_init
         call    debug_room_init
@@ -264,7 +253,7 @@ main_loop:
         call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; SAT order: lift, Smiley, cloud. Cloud remains final DMA writer.
+        ; SAT order: lift, Room00 enemies, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
