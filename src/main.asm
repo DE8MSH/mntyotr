@@ -16,6 +16,7 @@
         include "room01_native.asm"
         include "game_clock.asm"
         include "monty_physics.asm"
+        include "jump_collision_sweep.asm"
         include "collision_banking.asm"
         include "world.asm"
         include "vertical_world_edges.asm"
@@ -143,7 +144,8 @@ main_loop:
         sta     <main_exit_before_jump
         lda     <monty_x
         sta     <main_jump_x_before_step
-        call    monty_jump_step
+        ; C64 jump deltas are consumed one pixel at a time with collision checks.
+        call    monty_jump_step_swept
 
         lda     <main_exit_before_jump
         beq     .guard_jump_generated_exit
@@ -166,9 +168,9 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; C64 only evaluates the lower room edge while Y is moving downward.
-        ; This prevents an UP transition that spawns at Y=$DA from immediately
-        ; bouncing back down on the next stationary/horizontal tick.
+        ; Non-jump downward movement (fall/climb) still uses the shared helper.
+        ; The swept jump routine already checks $DA after every descent pixel;
+        ; monty_check_down_room_edge is idempotent when an exit already exists.
         lda     <monty_y
         cmp     <main_y_before_step
         bcc     .after_down_room_edge
