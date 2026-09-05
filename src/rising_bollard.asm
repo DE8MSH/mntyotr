@@ -23,15 +23,19 @@ rising_bollard_init:
         jmp     piledriver_init
 
 rising_bollard_room_sync:
-        call    piledriver_room_sync
         lda     <monty_room
         cmp     <rising_bollard_last_room
         bne     .changed
-        rts
+        jmp     piledriver_room_sync
 .changed:
         sta     <rising_bollard_last_room
         stz     <rising_bollard_active
-        rts
+        ; A forced same-room reload (death/respawn) invalidates this family via
+        ; rising_bollard_last_room=$ff. Force the standard Piledriver to re-run
+        ; RoomInit too, matching the C64 room-entry reset.
+        lda     #$ff
+        sta     <piledriver_last_room
+        jmp     piledriver_room_sync
 
 ; Run after normal movement with the real room id restored. Standard piledriver
 ; animation/collision advances first, then the special Room0C bollard behaviour.
