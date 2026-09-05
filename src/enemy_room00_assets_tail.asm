@@ -28,7 +28,3 @@ enemy_palette_white:                 ; C64 $01
         dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 enemy_palette_yellow:                ; C64 $07
         dw $000,$1fb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-
-; Compatibility aliases retained for older source/tests.
-enemy00_smiley_palette = enemy_palette_cyan
-enemy00_skate_palette  = enemy_palette_purple
