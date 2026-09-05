@@ -61,9 +61,12 @@ for needle in (
     "and     #1",
     "inc     enemy_state_tbl,x",
     "dec     enemy_state_tbl,x",
-    "inc     enemy_anim_timer_tbl,y",
+    "lda     enemy_anim_timer_tbl,y",
+    "ina",
+    "sta     enemy_anim_timer_tbl,y",
 ):
     assert needle in src, needle
+assert "inc     enemy_anim_timer_tbl,y" not in src
 
 # --newproc externally returns with LEAVE; internal helper RTS is intentional.
 procs = re.findall(r"(?ms)^\.proc\s+([^\n]+)\n(.*?)^\.endp\s*$", src)
