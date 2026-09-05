@@ -3,10 +3,14 @@
 ; The C64 cloud moves at pixel precision but exposes support through three
 ; character cells. The generic PCE ground probe only evaluates at an 8-pixel
 ; alignment, so a moving cloud can pass between probe phases. This contact pass
-; closes that gap without changing normal room collision: when Monty's feet
-; reach the cloud top while horizontally overlapping it, snap to cloud_y-$10,
-; end falling/descent, and mark the property-3 support state. rising_cloud_update
-; then carries Monty upward by the same 1px as the cloud.
+; closes that gap without changing normal room collision: only while Monty is
+; FALLING or in jump DESCENT, when his feet reach the cloud top and horizontally
+; overlap it, snap to cloud_y-$10, end the descent, and mark property-3 support.
+;
+; IMPORTANT: once landed, this routine must not snap again every tick. Normal
+; input must remain live so Monty can walk across/off the cloud or jump away.
+; rising_cloud_update independently carries a standing rider upward by the same
+; 1px as the cloud while the overlap/support conditions remain true.
 
 .zp
 rising_cloud_contact_y: ds 1
@@ -33,10 +37,17 @@ rising_cloud_contact_update:
         cmp     #$49
         bcs     .done
 
-        ; Never attach while still rising through the cloud.
+        ; Landing is one-way and event-driven. Never re-snap a rider who is
+        ; already standing on the cloud: doing so would clear fresh walk/jump
+        ; input every tick and make Monty appear glued to the platform.
         lda     <monty_jump_phase
         cmp     #1
-        beq     .done
+        beq     .done                 ; ascent: pass upward through platform
+        cmp     #2
+        beq     .descending
+        lda     <monty_falling
+        beq     .done                 ; standing/walking: leave controls alone
+.descending:
 
         ; Standing position is exactly 16 C64 pixels above sprite1_y_buffer.
         lda     <rising_cloud_y
