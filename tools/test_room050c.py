@@ -100,7 +100,7 @@ def main():
     assert 'include "room050c_loader.asm"' in main_asm
     assert 'call    room_load_pending_extended' in main_asm
     assert '.proc room_load_pending_extended' in ext
-    assert 'room_ext_room_ids:' in ext
+    assert 'room_ext_ids:' in ext
     assert 'room_ext_patterns_lo:' in ext
     assert 'room_ext_bat_lo:' in ext
     assert 'room_ext_collision_lo:' in ext
