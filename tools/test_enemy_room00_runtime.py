@@ -89,11 +89,16 @@ for needle in (
 ):
     assert needle in src, needle
 
-# Collision now iterates all four slots and selects the same current 0..7 type frame.
+# Collision still iterates all four slots and selects the same current 0..7
+# type frame, but it must reject by coordinates before paying for banked masks.
 for needle in (
     ".proc enemy_room00_collision_update",
-    "enemy_state_tbl+24",
+    ".scan_slot:",
+    ".prepare_masks:",
+    ".precise_scan:",
+    "cmp     #4",
     "inc     enemy_col_slot",
+    "jsr     .coarse_overlap",
     "jsr     .select_enemy_source",
     "enemy_type09_patterns",
     "enemy_type0e_patterns",
@@ -105,6 +110,17 @@ for needle in (
     "sta     <monty_action_counter",
 ):
     assert needle in collision, needle
+
+# Performance invariant: first coarse test happens before MPR3/MPR4 save/map and
+# before Monty's 63-byte mask is reconstructed. This preserves pixel accuracy
+# while making the far-from-enemies case state-only.
+proc_body = re.search(
+    r"(?ms)^\.proc\s+enemy_room00_collision_update\n(.*?)^\.endp\s*$",
+    collision,
+).group(1)
+assert proc_body.index("jsr     .coarse_overlap") < proc_body.index("php")
+assert proc_body.index("jsr     .coarse_overlap") < proc_body.index("jsr     .convert_monty_mask")
+assert ".done_unmapped:\n        leave" in proc_body
 
 # Six authentic types are generated as eight PCE frames. Four-frame C64 types
 # duplicate direction groups exactly; true 8-frame types retain distinct halves.
@@ -135,4 +151,4 @@ for arg in ("--skate", "--clock", "--big-nose", "--wasp", "--kettle", "--smiley"
 # Any death reload reruns the C64 SetupRoom enemy pass, not only enemy deaths.
 assert "sta     enemy_smiley_last_room" in life
 
-print("OK: exact four-slot C64 enemies for Rooms00-02 + H/V tick + 8-frame art/collision")
+print("OK: exact four-slot C64 enemies Rooms00-02 + broadphase-gated pixel collision")
