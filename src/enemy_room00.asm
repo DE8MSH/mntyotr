@@ -31,8 +31,7 @@ enemy00_init:
         lda     #$ff
         sta     enemy00_last_room
         stz     enemy00_active
-        stz     enemy00_smiley_anim
-        stz     enemy00_skate_anim
+        ; Anim counters are initialized by room_sync before Room00 can render.
         ; Sprite assets are banked ROM data. Preserve the caller's MPR3/MPR4
         ; mapping across both 2 KiB uploads, like the other bank-safe assets.
         php
