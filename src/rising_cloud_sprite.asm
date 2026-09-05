@@ -35,7 +35,7 @@ rising_cloud_sprite_upload:
         lda     #>CLOUD_SPR_VRAM
         sta     <_di+1
         call    vdc_di_to_mawr
-        ldx     #6                      ; 1536 bytes = six 256-byte source pages
+        ldx     #6
         cly
 .page:
         lda     [_bp],y
@@ -55,7 +55,6 @@ rising_cloud_sprite_upload:
         plp
         rts
 
-; Original selector: (cloud_tick & $0c)>>2 -> 0,1,2,3 and frame cycle 0,1,2,1.
 rising_cloud_sprite_select_frame:
         lda     <rising_cloud_tick
         and     #$0c
@@ -88,7 +87,6 @@ rising_cloud_sprite_update_satb:
         sta     <_di+1
         call    vdc_di_to_mawr
 
-        ; left 16x32 half
         lda     <rising_cloud_y
         clc
         adc     #15
@@ -103,12 +101,11 @@ rising_cloud_sprite_update_satb:
         sta     VDC_DL
         lda     rising_cloud_pat_left_hi,x
         sta     VDC_DH
-        lda     #$82                   ; sprite palette index 2 (palette slot 18)
+        lda     #$82
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
 
-        ; right 16x32 half
         lda     <rising_cloud_y
         clc
         adc     #15
@@ -140,7 +137,7 @@ rising_cloud_sprite_hide:
         cla
         sta     VDC_DL
         lda     #1
-        sta     VDC_DH              ; Y=$0100 off-screen
+        sta     VDC_DH
         cla
         sta     VDC_DL
         sta     VDC_DH
@@ -151,17 +148,19 @@ rising_cloud_sprite_hide:
         dex
         bne     .hide_one
 
+; This is the final SAT writer in main_loop. Repaint the 7-digit commit overlay
+; immediately afterwards so any earlier BAT writer can never leave row-0 debris
+; over the diagnostic commit id. SAT DMA is already armed by register $13 here;
+; changing MAWR afterwards does not alter the queued SAT source address.
 rising_cloud_sprite_sat_dma:
         st0     #$13
         st1     #<SAT_ADDR
         st2     #>SAT_ADDR
-        rts
+        jmp     debug_commit_bank_safe_draw
 
 .data
 rising_cloud_sprite_cycle:
         db 0,1,2,1
-; CLOUD_SPR_VRAM=$3400. PCE SAT pattern units are 32 VDC words; converted frames
-; consume $100 words each and the right half begins +$40 words.
 rising_cloud_pat_left_lo:
         db $a0,$a8,$b0
 rising_cloud_pat_left_hi:
