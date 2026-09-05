@@ -32,10 +32,9 @@ enemy00_init:
         sta     enemy00_last_room
         stz     enemy00_active
         ; Anim counters are initialized by room_sync before Room00 can render.
-        ; Sprite assets are banked ROM data. Preserve the caller's MPR3/MPR4
-        ; mapping across both 2 KiB uploads, like the other bank-safe assets.
-        php
-        sei
+        ; Preserve caller MPR3/MPR4 across both banked asset uploads. Init runs
+        ; before the gameplay/VBlank loop, so interrupt-status save/restore is
+        ; unnecessary here and would waste bytes in the nearly-full code bank.
         tma3
         pha
         tma4
@@ -46,7 +45,6 @@ enemy00_init:
         tam4
         pla
         tam3
-        plp
         rts
 
 enemy00_room_sync:
@@ -69,9 +67,9 @@ enemy00_room_sync:
         sta     enemy00_smiley_x
         lda     #$6a
         sta     enemy00_smiley_y
-        lda     #$01                    ; dir_idx4 -> vertical, forward/down
+        lda     #$01
         sta     enemy00_smiley_flags
-        stz     enemy00_smiley_count     ; bit7 clear -> counter 0
+        stz     enemy00_smiley_count
         stz     enemy00_smiley_anim
 
         ; Skate SetupRoom: x=$78/2+$1c=$58, y=$f9-$37=$c2.
@@ -79,9 +77,9 @@ enemy00_room_sync:
         sta     enemy00_skate_x
         lda     #$c2
         sta     enemy00_skate_y
-        lda     #$81                    ; dir_idx3 -> vertical, reverse/up
+        lda     #$81
         sta     enemy00_skate_flags
-        lda     #$13                    ; bit7 set -> counter starts at range
+        lda     #$13
         sta     enemy00_skate_count
         stz     enemy00_skate_anim
         rts
@@ -156,8 +154,7 @@ enemy00_update:
         inc     enemy00_skate_anim
         rts
 
-; Upload four 512-byte PCE frames (2048 bytes) per type. map_bp_to_mpr34 makes
-; the two adjacent HuCard banks visible, so a 2 KiB block is safe across a bank edge.
+; Upload four 512-byte PCE frames (2048 bytes) per type.
 enemy00_upload_skate:
         lda     #<enemy00_skate_patterns
         sta     <_bp
@@ -185,7 +182,7 @@ enemy00_upload_smiley:
 
 enemy00_upload_2k:
         call    vdc_di_to_mawr
-        ldx     #8                      ; 8 pages x 256 bytes = 2048 bytes
+        ldx     #8
         cly
 .page:
         lda     [_bp],y
@@ -206,7 +203,6 @@ enemy00_update_satb:
         bne     .show
         jmp     enemy00_hide
 .show:
-        ; Smiley entries 8/9. C64 hardware X/Y -> PCE SAT: +8 X, +14 Y.
         lda     #<ENEMY00_SMILEY_L
         sta     <_di
         lda     #>ENEMY00_SMILEY_L
@@ -227,7 +223,7 @@ enemy00_update_satb:
         sta     VDC_DL
         stz     VDC_DH
         call    enemy00_smiley_pat_left
-        lda     #$84                    ; sprite palette slot20 -> index4
+        lda     #$84
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
@@ -248,7 +244,6 @@ enemy00_update_satb:
         lda     #$10
         sta     VDC_DH
 
-        ; Skate entries 10/11.
         lda     enemy00_skate_anim
         and     #$06
         lsr     a
@@ -264,7 +259,7 @@ enemy00_update_satb:
         sta     VDC_DL
         stz     VDC_DH
         call    enemy00_skate_pat_left
-        lda     #$83                    ; sprite palette slot19 -> index3
+        lda     #$83
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
