@@ -44,7 +44,14 @@ def main():
     assert 'tools/lift_sprite.py' in build_sh
     assert '--write "$BUILD/lift-sprites.dat"' in build_sh
 
-    print('OK: authentic Room05/0D moving lifts + 2-sprite C64 lift art build wiring')
+    # These routines are already larger than HuC/PCEAS BRA's +/-127-byte reach.
+    # Keep the known long transfers absolute so content growth cannot break build.
+    assert 'jmp     moving_lift_sat_dma' in lift
+    assert 'bra     .sat_dma' not in lift
+    assert 'jmp     main_loop' in main
+    assert 'bra     main_loop' not in main
+
+    print('OK: authentic Room05/0D moving lifts + lift art + long-branch-safe runtime')
 
 
 if __name__ == '__main__':
