@@ -1,9 +1,11 @@
         include "standard_piledriver.asm"
         include "standard_piledriver_bat_fix.asm"
+        include "standard_piledriver_static.asm"
 
 ; Standard piledrivers are original-style dynamic BG charset tiles, not sprites.
-; They reuse the already-loaded C64 grey BG palette slots 6/5/4, so no extra
-; palette or sprite asset upload is required.
+; The safe runtime stage currently uses only static SeedGlyphs + DrawShaft; the
+; crash-prone MoveDown/MoveUp buffer path remains gated until static geometry is
+; confirmed in the emulator.
 .code
 piledriver_palette_init:
         rts
