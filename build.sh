@@ -30,6 +30,7 @@ export PCE_INCLUDE="$ELMER_INC:$HUCC_INC"
 echo "PCE_INCLUDE: $PCE_INCLUDE"
 
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_port.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_debug_room.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_sprite_banking.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room00_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room01.py"
