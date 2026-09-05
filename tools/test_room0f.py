@@ -15,7 +15,7 @@ enemies = (ROOT / "src/enemy_room0608_runtime.asm").read_text()
 main = (ROOT / "src/main.asm").read_text()
 
 cells = decode_room(ROOM0F_RLE)
-assert len(ROOM0F_RLE) == 114
+assert len(ROOM0F_RLE) == 115
 assert len(cells) == ROOM_CELLS == 640
 assert ROOM0F_TILE_IDS == (0x25,0x0f,0x02,0x64,0x27,0x6b,0x31,0x16)
 assert ROOM0F_COLOURS == (0x02,0x06,0x03,0x03,0x04,0x07,0x05,0x05)
@@ -26,8 +26,6 @@ assert len(make_screen_bat(cells)) == 36 * 20 * 2
 assert 'incbin "room0f-map.dat"' in assets
 assert 'db $01,$01,$01,$03,$02,$03,$02,$01' in assets
 
-# Room0F must be serviced by the sparse descriptor path, which is relocated out
-# of Bank0 so future rooms only extend data tables.
 for needle in (
     ".proc room_load_pending_extended",
     "ROOM_EXT_COUNT = 7",
@@ -36,18 +34,16 @@ for needle in (
 ):
     assert needle in loader, needle
 
-# World and SELECT QA cycle now include the first ESCAPE TUNNEL room at row3/col15.
 assert "cmp     #$10" in world
 assert "cmp     #$10" in warp
 assert "db $02,$02,$02,$02,$02,$02,$01,$01,$01,$01,$03,$03,$03,$03,$03,$03" in warp
 assert "db $15,$14,$13,$12,$11,$10,$11,$12,$13,$14,$14,$13,$10,$11,$12,$0f" in warp
 
-# Exact four C64 enemy SetupRoom states for Room $0F.
 for needle in (
-    "db $68,$ca,$07,$15,$81,$17,$17,$03",  # Bubble
-    "db $84,$82,$03,$1b,$01,$23,$00,$02",  # Hand
-    "db $80,$ca,$0a,$0f,$82,$47,$47,$02",  # Big Nose / light red
-    "db $20,$62,$0e,$0f,$02,$9c,$00,$01",  # Big Nose / light blue
+    "db $68,$ca,$07,$15,$81,$17,$17,$03",
+    "db $84,$82,$03,$1b,$01,$23,$00,$02",
+    "db $80,$ca,$0a,$0f,$82,$47,$47,$02",
+    "db $20,$62,$0e,$0f,$02,$9c,$00,$01",
     "db $06,$03,$0a,$09",
     "enemy_palette_light_red",
     "C64 $0A -> $0eb",
