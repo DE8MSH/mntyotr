@@ -20,12 +20,14 @@ ENEMY_SKATE_SAT_R  = SAT_ADDR+44      ; SAT entry 11
 .bss
 enemy_smiley_last_room: ds 1
 enemy_smiley_active:    ds 1
+enemy_smiley_x:         ds 1
 enemy_smiley_y:         ds 1
 enemy_smiley_flags:     ds 1
 enemy_smiley_count:     ds 1
 enemy_smiley_anim:      ds 1
 enemy_smiley_frame:     ds 1
 enemy_skate_active:     ds 1
+enemy_skate_x:          ds 1
 enemy_skate_y:          ds 1
 enemy_skate_flags:      ds 1
 enemy_skate_count:      ds 1
@@ -153,6 +155,8 @@ enemy_skate_frame:      ds 1
         sta     enemy_smiley_active
         sta     enemy_skate_active
 
+        lda     #$78
+        sta     enemy_smiley_x
         lda     #$6a
         sta     enemy_smiley_y
         lda     #$01                    ; dir_idx4 -> vertical/down
@@ -160,6 +164,8 @@ enemy_skate_frame:      ds 1
         stz     enemy_smiley_count
         stz     enemy_smiley_anim
 
+        lda     #$58
+        sta     enemy_skate_x
         lda     #$c2
         sta     enemy_skate_y
         lda     #$81                    ; dir_idx3 -> vertical/up
@@ -250,9 +256,10 @@ enemy_skate_frame:      ds 1
         leave
 .endp
 
-; SAT bridge: C64 VIC sprite coordinates are relative to a 24px/50px display
-; origin. PCE SAT visible origin is +32/+64, therefore SAT X=VIC X+8,
-; SAT Y=VIC Y+14. C64 sprites are 24x21, carried as two 16x32 PCE halves.
+; Exact C64 enemy coordinate bridge:
+; SetupRoom stores a half-X in enemy_state_tbl. ProcessSprites later ASLs that
+; byte when writing VIC X. With the PCE SAT +32 origin versus C64 game +24,
+; SAT X = 2*enemy_x + 8. Y is already VIC Y, so SAT Y = enemy_y + 14.
 .proc enemy_smiley_update_satb
         lda     enemy_smiley_active
         bne     .show
@@ -292,14 +299,25 @@ enemy_skate_frame:      ds 1
         sta     <_di+1
         call    vdc_di_to_mawr
 
+        ; Smiley left half: SAT X = 2*$78+8 = $00F8.
         lda     enemy_smiley_y
         clc
         adc     #14
         sta     VDC_DL
         stz     VDC_DH
-        lda     #$80                    ; C64 X=$78 + 8
+        lda     enemy_smiley_x
+        asl     a
+        ldx     #0
+        bcc     .sm_l_mul_ok
+        inx
+.sm_l_mul_ok:
+        clc
+        adc     #8
+        bcc     .sm_l_add_ok
+        inx
+.sm_l_add_ok:
         sta     VDC_DL
-        stz     VDC_DH
+        stx     VDC_DH
         lda     enemy_smiley_frame
         asl     a
         asl     a
@@ -315,14 +333,25 @@ enemy_skate_frame:      ds 1
         lda     #$10                    ; 16x32
         sta     VDC_DH
 
+        ; Smiley right half: SAT X = 2*$78+24 = $0108.
         lda     enemy_smiley_y
         clc
         adc     #14
         sta     VDC_DL
         stz     VDC_DH
-        lda     #$90
+        lda     enemy_smiley_x
+        asl     a
+        ldx     #0
+        bcc     .sm_r_mul_ok
+        inx
+.sm_r_mul_ok:
+        clc
+        adc     #24
+        bcc     .sm_r_add_ok
+        inx
+.sm_r_add_ok:
         sta     VDC_DL
-        stz     VDC_DH
+        stx     VDC_DH
         lda     enemy_smiley_frame
         asl     a
         asl     a
@@ -344,14 +373,25 @@ enemy_skate_frame:      ds 1
         lsr     a
         sta     enemy_skate_frame
 
+        ; Skate left half: SAT X = 2*$58+8 = $00B8.
         lda     enemy_skate_y
         clc
         adc     #14
         sta     VDC_DL
         stz     VDC_DH
-        lda     #$60                    ; C64 X=$58 + 8
+        lda     enemy_skate_x
+        asl     a
+        ldx     #0
+        bcc     .sk_l_mul_ok
+        inx
+.sk_l_mul_ok:
+        clc
+        adc     #8
+        bcc     .sk_l_add_ok
+        inx
+.sk_l_add_ok:
         sta     VDC_DL
-        stz     VDC_DH
+        stx     VDC_DH
         lda     enemy_skate_frame
         asl     a
         asl     a
@@ -367,14 +407,25 @@ enemy_skate_frame:      ds 1
         lda     #$10
         sta     VDC_DH
 
+        ; Skate right half: SAT X = 2*$58+24 = $00C8.
         lda     enemy_skate_y
         clc
         adc     #14
         sta     VDC_DL
         stz     VDC_DH
-        lda     #$70
+        lda     enemy_skate_x
+        asl     a
+        ldx     #0
+        bcc     .sk_r_mul_ok
+        inx
+.sk_r_mul_ok:
+        clc
+        adc     #24
+        bcc     .sk_r_add_ok
+        inx
+.sk_r_add_ok:
         sta     VDC_DL
-        stz     VDC_DH
+        stx     VDC_DH
         lda     enemy_skate_frame
         asl     a
         asl     a
