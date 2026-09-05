@@ -1,4 +1,4 @@
-; Phase 44 room loader: active house route includes rooms $00-$04 plus $0D/$0E.
+; Phase 45 room loader: active route includes rooms $00-$04, $0A/$0B and $0D/$0E.
 ; Tail rooms keep bulk assets in the ROM tail. Their 640-byte collision map plus
 ; 8 properties are copied into the shared room02_* RAM cache before gameplay.
 
@@ -8,21 +8,45 @@ room_copy_rows: ds 1
 .code
 
 ; C=1 when a supported pending room was committed.
+; Use short conditional skips plus absolute JMPs so adding rooms cannot push a
+; dispatch target outside the HuC6280 signed 8-bit branch range.
 room_load_pending:
         lda     <world_pending_room
-        beq     .room00
+        bne     .check01
+        jmp     .room00
+.check01:
         cmp     #1
-        beq     .room01
+        bne     .check02
+        jmp     .room01
+.check02:
         cmp     #2
-        beq     .room02
+        bne     .check03
+        jmp     .room02
+.check03:
         cmp     #3
-        beq     .room03
+        bne     .check04
+        jmp     .room03
+.check04:
         cmp     #4
-        beq     .room04
+        bne     .check0a
+        jmp     .room04
+.check0a:
+        cmp     #$0a
+        bne     .check0b
+        jmp     .room0a
+.check0b:
+        cmp     #$0b
+        bne     .check0d
+        jmp     .room0b
+.check0d:
         cmp     #$0d
-        beq     .room0d
+        bne     .check0e
+        jmp     .room0d
+.check0e:
         cmp     #$0e
-        beq     .room0e
+        bne     .unsupported
+        jmp     .room0e
+.unsupported:
         clc
         rts
 
@@ -75,6 +99,26 @@ room_load_pending:
         sec
         rts
 
+.room0a:
+        call    room0a_upload_patterns
+        call    room0a_draw_native
+        call    room0a_cache_collision
+        lda     #$0a
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
+.room0b:
+        call    room0b_upload_patterns
+        call    room0b_draw_native
+        call    room0b_cache_collision
+        lda     #$0b
+        sta     <monty_room
+        stz     <world_transition_ready
+        sec
+        rts
+
 .room0d:
         call    room0d_upload_patterns
         call    room0d_draw_native
@@ -96,14 +140,15 @@ room_load_pending:
         rts
 
 ; Tail-room collision caches. Every payload is exactly 648 contiguous bytes:
-; 640 collision-map bytes followed by 8 property bytes.
+; 640 collision-map bytes followed by 8 property bytes. Absolute JMPs are used
+; because this selector grows as more rooms are ported.
 room02_cache_collision:
         lda     #<room02_collision_map_rom
         sta     <_bp
         lda     #>room02_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room02_collision_map_rom)
-        bra     room_tail_cache_collision
+        jmp     room_tail_cache_collision
 
 room03_cache_collision:
         lda     #<room03_collision_map_rom
@@ -111,7 +156,7 @@ room03_cache_collision:
         lda     #>room03_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room03_collision_map_rom)
-        bra     room_tail_cache_collision
+        jmp     room_tail_cache_collision
 
 room04_cache_collision:
         lda     #<room04_collision_map_rom
@@ -119,7 +164,23 @@ room04_cache_collision:
         lda     #>room04_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room04_collision_map_rom)
-        bra     room_tail_cache_collision
+        jmp     room_tail_cache_collision
+
+room0a_cache_collision:
+        lda     #<room0a_collision_map_rom
+        sta     <_bp
+        lda     #>room0a_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room0a_collision_map_rom)
+        jmp     room_tail_cache_collision
+
+room0b_cache_collision:
+        lda     #<room0b_collision_map_rom
+        sta     <_bp
+        lda     #>room0b_collision_map_rom
+        sta     <_bp+1
+        ldy     #BANK(room0b_collision_map_rom)
+        jmp     room_tail_cache_collision
 
 room0d_cache_collision:
         lda     #<room0d_collision_map_rom
@@ -127,7 +188,7 @@ room0d_cache_collision:
         lda     #>room0d_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room0d_collision_map_rom)
-        bra     room_tail_cache_collision
+        jmp     room_tail_cache_collision
 
 room0e_cache_collision:
         lda     #<room0e_collision_map_rom
@@ -179,13 +240,14 @@ room_tail_cache_collision:
         rts
 
 ; Upload 9*32 = 288 bytes to the shared custom-char VRAM.
+; Keep the common target as an absolute JMP because this table also grows.
 room01_upload_patterns:
         lda     #<room01_patterns
         sta     <_bp
         lda     #>room01_patterns
         sta     <_bp+1
         ldy     #BANK(room01_patterns)
-        bra     room_upload_9_patterns
+        jmp     room_upload_9_patterns
 
 room02_upload_patterns:
         lda     #<room02_patterns
@@ -193,7 +255,7 @@ room02_upload_patterns:
         lda     #>room02_patterns
         sta     <_bp+1
         ldy     #BANK(room02_patterns)
-        bra     room_upload_9_patterns
+        jmp     room_upload_9_patterns
 
 room03_upload_patterns:
         lda     #<room03_patterns
@@ -201,7 +263,7 @@ room03_upload_patterns:
         lda     #>room03_patterns
         sta     <_bp+1
         ldy     #BANK(room03_patterns)
-        bra     room_upload_9_patterns
+        jmp     room_upload_9_patterns
 
 room04_upload_patterns:
         lda     #<room04_patterns
@@ -209,7 +271,23 @@ room04_upload_patterns:
         lda     #>room04_patterns
         sta     <_bp+1
         ldy     #BANK(room04_patterns)
-        bra     room_upload_9_patterns
+        jmp     room_upload_9_patterns
+
+room0a_upload_patterns:
+        lda     #<room0a_patterns
+        sta     <_bp
+        lda     #>room0a_patterns
+        sta     <_bp+1
+        ldy     #BANK(room0a_patterns)
+        jmp     room_upload_9_patterns
+
+room0b_upload_patterns:
+        lda     #<room0b_patterns
+        sta     <_bp
+        lda     #>room0b_patterns
+        sta     <_bp+1
+        ldy     #BANK(room0b_patterns)
+        jmp     room_upload_9_patterns
 
 room0d_upload_patterns:
         lda     #<room0d_patterns
@@ -217,7 +295,7 @@ room0d_upload_patterns:
         lda     #>room0d_patterns
         sta     <_bp+1
         ldy     #BANK(room0d_patterns)
-        bra     room_upload_9_patterns
+        jmp     room_upload_9_patterns
 
 room0e_upload_patterns:
         lda     #<room0e_patterns
@@ -272,13 +350,14 @@ room_upload_9_patterns:
         plp
         rts
 
+; Draw selectors also use absolute JMPs for branch-range safety.
 room01_draw_native:
         lda     #<room01_screen_bat
         sta     <_bp
         lda     #>room01_screen_bat
         sta     <_bp+1
         ldy     #BANK(room01_screen_bat)
-        bra     room_draw_native_36x20
+        jmp     room_draw_native_36x20
 
 room02_draw_native:
         lda     #<room02_screen_bat
@@ -286,7 +365,7 @@ room02_draw_native:
         lda     #>room02_screen_bat
         sta     <_bp+1
         ldy     #BANK(room02_screen_bat)
-        bra     room_draw_native_36x20
+        jmp     room_draw_native_36x20
 
 room03_draw_native:
         lda     #<room03_screen_bat
@@ -294,7 +373,7 @@ room03_draw_native:
         lda     #>room03_screen_bat
         sta     <_bp+1
         ldy     #BANK(room03_screen_bat)
-        bra     room_draw_native_36x20
+        jmp     room_draw_native_36x20
 
 room04_draw_native:
         lda     #<room04_screen_bat
@@ -302,7 +381,23 @@ room04_draw_native:
         lda     #>room04_screen_bat
         sta     <_bp+1
         ldy     #BANK(room04_screen_bat)
-        bra     room_draw_native_36x20
+        jmp     room_draw_native_36x20
+
+room0a_draw_native:
+        lda     #<room0a_screen_bat
+        sta     <_bp
+        lda     #>room0a_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room0a_screen_bat)
+        jmp     room_draw_native_36x20
+
+room0b_draw_native:
+        lda     #<room0b_screen_bat
+        sta     <_bp
+        lda     #>room0b_screen_bat
+        sta     <_bp+1
+        ldy     #BANK(room0b_screen_bat)
+        jmp     room_draw_native_36x20
 
 room0d_draw_native:
         lda     #<room0d_screen_bat
@@ -310,7 +405,7 @@ room0d_draw_native:
         lda     #>room0d_screen_bat
         sta     <_bp+1
         ldy     #BANK(room0d_screen_bat)
-        bra     room_draw_native_36x20
+        jmp     room_draw_native_36x20
 
 room0e_draw_native:
         lda     #<room0e_screen_bat
