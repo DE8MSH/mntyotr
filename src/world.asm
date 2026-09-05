@@ -42,15 +42,17 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Phase 45 adds the lower house cells that the C64 world grid reaches through
-; the floor openings: $01 down->$0A and $02 down->$0B. Room $0B connects left
-; into the already active $0E->$0D->$04 lower route.
+; Phase 46 extends the confirmed lower-house path beyond Room $04:
+; $04 left->$05 and $05 down->$0C. The older $01/$02 floor exits and the
+; $0B->$0E->$0D section remain active.
 world_room_supported:
-        cmp     #5
+        cmp     #6
         bcc     .yes
         cmp     #$0a
         beq     .yes
         cmp     #$0b
+        beq     .yes
+        cmp     #$0c
         beq     .yes
         cmp     #$0d
         beq     .yes
