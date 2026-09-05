@@ -8,6 +8,7 @@ def main():
     main_asm = (ROOT / 'src/main.asm').read_text()
     bank = (ROOT / 'src/collision_banking.asm').read_text()
     physics = (ROOT / 'src/monty_physics.asm').read_text()
+    sweep = (ROOT / 'src/jump_collision_sweep.asm').read_text()
     loader = (ROOT / 'src/room_loader.asm').read_text()
     ext = (ROOT / 'src/room050c_loader.asm').read_text()
     tails = {
@@ -25,10 +26,12 @@ def main():
 
     enter = main_asm.index('call    collision_bank_enter')
     update = main_asm.index('call    monty_update_input')
-    jump = main_asm.index('call    monty_jump_step')
+    jump = main_asm.index('call    monty_jump_step_swept')
     leave = main_asm.index('call    collision_bank_exit')
     world = main_asm.index('call    world_resolve_exit')
     assert enter < update < jump < leave < world
+    assert 'call    monty_check_tile_below' in sweep
+    assert 'call    monty_check_tile_above' in sweep
 
     assert 'BANK(room00_collision_map)' in bank
     assert 'BANK(room01_collision_map)' in bank
@@ -52,8 +55,9 @@ def main():
     assert 'tam3' in bank and 'tam4' in bank
     assert 'sei' in bank and 'cli' in bank
 
-    # Sensitive physics remains direct-pointer based and unchanged. All tail
-    # rooms above $02 are adapted outside it through the shared Room02 RAM cache.
+    # Sensitive collision lookup remains direct-pointer based. Tail rooms above
+    # $02 are still adapted through the shared Room02 RAM cache while both normal
+    # movement and the new pixelwise jump sweep run inside collision_bank_enter.
     assert 'lda     [collision_ptr],y' in physics
     assert '#<room00_collision_map' in physics
     assert '#<room01_collision_map' in physics
@@ -62,7 +66,7 @@ def main():
     for room in ('05','09','0a','0b','0c','0d','0e'):
         assert f'room{room}_collision_map' not in physics
 
-    print('OK: Room00/01 ROM banking + shared tail-room RAM collision cache through 05/09/0A-0E')
+    print('OK: collision banking encloses normal movement + pixelwise jump sweep through 05/09/0A-0E')
 
 
 if __name__ == '__main__':
