@@ -54,7 +54,7 @@ def main():
     assert 'cmp     #3' in banking and 'bcc     .select_room' in banking
     assert 'world_room_supported:' in world
     compact = ''.join(world.lower().split())
-    assert 'cmp#$0f' in compact
+    assert 'cmp#$10' in compact
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
 
     print('OK: exact Room 04 active and reachable through Room 0D from below')
