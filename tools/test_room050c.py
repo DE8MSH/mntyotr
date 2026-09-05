@@ -64,7 +64,6 @@ def main():
     assert ROOM0C_TILE_BITMAPS[3] == bytes.fromhex('ff c1 63 36 1c ff 00 00')
     assert ROOM0C_TILE_BITMAPS[6] == bytes.fromhex('6e 7e c7 d3 da c3 67 ef')
 
-    # Room $05 really contains a bottom opening instead of an all-solid floor.
     bottom = cells05[18*32:20*32]
     assert 0 in bottom and 5 in bottom
 
@@ -90,8 +89,8 @@ def main():
     assert 'cmp     #6' in world_asm
     assert 'cmp     #$0c' in world_asm
 
-    # $04 left is now a supported transition; do not reintroduce the old guard.
-    guard = main_asm.split('; Phase 46 opens the original continuation', 1)[1]
+    # $04 left remains supported; don't tie this check to comments/phase labels.
+    guard = main_asm.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
     assert 'cmp     #4' not in guard
 
