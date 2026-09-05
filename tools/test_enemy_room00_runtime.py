@@ -4,6 +4,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 src = (ROOT / "src/enemy_smiley_runtime.asm").read_text()
+collision = (ROOT / "src/enemy_room00_collision.asm").read_text()
 
 # Exact Room $00 state reconstructed from C64 SetupRoom.
 for needle in (
@@ -29,7 +30,8 @@ for needle in (
 ):
     assert needle in src, needle
 
-# --newproc thunks JMP into MPR6. Every exit must use LEAVE so MPR6 is restored.
+# --newproc thunks JMP into MPR6. Every exit from the four movement/render
+# procs must use LEAVE so MPR6 is restored.
 procs = re.findall(r"(?ms)^\.proc\s+([^\n]+)\n(.*?)^\.endp\s*$", src)
 assert len(procs) == 4, [name for name, _ in procs]
 for name, body in procs:
@@ -58,4 +60,25 @@ for needle in (
 assert "lda     #$80                    ; C64 X=$78 + 8" not in src
 assert "lda     #$60                    ; C64 X=$58 + 8" not in src
 
-print("OK: Room00 Smiley+Skate exact spawn/speed/range/half-frame tick + doubled C64 enemy X bridge")
+# Room00 collision is wired before Enemies.Tick, matching the C64 order where
+# ProcessSprites latches $D01E before the odd-frame enemy movement pass.
+assert 'include "enemy_room00_collision.asm"' in src
+assert "call    enemy_room00_collision_update" in src
+for needle in (
+    ".proc enemy_room00_collision_update",
+    "enemy_col_monty_mask:   ds 63",
+    "enemy_col_enemy_mask:   ds 63",
+    "call    map_bp_to_mpr34",
+    "monty_walk_r_lo,x",
+    "monty_sault_l_bank,x",
+    "enemy00_smiley_patterns",
+    "enemy00_skate_patterns",
+    "jsr     .opaque_overlap",
+    "lda     #2",
+    "sta     <monty_action_counter",
+    "sta     enemy_smiley_last_room",
+    ".done:\n        leave",
+):
+    assert needle in collision, needle
+
+print("OK: Room00 Smiley+Skate exact movement/X + opaque-pixel enemy collision + newproc LEAVE")
