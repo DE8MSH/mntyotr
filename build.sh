@@ -40,6 +40,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_phase48_traversal.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_phase49_mechanics.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_moving_lift.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_cloud_sprite.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room03.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room050c.py"
@@ -91,6 +92,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-ma
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
+python3 "$ROOT/tools/cloud_sprite.py" --write "$BUILD/cloud-sprites.dat" >/dev/null
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
