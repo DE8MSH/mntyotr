@@ -15,6 +15,7 @@
         include "room01_assets.asm"
         include "room01_native.asm"
         include "game_clock.asm"
+        include "score_runtime.asm"
         include "monty_physics.asm"
         include "jump_collision_sweep.asm"
         include "collision_banking.asm"
@@ -136,6 +137,7 @@ bare_main:
 
         call    draw_room00_native
         call    game_clock_init
+        call    score_init
         call    monty_physics_init
         call    world_init
         call    rising_cloud_init
@@ -145,7 +147,7 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
-        ; Banked Room00 enemy init owns sprite palettes 19/20 and both GFX sets.
+        ; Banked Room00 enemy init owns sprite palettes 19+ and active GFX sets.
         call    enemy_smiley_init
         call    game_life_init
         call    debug_room_init
@@ -257,12 +259,3 @@ main_loop:
         call    enemy_smiley_update_satb
         call    rising_cloud_sprite_update_satb
         jmp     main_loop
-
-init_c64_video:
-        st0     #$0a
-        st1     #<VDC_HSR_320
-        st2     #>VDC_HSR_320
-        st0     #$0b
-        st1     #<VDC_HDR_320
-        st2     #>VDC_HDR_320
-        rts
