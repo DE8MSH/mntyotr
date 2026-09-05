@@ -71,7 +71,7 @@ world_resolve_exit:
         beq     .up
         cmp     #4
         beq     .down
-        bra     .blocked
+        jmp     .blocked
 .left:
         lda     <world_exit_col
         beq     .blocked_left
