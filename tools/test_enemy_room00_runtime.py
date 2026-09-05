@@ -10,7 +10,7 @@ assets = (ROOT / "src/enemy_room00_assets_tail.asm").read_text()
 build = (ROOT / "build.sh").read_text()
 life = (ROOT / "src/game_life.asm").read_text()
 
-# The port now mirrors the original four 8-byte enemy slots and aux arrays.
+# The port mirrors the original four 8-byte enemy slots and aux arrays.
 for needle in (
     "enemy_state_tbl:          ds 32",
     "enemy_xmsb_tbl:           ds 4",
@@ -24,7 +24,7 @@ for needle in (
 ):
     assert needle in src, needle
 
-# Exact C64 spawn streams for rooms 00, 01 and 02.
+# Exact C64 spawn streams currently active for rooms 00, 01 and 02.
 for needle in (
     "db $05,$b8,$8f,$04,$19,$02,$25",
     "db $03,$78,$37,$03,$09,$03,$13",
@@ -111,9 +111,6 @@ for needle in (
 ):
     assert needle in collision, needle
 
-# Performance invariant: first coarse test happens before MPR3/MPR4 save/map and
-# before Monty's 63-byte mask is reconstructed. This preserves pixel accuracy
-# while making the far-from-enemies case state-only.
 proc_body = re.search(
     r"(?ms)^\.proc\s+enemy_room00_collision_update\n(.*?)^\.endp\s*$",
     collision,
@@ -122,33 +119,45 @@ assert proc_body.index("jsr     .coarse_overlap") < proc_body.index("php")
 assert proc_body.index("jsr     .coarse_overlap") < proc_body.index("jsr     .convert_monty_mask")
 assert ".done_unmapped:\n        leave" in proc_body
 
-# Six authentic types are generated as eight PCE frames. Four-frame C64 types
-# duplicate direction groups exactly; true 8-frame types retain distinct halves.
-for blob in (art.SKATE, art.CLOCK, art.WASP, art.SMILEY):
+# Rooms00-05 need twelve authentic C64 sprite types. Four-frame C64 types are
+# duplicated into direction groups; true eight-frame types keep distinct halves.
+for blob in (
+    art.SKATE, art.CLOCK, art.WASP, art.BUBBLE, art.SAD_GHOST,
+    art.SMILEY, art.JELLY_FISH,
+):
     out = art.build8(blob)
     assert len(out) == 4096
     assert out[:2048] == out[2048:]
-for blob in (art.BIG_NOSE, art.KETTLE):
+for blob in (art.LAMP, art.KNIGHT, art.BIG_NOSE, art.KETTLE, art.HAND):
     out = art.build8(blob)
     assert len(out) == 4096
     assert out[:2048] != out[2048:]
 
 for needle in (
     'incbin "enemy-type09-skate.dat"',
+    'incbin "enemy-type0a-lamp.dat"',
+    'incbin "enemy-type0b-knight.dat"',
     'incbin "enemy-type0e-clock.dat"',
     'incbin "enemy-type0f-big-nose.dat"',
     'incbin "enemy-type14-wasp.dat"',
+    'incbin "enemy-type15-bubble.dat"',
+    'incbin "enemy-type16-sad-ghost.dat"',
     'incbin "enemy-type18-kettle.dat"',
     'incbin "enemy-type19-smiley.dat"',
+    'incbin "enemy-type1b-hand.dat"',
+    'incbin "enemy-type1d-jelly-fish.dat"',
     "enemy_palette_white:",
     "enemy_palette_yellow:",
 ):
     assert needle in assets, needle
 
-for arg in ("--skate", "--clock", "--big-nose", "--wasp", "--kettle", "--smiley"):
+for arg in (
+    "--skate", "--lamp", "--knight", "--clock", "--big-nose", "--wasp",
+    "--bubble", "--sad-ghost", "--kettle", "--smiley", "--hand", "--jelly-fish",
+):
     assert arg in build, arg
 
 # Any death reload reruns the C64 SetupRoom enemy pass, not only enemy deaths.
 assert "sta     enemy_smiley_last_room" in life
 
-print("OK: exact four-slot C64 enemies Rooms00-02 + broadphase-gated pixel collision")
+print("OK: exact four-slot C64 enemies Rooms00-02 + Room03-05 art + broadphase collision")
