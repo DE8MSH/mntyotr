@@ -22,12 +22,19 @@ def main():
 
     run01 = scaffold01(base01)
     assert ROOM01_PROPERTIES[7] == 3
-    assert (13, 11) in ROOM01_DEBUG_SCAFFOLD
     for y in range(0, 19):
         for x in (8, 9, 10):
+            assert (y, x) in ROOM01_DEBUG_SCAFFOLD
             assert run01[y*32+x] == 8
     # This follows C64 UpdateRisingCloud's screen columns $0C-$0E, i.e. logical
     # room columns 8..10 after the four-column C64 playfield offset.
+
+    # The current Phase-48 debug route also has a property-2 bridge on logical
+    # row 17 from the right-hand entry platform to the cloud/climb columns.
+    assert ROOM01_PROPERTIES[4] == 2
+    for x in range(11, 25):
+        assert (17, x) in ROOM01_DEBUG_SCAFFOLD
+        assert run01[17*32+x] == 5
 
     run02 = scaffold02(base02)
     assert ROOM02_PROPERTIES[3] == 3
