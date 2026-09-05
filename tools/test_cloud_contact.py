@@ -13,7 +13,6 @@ def prop_for_code(code: int) -> int:
 
 
 def room01_prop_at_screen(screen_x: int, screen_y: int) -> int:
-    # Match room00_get_tile_xy border semantics used by the runtime.
     if screen_y < 3 or screen_y >= 23:
         return 0
     if screen_x < 2 or screen_x >= 38:
@@ -29,8 +28,6 @@ def room01_prop_at_screen(screen_x: int, screen_y: int) -> int:
 
 
 def prospective_push_blocked(monty_x: int, monty_y: int) -> bool:
-    # Python mirror of rising_cloud_can_push_up for the exact Room01 head-bump
-    # boundary. monty_y here is the current Y before a 1px upward cloud push.
     probe_y = ((monty_y - 1 - 0x32) & 0xFF) >> 3
     xraw = (monty_x - 0x0C) & 0xFF
     probe_x = xraw >> 2
@@ -40,6 +37,12 @@ def prospective_push_blocked(monty_x: int, monty_y: int) -> bool:
             if room01_prop_at_screen(sx, sy) == 1:
                 return True
     return False
+
+
+def cloud_room_boundary_allows_push(monty_y: int) -> bool:
+    # Runtime rule: $4D->$4C is the last legal cloud-supported pixel.
+    # At $4C, another push would make $4B and therefore create an UP exit.
+    return monty_y >= 0x4D
 
 
 def main():
@@ -53,7 +56,6 @@ def main():
     u = main.index('call    rising_cloud_update')
     assert c < u
 
-    # Landing remains event-only: fall/descent snaps to cloud_y-$10.
     assert 'sbc     #$10' in contact
     assert 'sta     <rising_cloud_contact_y' in contact
     assert 'cmp     #1' in contact
@@ -63,9 +65,6 @@ def main():
     assert 'cmp     #$fe' in contact
     assert 'rising_cloud_riding' not in contact
 
-    # Critical anti-stick rule: after the generic 2x3 property scan, exact cloud
-    # support is separated from monty_tile_state. It suppresses only auto-fall;
-    # normal fire/jump and horizontal input continue through .after_fall.
     assert 'rising_cloud_support:    ds 1' in cloud
     assert 'rising_cloud_support_update:' in cloud
     assert 'stz     <monty_tile_state' in cloud
@@ -77,7 +76,6 @@ def main():
     assert 'lda joynow\n        and #$80' in input_code
     assert 'lda joynow\n        and #$20' in input_code
 
-    # No persistent rider state. Push is exact and input-state driven.
     assert 'rising_cloud_riding' not in cloud
     assert 'rising_cloud_detect_push:' in cloud
     assert 'lda     <monty_jump_phase' in cloud
@@ -85,8 +83,15 @@ def main():
     assert 'cmp     #$36' in cloud and 'cmp     #$49' in cloud
     assert 'cmp     <monty_y' in cloud
 
-    # Ceiling/wall protection checks the complete prospective footprint without
-    # relying on the ordinary 8px-aligned CheckTileAbove gate.
+    # Hard topology guard: moving cloud support may never itself create an UP exit.
+    move = cloud[cloud.index('.move_tick:'):cloud.index('rising_cloud_detect_push:')]
+    assert 'lda     <monty_y' in move
+    assert 'cmp     #$4d' in move
+    assert 'bcc     .refresh' in move
+    assert move.index('cmp     #$4d') < move.index('dec     <monty_y')
+    assert cloud_room_boundary_allows_push(0x4D)
+    assert not cloud_room_boundary_allows_push(0x4C)
+
     assert 'rising_cloud_can_push_up:' in cloud
     guard = cloud[cloud.index('rising_cloud_can_push_up:'):cloud.index('rising_cloud_refresh_row:')]
     assert 'call    room00_get_property_xy' in guard
@@ -97,16 +102,12 @@ def main():
     assert 'dec     <rising_cloud_y' in cloud
     assert 'dec     <monty_y' in cloud
 
-    # Concrete Room01 head-bump geometry at the real cloud columns. Row 1 is
-    # empty, row 0 is a property-1 ceiling. At cloud_y=$63 Monty may still move
-    # from Y=$53 to $52. On the next odd cloud tick (cloud_y=$62, Monty Y=$52),
-    # the prospective Y=$51 footprint reaches row 0 and MUST be blocked.
     assert room01_prop_at_screen(12, 4) == 0
     assert room01_prop_at_screen(12, 3) == 1
     assert not prospective_push_blocked(0x3C, 0x53)
     assert prospective_push_blocked(0x3C, 0x52)
 
-    print('OK: Room01 cloud walk/jump free; exact $63->$62 ceiling boundary blocks head push without clipping')
+    print('OK: Room01 cloud walk/jump free; ceiling footprint + hard $4C top-exit guard prevent cloud room transition')
 
 
 if __name__ == '__main__':
