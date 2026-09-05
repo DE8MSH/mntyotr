@@ -95,7 +95,13 @@ python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
 python3 "$ROOT/tools/cloud_sprite.py" --write "$BUILD/cloud-sprites.dat" >/dev/null
-python3 "$ROOT/tools/enemy_room00.py" --skate "$BUILD/enemy00-skate.dat" --smiley "$BUILD/enemy00-smiley.dat" >/dev/null
+python3 "$ROOT/tools/enemy_room00.py" \
+  --skate "$BUILD/enemy-type09-skate.dat" \
+  --clock "$BUILD/enemy-type0e-clock.dat" \
+  --big-nose "$BUILD/enemy-type0f-big-nose.dat" \
+  --wasp "$BUILD/enemy-type14-wasp.dat" \
+  --kettle "$BUILD/enemy-type18-kettle.dat" \
+  --smiley "$BUILD/enemy-type19-smiley.dat" >/dev/null
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
