@@ -34,6 +34,7 @@
         include "game_life.asm"
         include "monty_sprite.asm"
         include "debug_room.asm"
+        include "debug_room_warp.asm"
         include "debug_footer_visible.asm"
         ; Large banked room/decor/sprite data is appended after gameplay/runtime.
         include "moving_lift_assets_tail.asm"
@@ -151,6 +152,7 @@ bare_main:
         call    enemy_smiley_init
         call    game_life_init
         call    debug_room_init
+        call    debug_room_warp_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
         call    monty_sprite_update_satb
@@ -162,6 +164,24 @@ bare_main:
 main_loop:
         call    wait_vsync
         call    read_joypads
+
+        ; QA shortcut: one SELECT press loads the next supported room immediately.
+        ; Skip the gameplay tick on the warp frame so the fresh spawn cannot be
+        ; consumed by a stale collision/action before room-scoped state is synced.
+        call    debug_room_warp_poll
+        bcc     .after_debug_room_warp
+        call    rising_cloud_room_sync
+        call    rising_bollard_room_sync
+        call    moving_lift_room_sync
+        call    enemy_smiley_room_sync
+        call    game_life_room_sync
+        call    debug_room_draw
+        call    monty_sprite_update_satb
+        call    moving_lift_update_satb
+        call    enemy_smiley_update_satb
+        call    rising_cloud_sprite_update_satb
+        jmp     main_loop
+.after_debug_room_warp:
 
         call    game_clock_step
         bcc     main_loop
