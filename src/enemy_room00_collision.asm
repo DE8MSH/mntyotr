@@ -227,10 +227,10 @@ enemy_col_e2:           ds 1
         lda     [_bp],y                 ; left tile plane0 high byte = pixels 0..7
         sta     enemy_col_monty_mask,x
         inx
-        lda     enemy_col_tmp            ; low byte = pixels 8..15
+        lda     enemy_col_tmp           ; low byte = pixels 8..15
         sta     enemy_col_monty_mask,x
         inx
-        lda     [_di],y                  ; right high byte = pixels 16..23
+        lda     [_di],y                 ; right high byte = pixels 16..23
         sta     enemy_col_monty_mask,x
         inx
         iny
@@ -329,7 +329,9 @@ enemy_col_e2:           ds 1
         sec
         sbc     <monty_x
         cmp     #12                     ; 12 half-pixels = full 24px width
-        bcs     .no_overlap
+        bcc     .x_right_ok
+        jmp     .no_overlap
+.x_right_ok:
         asl     a
         sta     enemy_col_shift
         stz     enemy_col_shift_side    ; enemy starts to the right
@@ -339,7 +341,9 @@ enemy_col_e2:           ds 1
         sec
         sbc     enemy_col_enemy_x
         cmp     #12
-        bcs     .no_overlap
+        bcc     .x_left_ok
+        jmp     .no_overlap
+.x_left_ok:
         asl     a
         sta     enemy_col_shift
         lda     #1
@@ -357,7 +361,9 @@ enemy_col_e2:           ds 1
         sec
         sbc     enemy_col_tmp           ; enemy below Monty
         cmp     #21
-        bcs     .no_overlap
+        bcc     .y_below_ok
+        jmp     .no_overlap
+.y_below_ok:
         sta     enemy_col_mrow
         stz     enemy_col_erow
         lda     #21
@@ -371,7 +377,9 @@ enemy_col_e2:           ds 1
         sec
         sbc     enemy_col_enemy_y
         cmp     #21
-        bcs     .no_overlap
+        bcc     .y_above_ok
+        jmp     .no_overlap
+.y_above_ok:
         sta     enemy_col_erow
         stz     enemy_col_mrow
         lda     #21
@@ -475,7 +483,9 @@ enemy_col_e2:           ds 1
         inc     <_di+1
 .di_ok:
         dec     enemy_col_rows
-        bne     .row_loop
+        beq     .rows_done
+        jmp     .row_loop
+.rows_done:
 
 .no_overlap:
         clc
