@@ -26,7 +26,8 @@ rising_bollard_room_sync:
         lda     <monty_room
         cmp     <rising_bollard_last_room
         bne     .changed
-        jmp     piledriver_room_sync
+        call    piledriver_room_sync
+        rts
 .changed:
         sta     <rising_bollard_last_room
         stz     <rising_bollard_active
