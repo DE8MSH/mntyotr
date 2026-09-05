@@ -42,8 +42,8 @@ def main():
     assert 'include "standard_piledriver_bundle.asm"' in bollard
     assert 'include "standard_piledriver_static.asm"' in bundle
 
-    # Proven static DrawShaft is retained; only the safe regenerated-char
-    # animation is now ticked. Old mutable-buffer runtime remains unused.
+    # Proven DrawShaft is retained; only the safe regenerated-char animation is
+    # ticked. The old mutable-buffer runtime stays disconnected.
     assert 'jmp     piledriver_static_init' in bollard
     assert 'jmp     piledriver_static_room_sync' in bollard
     assert 'call    piledriver_static_update' in bollard
@@ -58,8 +58,8 @@ def main():
     assert 'lda     #$1f' in static
     assert 'lda     #$2f' in static
 
-    # Original state machine: random delay $14..$53, position starts 5,
-    # descends/retracts in 2px steps. Visible shift is exactly position-5.
+    # Original state machine: delay $14..$53, position starts at 5 and changes
+    # by two pixels per update. Visible displacement is exactly position-5.
     assert 'piledriver_static_update:' in static
     assert 'and     #$3f' in static and 'adc     #$14' in static
     assert 'lda     #5\n        sta     <pile_static_position' in static
@@ -68,11 +68,12 @@ def main():
     assert static.count('sbc     #5\n        sta     <pile_static_shift') == 2
     assert 'lda     #2\n        sta     <pile_static_state' in static
 
-    # Safe renderer regenerates the C64 48-byte-column shift directly, avoiding
-    # the crash-prone 144-byte RAM pointer walks.
+    # Safe renderer regenerates each 18-tile set directly from the C64 seed and
+    # shift. Test behaviour/structure rather than private scratch-symbol names.
     assert 'piledriver_static_upload_selected:' in static
-    assert 'piledriver_static_global' in static
+    assert 'piledriver_static_upload_common:' in static
     assert 'sbc     <pile_static_shift' in static
+    assert 'cmp     #6' in static and 'cmp     #12' in static
     assert 'piledriver_buf0' not in static
     assert 'piledriver_buf1' not in static
 
@@ -99,7 +100,7 @@ def main():
     for event in ('#2','#3','#4','#5','#7'):
         assert f'cmp     {event}' in life
 
-    print('OK: Room01 proven DrawShaft + safe original Piledriver 2px down/up animation; collision still gated')
+    print('OK: Room01 DrawShaft + safe original Piledriver 2px down/up animation; collision still gated')
 
 
 if __name__ == '__main__':
