@@ -19,6 +19,7 @@
         include "jump_collision_sweep.asm"
         include "collision_banking.asm"
         include "rising_cloud.asm"
+        include "rising_cloud_sprite.asm"
         include "rising_bollard.asm"
         include "moving_lift.asm"
         include "world.asm"
@@ -34,6 +35,7 @@
         ; Large banked room/decor data is appended after gameplay/runtime code so
         ; adding new content cannot move the confirmed physics/collision layout.
         include "moving_lift_assets_tail.asm"
+        include "rising_cloud_sprite_assets_tail.asm"
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
@@ -116,6 +118,18 @@ bare_main:
         sta     <_bp + 1
         ldy     #^moving_lift_palette
         call    load_palettes
+
+        ; Sprite palette 18: authentic white rising cloud.
+        lda     #18
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<rising_cloud_sprite_palette
+        sta     <_bp + 0
+        lda     #>rising_cloud_sprite_palette
+        sta     <_bp + 1
+        ldy     #^rising_cloud_sprite_palette
+        call    load_palettes
         call    xfer_palettes
 
         call    draw_room00_native
@@ -124,6 +138,7 @@ bare_main:
         call    world_init
         call    rising_cloud_init
         call    rising_cloud_room_sync
+        call    rising_cloud_sprite_init
         call    rising_bollard_init
         call    rising_bollard_room_sync
         call    moving_lift_init
@@ -134,6 +149,7 @@ bare_main:
         call    monty_sprite_init
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
+        call    rising_cloud_sprite_update_satb
         call    set_dspon
 
 main_loop:
@@ -229,9 +245,10 @@ main_loop:
         call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; Lift uses SAT entries 2..5; update after Monty's entries 0..1, then
-        ; re-arm SAT DMA from the shared SAT_ADDR.
+        ; Mechanism sprites use SAT entries after Monty's two entries. Update all
+        ; writers before the final SAT-DMA arm; cloud occupies entries 6..7.
         call    moving_lift_update_satb
+        call    rising_cloud_sprite_update_satb
         jmp     main_loop
 
 init_c64_video:
