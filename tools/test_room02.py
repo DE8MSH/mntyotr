@@ -53,15 +53,15 @@ def main():
     assert 'BANK(room02_collision_map_rom)' in loader
     assert 'world_room_supported:' in world
 
-    # Room02 remains an interior room; outer-edge policy must not be tied to it.
-    guard = main_asm.index('lda     <collision_actual_room')
-    guard_end = main_asm.index('.guard_room00_right:', guard)
-    outer_left_guard = main_asm[guard:guard_end]
-    assert 'cmp     #4' in outer_left_guard
-    assert 'cmp     #1' in outer_left_guard
-    assert 'lda     #$15' in outer_left_guard
+    # Room02 remains an interior room. The pre-world jump guard must not encode
+    # any Room02-specific topology; Phase 46 special-cases only Room00 right.
+    guard = main_asm.split('; Phase 46 opens the original continuation', 1)[1]
+    guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
+    assert 'cmp     #2' in guard          # exit direction: right
+    assert 'cmp     #4' not in guard      # no Room04 special case anymore
+    assert 'lda     #$9b' in guard
 
-    print('OK: Room 02 remains stable inside the active house route')
+    print('OK: Room 02 remains stable and topology-agnostic inside active route')
 
 
 if __name__ == '__main__':
