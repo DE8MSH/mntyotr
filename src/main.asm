@@ -20,6 +20,7 @@
         include "collision_banking.asm"
         include "rising_cloud.asm"
         include "rising_bollard.asm"
+        include "moving_lift.asm"
         include "world.asm"
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
@@ -31,6 +32,7 @@
         include "debug_footer_visible.asm"
         ; Large banked room/decor data is appended after gameplay/runtime code so
         ; adding new content cannot move the confirmed physics/collision layout.
+        include "moving_lift_assets_tail.asm"
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
@@ -90,6 +92,7 @@ bare_main:
         ldy     #^room03_extra_palette
         call    load_palettes
 
+        ; Sprite palette 16: Monty.
         lda     #16
         sta     <_al
         lda     #1
@@ -99,6 +102,18 @@ bare_main:
         lda     #>monty_sprite_palette
         sta     <_bp + 1
         ldy     #^monty_sprite_palette
+        call    load_palettes
+
+        ; Sprite palette 17: authentic multicolour lift pair.
+        lda     #17
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<moving_lift_palette
+        sta     <_bp + 0
+        lda     #>moving_lift_palette
+        sta     <_bp + 1
+        ldy     #^moving_lift_palette
         call    load_palettes
         call    xfer_palettes
 
@@ -110,10 +125,13 @@ bare_main:
         call    rising_cloud_room_sync
         call    rising_bollard_init
         call    rising_bollard_room_sync
+        call    moving_lift_init
+        call    moving_lift_room_sync
         call    debug_room_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
         call    monty_sprite_update_satb
+        call    moving_lift_update_satb
         call    set_dspon
 
 main_loop:
@@ -184,11 +202,10 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
-        ; Dynamic mechanisms run with the real room id restored. The cloud edits
-        ; Room01 collision for the next tick; the Room0C bollard carries Monty
-        ; directly, matching the C64 mechanism's game-mode-locked ride.
+        ; Dynamic mechanisms run with the real room id restored.
         call    rising_cloud_update
         call    rising_bollard_update
+        call    moving_lift_update
 
         call    world_resolve_exit
         bcc     .no_room_change
@@ -197,10 +214,14 @@ main_loop:
         ; Room-entry sync restores mutable/dynamic mechanism state after loading.
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
+        call    moving_lift_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
+        ; Lift uses SAT entries 2..5; update after Monty's entries 0..1, then
+        ; re-arm SAT DMA from the shared SAT_ADDR.
+        call    moving_lift_update_satb
         bra     main_loop
 
 init_c64_video:
