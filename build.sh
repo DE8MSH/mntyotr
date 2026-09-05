@@ -48,6 +48,30 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
 
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
+
+# Embed the exact source revision used for this ROM. The overlay font only needs
+# hexadecimal glyphs, so store the seven short-SHA characters as nibble bytes.
+COMMIT_HEX="$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || printf '0000000')"
+COMMIT_HEX="$(printf '%s' "$COMMIT_HEX" | tr '[:lower:]' '[:upper:]')"
+case "$COMMIT_HEX" in
+  ???????) ;;
+  *) COMMIT_HEX="0000000" ;;
+esac
+python3 - "$COMMIT_HEX" "$BUILD/build-commit.dat" <<'PY'
+import sys
+from pathlib import Path
+text = sys.argv[1]
+out = Path(sys.argv[2])
+try:
+    data = bytes(int(ch, 16) for ch in text)
+except ValueError:
+    text = '0000000'
+    data = bytes(7)
+assert len(data) == 7
+out.write_bytes(data)
+print(f'ROM commit overlay: {text}')
+PY
+
 python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" --screen-bat "$BUILD/room00-screen-bat.dat" --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01.py" --map "$BUILD/room01-map.dat" --screen-bat "$BUILD/room01-screen-bat.dat" --patterns "$BUILD/room01-patterns.dat" >/dev/null
