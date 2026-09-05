@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Generate exact C64 room-$09 map, PCE BAT and room-custom patterns.
+"""Generate C64 room-$09 map, PCE BAT and room-custom patterns.
 
 Primary reference: refactored/src/subsystems/room_data.asm + tiles.asm.
 Room $09 is directly above Room $01 in the original world grid.
+
+The exact RLE remains untouched. While the original Room-$01 rising cloud is
+represented by a temporary traversal scaffold, Room $09 gets a matching short
+property-3 entry scaffold so an upward room transition at Y=$DA cannot instantly
+fall back before the tester can reach the room's original central climb strip.
 """
 from __future__ import annotations
 
@@ -41,6 +46,22 @@ ROOM09_TILE_BITMAPS = (
 )
 
 PAL_BY_C64 = {0x0A: 10, 0x02: 2, 0x08: 11, 0x03: 3, 0x05: 12, 0x0D: 9}
+
+# Temporary continuation of the Room-$01 cloud-path scaffold. Code 6 is the
+# room's native tile $60, property 3. A short vertical section at cols 8..10
+# catches Monty at the bottom spawn, then row 15 bridges to the original
+# property-3 column 15 so normal Room-$09 geometry takes over above it.
+ROOM09_DEBUG_SCAFFOLD = tuple(
+    [(y, x) for y in range(15, 20) for x in (8, 9, 10)]
+    + [(15, x) for x in range(11, 16)]
+)
+
+
+def apply_debug_scaffold(cells: list[int]) -> list[int]:
+    out = list(cells)
+    for y, x in ROOM09_DEBUG_SCAFFOLD:
+        out[y * 32 + x] = 6
+    return out
 
 
 def c64_char_to_pce_tile(char: bytes) -> bytes:
@@ -81,12 +102,13 @@ def main() -> None:
     ap.add_argument('--screen-bat', type=Path, required=True)
     ap.add_argument('--patterns', type=Path, required=True)
     args = ap.parse_args()
-    cells = decode_room(ROOM09_RLE)
-    assert len(cells) == ROOM_CELLS
+    source_cells = decode_room(ROOM09_RLE)
+    assert len(source_cells) == ROOM_CELLS
+    cells = apply_debug_scaffold(source_cells)
     args.map.write_bytes(bytes(cells))
     args.screen_bat.write_bytes(make_screen_bat(cells))
     args.patterns.write_bytes(build_patterns())
-    print(f'room 09: {len(ROOM09_RLE)} compressed bytes -> {len(cells)} cells; 9 patterns')
+    print(f'room 09: {len(ROOM09_RLE)} exact compressed bytes -> {len(cells)} cells + temporary entry scaffold')
 
 
 if __name__ == '__main__':
