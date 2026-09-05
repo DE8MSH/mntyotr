@@ -10,8 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 assets = (ROOT / "src/room0f_assets_tail.asm").read_text()
 loader = (ROOT / "src/room050c_loader.asm").read_text()
 warp = (ROOT / "src/debug_room_warp.asm").read_text()
+world = (ROOT / "src/world.asm").read_text()
+enemies = (ROOT / "src/enemy_room0608_runtime.asm").read_text()
+main = (ROOT / "src/main.asm").read_text()
 
 cells = decode_room(ROOM0F_RLE)
+assert len(ROOM0F_RLE) == 114
 assert len(cells) == ROOM_CELLS == 640
 assert ROOM0F_TILE_IDS == (0x25,0x0f,0x02,0x64,0x27,0x6b,0x31,0x16)
 assert ROOM0F_COLOURS == (0x02,0x06,0x03,0x03,0x04,0x07,0x05,0x05)
@@ -22,14 +26,34 @@ assert len(make_screen_bat(cells)) == 36 * 20 * 2
 assert 'incbin "room0f-map.dat"' in assets
 assert 'db $01,$01,$01,$03,$02,$03,$02,$01' in assets
 
-# Room0F must be serviced by the compact external-room descriptor path.
+# Room0F must be serviced by the sparse descriptor path, which is relocated out
+# of Bank0 so future rooms only extend data tables.
 for needle in (
-    "$0f", "room0f_patterns", "room0f_screen_bat", "room0f_collision_map_rom",
+    ".proc room_load_pending_extended",
+    "ROOM_EXT_COUNT = 7",
+    "db $05,$06,$07,$08,$09,$0c,$0f",
+    "room0f_patterns", "room0f_screen_bat", "room0f_collision_map_rom",
 ):
     assert needle in loader, needle
 
-# QA SELECT cycle must include Room $0F and know its real world-grid cell row3/col15.
+# World and SELECT QA cycle now include the first ESCAPE TUNNEL room at row3/col15.
+assert "cmp     #$10" in world
 assert "cmp     #$10" in warp
-assert "$03" in warp and "$0f" in warp
+assert "db $02,$02,$02,$02,$02,$02,$01,$01,$01,$01,$03,$03,$03,$03,$03,$03" in warp
+assert "db $15,$14,$13,$12,$11,$10,$11,$12,$13,$14,$14,$13,$10,$11,$12,$0f" in warp
 
-print("OK: exact Room0F ESCAPE TUNNEL geometry, colours, properties, loader + SELECT reachability")
+# Exact four C64 enemy SetupRoom states for Room $0F.
+for needle in (
+    "db $68,$ca,$07,$15,$81,$17,$17,$03",  # Bubble
+    "db $84,$82,$03,$1b,$01,$23,$00,$02",  # Hand
+    "db $80,$ca,$0a,$0f,$82,$47,$47,$02",  # Big Nose / light red
+    "db $20,$62,$0e,$0f,$02,$9c,$00,$01",  # Big Nose / light blue
+    "db $06,$03,$0a,$09",
+    "enemy_palette_light_red",
+    "C64 $0A -> $0eb",
+):
+    assert needle in enemies, needle
+assert "call    enemy_room0f_palette_init" in main
+assert 'include "room0f_assets_tail.asm"' in main
+
+print("OK: exact Room0F ESCAPE TUNNEL geometry, collision, enemies, loader + SELECT reachability")
