@@ -1,146 +1,125 @@
 # Was bisher geschah
 
-Stand: 2026-09-05 — Phase 45
+Stand: 2026-09-05 — Phase 46
 
 ## Portierungsstand
 
-**Gesamtport: ca. 57 %**
+**Gesamtport: ca. 60 %**
 
-Primaere Referenz bleibt `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` ist nur zusaetzliche Ground-Truth.
+Primaere Referenz bleibt `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` ist zusaetzliche Ground-Truth. Die PC-Engine-Portierung verwendet weiterhin C64-Spielkoordinaten, PAL-logische Ticks und einen gemeinsamen 648-Byte-RAM-Collision-Cache fuer banked Tail-Raeume.
 
-## Bestaetigter Stand
+## Lokal bestaetigter Runtime-Stand
 
-- Raum $00/$01: Boden, Gehen, Springen, Landen und Animationen funktionieren.
-- Raum $01: Original-Decors aktiv.
-- Raum $02: spielbar, fuenf Original-Decors aktiv; vollstaendige Traversal/Mechanismen sind noch nicht fertig.
-- Raum $03: spielbar und lokal bestaetigt.
-- Raum $04, $0D und $0E: als aktive Basisraeume integriert.
-- Gemeinsamer 648-Byte-RAM-Collision-Cache fuer Tail-Raeume ist bewaehrt.
-- `monty_physics.asm` bleibt die empfindliche, bestaetigte Physics-Basis.
-- Phase 44b baut beim Nutzer mit PCEAS ohne Fehler.
-
-## Phase 44 — vertikale Weltkante und $0D/$0E
-
-Phase 44 portierte den fehlenden unteren Raumrand aus `Monty.UpdateMovement_down`: bei Y=$DA wird ein Down-Exit ausgeloest und Monty erscheint bei einem gueltigen Ziel oben auf Y=$4C.
-
-Damit wurde zunaechst die Weltkartenverbindung
-
-`$03 DOWN -> $0E LEFT -> $0D UP -> $04`
-
-aktiviert. Room $0D und $0E werden als Tail-Raeume geladen; ihre 640 Collision-Bytes plus 8 Properties werden in den gemeinsamen `room02_*`-RAM-Cache kopiert.
-
-### Phase 44a — Room-$0D-RLE repariert
-
-Der erste lokale Phase-44-Build stoppte mit `decoded 624 cells, expected 640`. In `tools/room0d.py` fehlte ein `$f0`-Run. Die Primaerquelle enthaelt an dieser Stelle fuenf aufeinanderfolgende `$f0`-Bytes. Der Stream ist jetzt 66 Bytes lang und dekodiert wieder exakt 640 Zellen.
-
-Commits:
-
-- `ae6ee6fd1d305cbdf947f7c9c6646597d639fa7a` — fehlenden `$f0`-Run wiederhergestellt
-- `8631166c1ba3b4ba623d616a2732a133fbd97212` — Regressionstest fuer die `$f0`-Sequenz
-- `3d70cbf8b10fd67d29d3f608e7c4d15046e81d4e` — 66-Byte-Stream im Test festgeschrieben
-
-### Phase 44b — PCEAS-Branch-Reichweite repariert
-
-Nach Phase 44a erreichte der Build PCEAS und stoppte in `src/world.asm` mit `Branch address out of range`. Der entfernte Fallback von `world_resolve_exit` lag inzwischen 130 Bytes hinter einem `BRA`; erlaubt sind nur -128..+127. Der Sprung ist deshalb jetzt ein absoluter `JMP`.
-
-Commits:
-
-- `6e7e8b8d15a6b81dfaa7f32c980c5e501980f704` — `bra .blocked` -> `jmp .blocked`
-- `87050f173643ae23d678ca5b1f533eeb8764e9fe` — Regressionstest fuer den Long Jump
-- `3d2daa0a4649a14d3dba186c29e064c635813971` — Phase 44b dokumentiert
-
-Der Nutzer hat Phase 44b lokal gebaut: **kein Assemblerfehler mehr**.
-
-## Phase 45 — Freeze im Loch von Room $01 erklaert
-
-Der anschliessende Runtime-Test zeigte zwei wichtige Dinge:
-
-1. Beim Fallen in das Loch von Room $01 fror das Spiel am unteren Rand ein.
-2. Der Abstecher in Room $02 fuehrte sichtbar nicht auf dem erwarteten Vorwaertsweg weiter.
-
-Der Freeze war kein akzeptabler Endzustand, sondern ein World-Gate-Fehler des noch unvollstaendigen Ports. `monty_check_down_room_edge` erzeugte bei Y=$DA korrekt einen Down-Exit. Die C64-Weltkarte hat unter Room $01 aber **Room $0A**. Da `$0A` noch keinen Loader hatte, blockierte `world_resolve_exit` den Wechsel und setzte Monty auf Y=$D9 zurueck. Im naechsten Fall-Tick wurde wieder Y=$DA erreicht: ein endloser `$D9 <-> $DA`-Loop, der wie ein Freeze aussieht.
-
-Der erneute Abgleich mit der originalen 6x23-Weltkarte zeigt den viel wichtigeren unteren Hausweg:
-
-`$00 LEFT -> $01`
+- PCEAS baut den Port wieder fehlerfrei.
+- Raum `$00/$01`: Gehen, Springen, Landen und Animationen funktionieren.
+- Raum `$01`: Original-Decors aktiv.
+- Raum `$02`: spielbar, fuenf Original-Decors aktiv; Mechanismen wie Piledriver fehlen noch.
+- Raum `$03`: spielbar und lokal bestaetigt.
+- Unterer Hausweg bis `$04` funktioniert inzwischen praktisch:
 
 `$01 DOWN -> $0A LEFT -> $0B LEFT -> $0E LEFT -> $0D UP -> $04`
 
-Danach zeigt die Weltkarte von `$04` nach links auf `$05`, das noch nicht portiert ist.
+- Fallen aus `$01` nach `$0A` funktioniert.
+- Rueckweg `$0A UP -> $01` funktioniert nach Korrektur der Room-$01-Kletterproperties.
+- Oben rechts wird dauerhaft die aktuelle Raum-ID zweistellig hexadezimal angezeigt (`00`, `01`, `0A`, ...). Das bleibt fuer die weitere Portierung aktiv.
 
-Room $02/$03 bilden weiterhin gueltige Weltzellen und bleiben als Seiten-/Alternativzweig aktiv. Dass Room $02 nicht einfach durchlaufen werden kann, ist in diesem Stadium nicht derselbe Fehler wie der Freeze: die originale Room-$02-Geometrie enthaelt unter anderem einen Piledriver/Zerstampfer, dessen Mechanik im PC-Engine-Port noch fehlt. Fuer den aktuellen Vorwaertstest ist Room $02 nicht noetig; wichtig ist, dass man von dort weiterhin nach rechts nach `$01` zurueck kann.
+## Wichtige Fixes seit Phase 44
 
-## Phase 45 — Room $0A/$0B
+### PCEAS Branch Range
 
-Room $0A und $0B wurden aus `refactored/src/subsystems/room_data.asm` und `tiles.asm` exakt als neue Tail-Raeume uebernommen.
+Der gewachsene `world_resolve_exit` hatte einen `BRA .blocked` ausserhalb der signed-8-bit-Reichweite. Der entfernte Sprung ist seit Phase 44b ein absoluter `JMP`; ein Regressionstest pinnt das fest.
 
-Room $0A:
+### Room-$0D-RLE
 
-- RLE: 116 Bytes -> exakt 640 Zellen
-- Tile-IDs `$0c,$65,$43,$3a,$00,$00,$00,$00`
-- Farben `$09,$05,$03,$04,$02,$00,$00,$00`
-- Properties `1,3,2,2,1,1,1,1`
+Im Room-$0D-Stream fehlte ein `$f0`-Run. Der exakte C64-Stream hat dort fuenf aufeinanderfolgende `$f0`-Bytes und dekodiert auf 640 Zellen.
 
-Room $0B:
+### Freeze beim Fallen aus Room `$01`
 
-- RLE: 124 Bytes -> exakt 640 Zellen
-- Tile-IDs `$05,$47,$65,$3b,$36,$62,$03,$51`
-- Farben `$0a,$03,$07,$04,$01,$05,$0d,$08`
-- Properties `1,1,3,2,2,3,1,4`
+Das war kein gewollter Zustand: unter `$01` liegt laut originaler 6x23-Weltkarte Room `$0A`. Solange `$0A` nicht geladen werden konnte, pendelte Monty am unteren Rand zwischen Y=$D9/$DA. Phase 45 aktivierte deshalb `$0A/$0B` und den echten unteren Hausweg.
 
-Alle benoetigten Farben liegen bereits in den vorhandenen BG-Palettenslots. Neue Paletteintraege sind fuer diese beiden Basisraeume nicht erforderlich.
+### Rueckweg `$0A -> $01`
 
-`world_room_supported` erlaubt jetzt `$00-$04`, `$0A`, `$0B`, `$0D` und `$0E`. Beide neuen Raeume benutzen denselben 648-Byte-RAM-Collision-Cache wie die bisherigen Tail-Raeume.
+Beim ersten Runtime-Test flackerte `$01` kurz auf und Monty fiel sofort nach `$0A` zurueck. Der Decompile-Abgleich zeigte einen alten Portierungsfehler in Room `$01`: Tile-IDs `$63` und `$64` liegen im C64-Bereich `$56-$76` und muessen Property 3 haben. Im Port standen sie auf 0.
 
-Weil `room_loader.asm` durch zwei weitere Raeume deutlich waechst, wurden dessen wachsende Selector-Spruenge gleichzeitig branch-range-sicher gemacht: Dispatch, Collision-Cache-Auswahl, Pattern-Upload und BAT-Draw benutzen an entfernten gemeinsamen Zielen absolute `JMP`s statt riskanter `BRA`s.
+Korrekte Room-$01-Properties:
 
-## Phase-45-Commits
+`1,3,1,1,2,1,4,3`
 
-- `b0e208b955127ac87a273d0a2acaddad2c480840` — exakter Room-$0A-Generator
-- `4edab57b53bdcd44df471f5c04496be116ea0f7d` — exakter Room-$0B-Generator
-- `119e0d64f3e39b70da72fe6b433e5537092d0328` — Room-$0A-Tail-Assets
-- `955547e165320f0f7cfbd7ad0b36182ce100390c` — Room-$0B-Tail-Assets
-- `0dfe6dd227415948b3c735269731e151f2439492` — `$0A/$0B` im World-Gate aktiviert
-- `7d3de5923e1286c45e1c388d564396ca45101c6a` — Loader/Cache/Upload/Draw fuer `$0A/$0B`, Long-Jump-sicher
-- `35d2564f3c913d28dde11f416ebac52acde662bc` — Tail-Assets in `main.asm` eingebunden
-- `14a3ee9da7e4fd23cfa3852634330f4f7ac148f0` — exakter `$0A/$0B`- und Topologie-Test
-- `57563a4c11087fccb4d9a2e3a69d2feeb0fc29bb` — Build erzeugt/testet `$0A/$0B`
-- `bc3b12fac65c9d363d9560ba8a1a86bd09f12425` — Collision-Cache-Test erweitert
-- `140c6fb0c923df2bb764042c658eb259376d35bd` — Vertical-Route-Test auf unteren Hausweg erweitert
-- `eaf809f139ab8c507096f05f7e93e16cdad90561` — Collision-Banking-Dokumentation aktualisiert
+Nach dieser Korrektur ist der Aufstieg `$0A UP -> $01` lokal bestaetigt.
 
-## Erwarteter lokaler Test fuer Phase 45
+## Phase 46 — Room `$05` und `$0C`
+
+Der naechste originale Weltabschnitt ist:
+
+`$04 LEFT -> $05 DOWN -> $0C`
+
+Die Weltkarte hat `$05` auf Zeile 2 / Spalte $10, direkt links von `$04`; darunter auf Zeile 3 liegt `$0C`. Die Room-$05-Geometrie besitzt unten einen echten Durchstieg, daher werden beide Raeume gemeinsam aktiviert.
+
+### Room `$05`
+
+- RLE: 122 Bytes -> exakt 640 Zellen
+- Tile-IDs: `$01,$41,$2b,$65,$67,$00,$3f,$63`
+- Farben: `$01,$05,$03,$04,$07,$0d,$02,$03`
+- Properties: `1,2,2,3,3,1,2,3`
+
+### Room `$0C`
+
+- RLE: 91 Bytes -> exakt 640 Zellen
+- Tile-IDs: `$05,$0f,$10,$28,$6a,$5f,$4f,$00`
+- Farben: `$0d,$05,$07,$03,$05,$02,$02,$00`
+- Properties: `1,1,1,2,3,3,4,1`
+
+Die Properties wurden erneut direkt gegen `Monty.SetTileProperty` geprueft. Beide Raeume brauchen keine neuen BG-Paletten; alle Farben sind bereits vorhanden.
+
+## Phase-46-Architektur
+
+`room_loader.asm` bleibt bewusst unveraendert, weil dieser Pfad fuer die bisher aktiven Raeume bereits lokal bestaetigt ist. Statt ihn weiter wachsen zu lassen, liegt fuer `$05/$0C` jetzt `src/room050c_loader.asm` davor:
+
+- behandelt Pending Room `$05` und `$0C` selbst,
+- faellt fuer alle aelteren Raeume per `JMP room_load_pending` auf den bestaetigten Loader zurueck,
+- verwendet dieselben gemeinsamen Routinen fuer Pattern-Upload, 36x20-BAT-Draw und 648-Byte-Collision-Cache.
+
+Der alte Jump-Guard, der `$04 LEFT` absichtlich blockierte solange `$05` nicht geladen war, ist entfernt. Der echte Aussenrand `$00 RIGHT` bleibt vorab gesperrt; weitere nicht portierte Ziele blockiert `world_resolve_exit` selbst.
+
+## Neue/aktualisierte Phase-46-Tests
+
+- `tools/test_room050c.py` — exakte RLE/Tile/Property-Daten, Weltpositionen, Loader-Extension und offene `$04->$05`-Kante
+- `tools/test_vertical_route.py` — untere Route bis `$05->$0C`
+- `tools/test_collision_banking.py` — `$05/$0C` im gemeinsamen RAM-Cache
+- `tools/test_jump_edge_guard.py` — `$04->$05` darf nicht wieder vorab blockiert werden
+- `tools/test_room02.py` — Edge-Test wieder topology-agnostisch
+- `tools/test_room01.py` — neuer Loader-Dispatcher faellt korrekt auf den bestaetigten alten Loader zurueck
+
+`build.sh` erzeugt jetzt auch `room05-*.dat` und `room0c-*.dat` und fuehrt `test_room050c.py` vor PCEAS aus.
+
+## Erwarteter lokaler Test fuer Phase 46
 
 Nach:
 
 `git pull && ./build.sh`
 
-sollen alle Python-Regressionstests einschliesslich
+soll zusaetzlich erscheinen:
 
-`OK: exact Room 0A/0B assets + lower-house route wiring`
+`OK: exact Room 05/0C assets + $04->$05->$0C continuation wiring`
 
-laufen und PCEAS wieder `build/monty.pce` erzeugen.
+Danach in Mednafen den bestaetigten Weg bis `$04` laufen und weiter testen:
 
-Danach in Mednafen gezielt testen:
+1. `$04` nach links -> Debug-ID muss auf `05` wechseln und dort bleiben.
+2. In `$05` Gehen, Springen, Collision und Rueckweg rechts -> `$04` testen.
+3. Den unteren Durchstieg in `$05` finden und nach `$0C` fallen; Debug-ID muss `0C` anzeigen.
+4. Falls ein Aufstieg `$0C -> $05` moeglich ist, ebenfalls testen und auf Flackern/sofortigen Rueckfall achten.
+5. In `$0C` noch nicht erwarten, dass Gegner, Decors oder alle Mechanismen vorhanden sind.
 
-1. `$00 -> links -> $01`.
-2. In `$01` in das Loch fallen: **kein Freeze mehr**, stattdessen muss `$0A` geladen werden.
-3. In `$0A` nach links -> `$0B`.
-4. In `$0B` nach links -> `$0E`.
-5. `$0E` links -> `$0D`.
-6. `$0D` oben -> `$04`.
-7. Rueckwege ebenfalls testen, insbesondere `$0A` oben -> `$01` und `$0B` rechts -> `$0A`.
-8. Room `$02` darf weiterhin betreten und nach rechts verlassen werden; seine noch fehlenden Mechanismen sind ein separater Portschritt.
+Die Weltkarte verzweigt von `$0C` weiter nach `$0F` (links), `$11` (unten) und `$0D` (rechts). Welcher dieser Zweige als naechstes portiert wird, wird nach dem Runtime-Test von `$05/$0C` entschieden.
 
-Room-$0A/$0B-Decors, Gegner und Piledriver-Mechanismen sind in Phase 45 noch nicht enthalten. Zuerst soll der echte untere Raumweg stabil werden.
+## Noch fehlend / spaeter
 
-## Naechste Portschritte
-
-1. Phase 45 lokal bauen und den unteren Hausweg in Mednafen bestaetigen.
-2. Falls `$0A/$0B` Traversal stabil ist: Room `$05` als naechste Zelle links von `$04` portieren.
-3. Original-Decors fuer die neu aktiven Raeume nachziehen.
-4. Piledriver/Zerstampfer und weitere Mechanismen portieren; damit auch Room-$02/$03 vollstaendig gegen das C64-Verhalten pruefen.
-5. Gegner, Items, HUD/Gameflow und Audio schrittweise ergaenzen.
+- Decors fuer viele neu aktive Raeume
+- Piledriver/Zerstampfer und weitere Room-Mechanismen
+- Gegner
+- Items/Sammelobjekte
+- HUD/Gameflow/Leben/Tod
+- Musik und SFX
 
 ## Referenzen
 
