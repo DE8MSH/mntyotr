@@ -1,22 +1,20 @@
-; Phase 50: Room $01 rising cloud collision + stateless moving-platform support.
+; Phase 50: Room $01 rising cloud aligned with the original C64 routine.
 ;
-; C64 SpecialItems.UpdateRisingCloud:
-;   - active only in Room $01
-;   - fixed screen columns $0C-$0E (logical room cols 8..10)
-;   - moves upward one pixel on odd logical ticks
-;   - writes screen code $08 (Room01 tile $64 / property 3) into its row
-;   - clears the row below as the cloud rises
+; Original C64 SpecialItems.UpdateRisingCloud does NOT move Monty directly.
+; It only:
+;   - advances cloud_tick,
+;   - moves the cloud sprite up by 1px on odd ticks,
+;   - writes code $08/property-3 into screen columns $0C-$0E,
+;   - clears the trail row below.
 ;
-; The PCE port keeps the authentic mutable property-3 strip for source parity,
-; but separates "standing on the moving cloud" from generic monty_tile_state.
-; rising_cloud_support_update is called from the input path after UpdateTileFlags;
-; exact cloud support clears the generic tile-state for that tick so the cloud
-; cannot behave like a climb/ladder surface while still suppressing auto-fall.
+; Monty's own movement/collision runs before UpdateRisingCloud in the original
+; frame order. Therefore this module never writes monty_y and can never create
+; an UP room exit by pushing Monty through a ceiling.
 ;
-; Before a 1px upward push the COMPLETE prospective 2x3/3x3 tile footprint is
-; checked for property-1 solids. The moving cloud is also forbidden from pushing
-; Monty itself across the C64 top-room threshold: Y=$4C is the highest position
-; reachable by cloud support, and only Monty's own movement may create an UP exit.
+; The only PCE-specific adaptation retained is rising_cloud_support_update:
+; because our generic property-3 footprint scan can otherwise make the cloud
+; behave like a ladder, exact cloud support is separated from monty_tile_state
+; while preserving normal jump/left/right input.
 
 CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12
@@ -25,19 +23,12 @@ CLOUD_PAL           = 12
 CLOUD_BAT_WORD      = $c000+CHR_GAME+CLOUD_CODE
 
 .zp
-rising_cloud_last_room:  ds 1
-rising_cloud_y:          ds 1
-rising_cloud_tick:       ds 1
-rising_cloud_row:        ds 1
-rising_cloud_support:    ds 1
-rising_cloud_push:       ds 1
-rising_cloud_tmp_row:    ds 1
-rising_cloud_top_y:      ds 1
-rising_cloud_probe_x:    ds 1
-rising_cloud_probe_y:    ds 1
-rising_cloud_probe_cols: ds 1
-rising_cloud_probe_rows: ds 1
-rising_cloud_probe_ctr:  ds 1
+rising_cloud_last_room: ds 1
+rising_cloud_y:         ds 1
+rising_cloud_tick:      ds 1
+rising_cloud_row:       ds 1
+rising_cloud_support:   ds 1
+rising_cloud_tmp_row:   ds 1
 
 .code
 
@@ -49,7 +40,6 @@ rising_cloud_init:
         sta     <rising_cloud_y
         stz     <rising_cloud_tick
         stz     <rising_cloud_support
-        stz     <rising_cloud_push
         rts
 
 rising_cloud_room_sync:
@@ -60,7 +50,6 @@ rising_cloud_room_sync:
 .changed:
         sta     <rising_cloud_last_room
         stz     <rising_cloud_support
-        stz     <rising_cloud_push
         cmp     #1
         beq     .enter_room01
         lda     #$ff
@@ -118,9 +107,8 @@ rising_cloud_copy_room01_map:
         plp
         rts
 
-; Called from monty_update_input directly after monty_update_tile_state.
-; This does not move Monty. It only reports exact moving-platform support and
-; removes the cloud's dynamic property-3 cell from generic climb semantics.
+; PCE adaptation only: report exact support without turning the moving cloud
+; into a climbable property-3 ladder. This routine never moves Monty.
 rising_cloud_support_update:
         stz     <rising_cloud_support
         lda     <monty_room
@@ -151,6 +139,8 @@ rising_cloud_support_update:
 .done:
         rts
 
+; Exact original ordering inside UpdateRisingCloud: cloud tick changes first;
+; only odd ticks move sprite Y. Monty position is never touched here.
 rising_cloud_update:
         lda     <monty_room
         cmp     #1
@@ -160,106 +150,13 @@ rising_cloud_update:
         inc     <rising_cloud_tick
         lda     <rising_cloud_tick
         and     #1
-        bne     .move_tick
-        rts
-.move_tick:
-        call    rising_cloud_detect_push
-        dec     <rising_cloud_y
-        lda     <rising_cloud_push
         beq     .refresh
-
-        ; A moving platform may support Monty up to the room boundary, but may
-        ; never create the UP exit itself. $4D->$4C is allowed; at $4C the next
-        ; pixel would be $4B and is therefore blocked before any Y write occurs.
-        lda     <monty_y
-        cmp     #$4d
-        bcc     .refresh
-
-        call    rising_cloud_can_push_up
-        bcs     .refresh
-        dec     <monty_y
-        lda     #1
-        sta     <monty_is_moving
+        dec     <rising_cloud_y
 .refresh:
         jmp     rising_cloud_refresh_row
 
-rising_cloud_detect_push:
-        stz     <rising_cloud_push
-        lda     <monty_jump_phase
-        bne     .done
-        lda     <monty_falling
-        bne     .done
-        lda     <monty_x
-        cmp     #$36
-        bcc     .done
-        cmp     #$49
-        bcs     .done
-        lda     <rising_cloud_y
-        sec
-        sbc     #$10
-        sta     <rising_cloud_top_y
-        cmp     <monty_y
-        bne     .done
-        lda     #1
-        sta     <rising_cloud_push
-.done:
-        rts
-
-; C=1 if moving Monty upward by one pixel would make ANY tile in his complete
-; prospective footprint overlap a property-1 solid. No 8px alignment gate.
-rising_cloud_can_push_up:
-        lda     <monty_y
-        sec
-        sbc     #1
-        sec
-        sbc     #$32
-        lsr     a
-        lsr     a
-        lsr     a
-        sta     <rising_cloud_probe_y
-        lda     <monty_x
-        sec
-        sbc     #$0c
-        pha
-        lsr     a
-        lsr     a
-        sta     <rising_cloud_probe_x
-        pla
-        and     #$03
-        beq     .two_cols
-        lda     #3
-        bra     .store_cols
-.two_cols:
-        lda     #2
-.store_cols:
-        sta     <rising_cloud_probe_cols
-        lda     #3
-        sta     <rising_cloud_probe_rows
-.row_loop:
-        lda     <rising_cloud_probe_cols
-        sta     <rising_cloud_probe_ctr
-        ldx     <rising_cloud_probe_x
-        ldy     <rising_cloud_probe_y
-.col_loop:
-        phx
-        phy
-        call    room00_get_property_xy
-        ply
-        plx
-        cmp     #$01
-        beq     .blocked
-        inx
-        dec     <rising_cloud_probe_ctr
-        bne     .col_loop
-        inc     <rising_cloud_probe_y
-        dec     <rising_cloud_probe_rows
-        bne     .row_loop
-        clc
-        rts
-.blocked:
-        sec
-        rts
-
+; Convert C64 sprite Y into the logical row receiving code $08. $D9 maps to
+; row17; $52 maps to row1. Once Y<$52 the original clears the top visible row.
 rising_cloud_refresh_row:
         lda     <rising_cloud_y
         cmp     #$da
