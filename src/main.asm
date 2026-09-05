@@ -19,6 +19,7 @@
         include "jump_collision_sweep.asm"
         include "collision_banking.asm"
         include "rising_cloud.asm"
+        include "rising_cloud_contact.asm"
         include "rising_cloud_sprite.asm"
         include "rising_bollard.asm"
         include "moving_lift.asm"
@@ -220,7 +221,10 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
-        ; Dynamic mechanisms run with the real room id restored.
+        ; Dynamic mechanisms run with the real room id restored. Because the
+        ; cloud itself moves at pixel precision, resolve its landing contact
+        ; before advancing it; rising_cloud_update then carries a rider upward.
+        call    rising_cloud_contact_update
         call    rising_cloud_update
         call    rising_bollard_update
         call    moving_lift_update
