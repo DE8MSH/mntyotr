@@ -51,10 +51,9 @@ game_life_room_sync:
         rts
 
 ; C=1 if a death was consumed and the caller must skip normal world resolution.
-; Current action_counter values used by the port/reference:
-;   2 enemy hit/alive, 3 lift squash, 4 piledriver, 5 property-4 hazard,
-;   7 enemy hit/dead.  Event 6 is completion in the C64 dispatch and is NOT death.
-game_life_check:
+; This routine is --newproc-relocated so Bank 0 keeps enough thunk space for
+; subsequent rooms/systems.
+.proc game_life_check
         lda     <monty_action_counter
         cmp     #2
         beq     .death
@@ -67,7 +66,7 @@ game_life_check:
         cmp     #7
         beq     .death
         clc
-        rts
+        leave
 .death:
         stz     <monty_action_counter
         lda     <game_lives
@@ -102,7 +101,8 @@ game_life_check:
         lda     #1
         sta     <game_respawn_pending
         sec
-        rts
+        leave
+.endp
 
 ; Reload graphics/collision/mechanisms after game_life_check returns C=1.
 game_life_reload:
