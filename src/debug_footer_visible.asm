@@ -1,31 +1,17 @@
-; Runtime copy of the port signature on the first BAT row below the 20-row
-; C64 playfield. The legacy debug_room writer still targets row 27; clear that
-; row after every debug_room_draw so only ONE footer remains visible.
+; Runtime port signature and build id below the 20-row C64 playfield.
+; Row 23: fixed footer text. Row 24: 7-digit build commit directly underneath.
+; The old row-27 writer was removed earlier, so no per-frame legacy clear is
+; needed anymore. This also returns enough main-bank bytes for the live HUD.
 ;
 ; Both footer text and commit nibbles live in banked .data. Always map their
-; banks before reading them; direct absolute LDA produced the observed repeated
-; 0000/1111 garbage once runtime/data growth moved them out of the active bank.
+; banks before reading them; direct absolute LDA produced repeated garbage once
+; runtime/data growth moved them out of the active bank.
 
 DEBUG_FOOTER_VISIBLE_BAT = 23*BAT_LINE
-DEBUG_FOOTER_LEGACY_BAT  = 27*BAT_LINE
 
 .code
 
 debug_footer_visible_draw:
-        lda     #<DEBUG_FOOTER_LEGACY_BAT
-        sta     <_di
-        lda     #>DEBUG_FOOTER_LEGACY_BAT
-        sta     <_di+1
-        call    vdc_di_to_mawr
-        ldx     #18
-.clear_legacy:
-        lda     #<(DEBUG_HEX_CHR+$10)
-        sta     VDC_DL
-        lda     #$70
-        sta     VDC_DH
-        dex
-        bne     .clear_legacy
-
         php
         sei
         tma3
