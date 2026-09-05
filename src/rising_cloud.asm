@@ -1,4 +1,4 @@
-; Phase 49: first real moving-room mechanism -- Room $01 rising cloud.
+; Phase 50: Room $01 rising cloud collision + rider carry.
 ;
 ; C64 SpecialItems.UpdateRisingCloud:
 ;   - active only in Room $01
@@ -7,15 +7,14 @@
 ;   - writes screen code $08 (Room01 tile $64 / property 3) into its row
 ;   - clears the row below as the cloud rises
 ;
-; The PCE port now keeps Room01 collision in RAM, so the moving property-3 strip
-; is real rather than a baked ladder. The visual first pass uses the authentic
-; Room01 code-8 character in the BAT; a later sprite-art pass can add the smooth
-; C64 cloud sprite without changing this collision behaviour.
+; Phase50 rider rule: landing is detected separately by rising_cloud_contact.asm.
+; Carry then uses an explicit riding flag and exact cloud-top geometry rather
+; than the broad property-3/tile-state heuristic that could make Monty feel glued.
 
 CLOUD_OFFSCREEN_ROW = $ff
-CLOUD_VIS_COL       = 12              ; exact C64 screen column $0C
+CLOUD_VIS_COL       = 12
 CLOUD_CODE          = 8
-CLOUD_PAL           = 12              ; Room01 code 8 uses C64 green $05
+CLOUD_PAL           = 12
 CLOUD_BAT_WORD      = $c000+CHR_GAME+CLOUD_CODE
 
 .zp
@@ -24,7 +23,9 @@ rising_cloud_y:         ds 1
 rising_cloud_tick:      ds 1
 rising_cloud_row:       ds 1
 rising_cloud_carry:     ds 1
+rising_cloud_riding:    ds 1
 rising_cloud_tmp_row:   ds 1
+rising_cloud_top_y:     ds 1
 
 .code
 
@@ -36,11 +37,9 @@ rising_cloud_init:
         sta     <rising_cloud_y
         stz     <rising_cloud_tick
         stz     <rising_cloud_carry
+        stz     <rising_cloud_riding
         rts
 
-; Call after world/room loading while monty_room contains the real room id.
-; A fresh Room01 entry restores its generated base collision map (exact source
-; plus temporary access bridge), then places the cloud at the bottom of its path.
 rising_cloud_room_sync:
         lda     <monty_room
         cmp     <rising_cloud_last_room
@@ -48,6 +47,8 @@ rising_cloud_room_sync:
         rts
 .changed:
         sta     <rising_cloud_last_room
+        stz     <rising_cloud_riding
+        stz     <rising_cloud_carry
         cmp     #1
         beq     .enter_room01
         lda     #$ff
@@ -62,8 +63,6 @@ rising_cloud_room_sync:
         sta     <rising_cloud_row
         jmp     rising_cloud_refresh_row
 
-; 640-byte ROM -> RAM copy. Room01 is now mutable just like the shared tail map,
-; but keeps its own dedicated RAM because its cloud changes collision every run.
 rising_cloud_copy_room01_map:
         php
         sei
@@ -112,18 +111,20 @@ rising_cloud_copy_room01_map:
         plp
         rts
 
-; Per logical gameplay tick. Carry detection happens before the cloud moves so
-; Monty keeps the same relative position when supported by its property-3 strip.
 rising_cloud_update:
         lda     <monty_room
         cmp     #1
         beq     .room01
+        stz     <rising_cloud_riding
         rts
 .room01:
         inc     <rising_cloud_tick
         lda     <rising_cloud_tick
         and     #1
         bne     .move_tick
+        ; Even ticks still validate attachment so walking/jumping releases
+        ; immediately instead of waiting for the next cloud movement tick.
+        call    rising_cloud_detect_carry
         rts
 .move_tick:
         call    rising_cloud_detect_carry
@@ -136,36 +137,46 @@ rising_cloud_update:
 .refresh:
         jmp     rising_cloud_refresh_row
 
-; C=not used. Sets carry=1 only when Monty's two-column footprint overlaps the
-; cloud columns and his feet are roughly 16 pixels above the cloud's Y, which is
-; the same geometry implied by CheckTileBelow's +2 character rows.
+; Carry only a rider created by rising_cloud_contact_update, and only while the
+; player still stands exactly on cloud_y-$10. Jumping/falling or leaving the
+; horizontal footprint clears the attachment immediately. No tile_state test is
+; used here, so the moving room character cannot re-attach Monty by itself.
 rising_cloud_detect_carry:
         stz     <rising_cloud_carry
+        lda     <rising_cloud_riding
+        bne     .check_motion
+        rts
+.check_motion:
         lda     <monty_jump_phase
-        bne     .done
+        beq     .check_fall
+        stz     <rising_cloud_riding
+        rts
+.check_fall:
         lda     <monty_falling
-        bne     .done
-        lda     <monty_tile_state
-        beq     .done
+        beq     .check_x
+        stz     <rising_cloud_riding
+        rts
+.check_x:
         lda     <monty_x
-        cmp     #$38
-        bcc     .done
-        cmp     #$48
-        bcs     .done
+        cmp     #$36
+        bcc     .release
+        cmp     #$49
+        bcs     .release
+
         lda     <rising_cloud_y
         sec
-        sbc     <monty_y
-        cmp     #14
-        bcc     .done
-        cmp     #22
-        bcs     .done
+        sbc     #$10
+        sta     <rising_cloud_top_y
+        cmp     <monty_y
+        bne     .release
+
         lda     #1
         sta     <rising_cloud_carry
-.done:
+        rts
+.release:
+        stz     <rising_cloud_riding
         rts
 
-; Convert C64 pixel Y into logical Room01 row. $D9 maps to row17; $52 maps to
-; row1. Below $52 and the wrapped/off-screen $DA-$FF range contain no cloud tile.
 rising_cloud_refresh_row:
         lda     <rising_cloud_y
         cmp     #$da
@@ -204,7 +215,6 @@ rising_cloud_refresh_row:
         sta     <rising_cloud_row
         jmp     rising_cloud_set_row
 
-; A = logical row 1..17. Cloud path base cells are empty in the exact room data.
 rising_cloud_clear_row:
         sta     <rising_cloud_tmp_row
         tax
@@ -275,14 +285,11 @@ rising_cloud_set_row:
         rts
 
 .data
-; row * 32 offsets into the 640-byte logical collision map.
 rising_cloud_row_lo:
         db $00,$20,$40,$60,$80,$a0,$c0,$e0,$00,$20,$40,$60,$80,$a0,$c0,$e0,$00,$20,$40,$60
 rising_cloud_row_hi:
         db $00,$00,$00,$00,$00,$00,$00,$00,$01,$01,$01,$01,$01,$01,$01,$01,$02,$02,$02,$02
 
-; BAT word addresses for C64 screen column $0C and logical rows 0..19
-; (screen rows logical+3). Only entries 1..17 are used by the cloud.
 rising_cloud_bat_lo:
         db <(3*BAT_LINE+CLOUD_VIS_COL),<(4*BAT_LINE+CLOUD_VIS_COL),<(5*BAT_LINE+CLOUD_VIS_COL),<(6*BAT_LINE+CLOUD_VIS_COL)
         db <(7*BAT_LINE+CLOUD_VIS_COL),<(8*BAT_LINE+CLOUD_VIS_COL),<(9*BAT_LINE+CLOUD_VIS_COL),<(10*BAT_LINE+CLOUD_VIS_COL)
