@@ -1,0 +1,50 @@
+name: Build and publish WIP release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    if: startsWith(github.event.head_commit.message, '[release]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install HuC toolchain
+        run: ./install.sh
+
+      - name: Build ROM
+        run: ./build.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: monty-pce-${{ github.sha }}
+          path: |
+            build/monty.pce
+            build/monty.sym
+            build/monty.lst
+          if-no-files-found: error
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA::7}"
+          tag="wip-${short}"
+          gh release create "$tag" \
+            build/monty.pce \
+            build/monty.sym \
+            build/monty.lst \
+            --target "$GITHUB_SHA" \
+            --title "Monty on the Run PCE WIP ${short}" \
+            --notes "PC Engine WIP build. Fixes the pceas --newproc .PROC thunk overlap in Bank 0 by sharing the score reset implementation, preserving score behaviour while freeing 11 bytes in Bank 0." \
+            --prerelease
