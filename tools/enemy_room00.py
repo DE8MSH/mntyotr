@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert authentic C64 enemy sprite blocks needed by Rooms $00-$05.
+"""Convert authentic C64 enemy sprite blocks needed by Rooms $00-$08.
 
 C64 UnpackSpriteGraphics deinterleaves each 32-byte source chunk into one
 64-byte VIC sprite frame. Types with four source frames are duplicated into
@@ -46,6 +46,16 @@ BIG_NOSE = bytes.fromhex(
 "18266168353b3e3e00000080f07effff1e1f2c576862771f7f0e000000804040"
 "304cc2c16b767d7d00000000c0fcfefe3d3e582e517b7f00fe7c000040a0a0"
 "00304cc2c163767d7d00000000c0f8fcfe3c3e182e30281e1ffe3e1c000050e8e8")
+RUBIK = bytes.fromhex(
+"030f304e324c732c00c0304830c810a87d6a5e340e0200005088502000000000"
+"030f304c304c732c00c0308830c810a87d6a5e340e0200005088502000000000"
+"030f3042304c732c00c030c830c810a87d6a5e340e0200005088502000000000"
+"030f3049304c732c00c0304830c810a87d6a5e340e0200005088502000000000")
+PI_PIE = bytes.fromhex(
+"030f1c3a3e7d7f00c0f018bcbcdefe00ffff007f7f3f3f00f9f900e2e6ccdc00"
+"030f1c3a3e7d0000c0f018bcbcde00ffff007f7f3f3f00f9f900e2e6ccdc0000"
+"030f1c3a3e000000c0f018bcbc00ffff007f7f3f3f00f9f900e2e6ccdc000000"
+"030f1c3a3e7d0000c0f018bcbcde00ffff007f7f3f3f00f9f900e2e6ccdc00")
 WASP = bytes.fromhex(
 "0c060602020202013060604040404080040b150b57cf83a120d0a8d0eaf3c185"
 "0000701c0c06020100000e3830604080040b150b57cf83a120d0a8d0eaf3c185"
@@ -84,6 +94,15 @@ HAND = bytes.fromhex(
 "071f3f3f7f7c77efe0f0b8b87cfcfefec7ce041819010000f4dbc35898800000"
 "071f3f3f7f7c77efe0f0b8b87cfcf8f6c3cc1d1901010000c75b9a9898800000"
 "071f3f3f7e796fd8c0e07070e0d81c6cc3db5b1b000000006070200000000000")
+TANK = bytes.fromhex(
+"003c4fb79bab837f000080c0f0f8fcfe00ffffc0155c401900ffff038000019900"
+"3c4f879bab837f000080c0f0f8fcfe00ffffc01d01404c00ffff03b88101cc00"
+"3c4fb783ab837f000080c0f0f8fcfe00ffffc00100006600ffff03a839006600"
+"3c4fb7b3bb837f000080c0f0f8fcfe00ffffc01c40003300ffff033800003300"
+"0001030f1f3f7f003cf2edd9d5c1fe00ffffc00100809900ffff03a83a029800"
+"0001030f1f3f7f003cf2e1d9d5c1fe00ffffc01d81803300ffff03b880023200"
+"0001030f1f3f7f003cf2edc1d5c1fe00ffffc0159c006600ffff038000006600"
+"0001030f1f3f7f003cf2edcdddc1fe00ffffc01c0000cc00ffff03380200cc")
 JELLY_FISH = bytes.fromhex(
 "000e3b301337ef8c00f0980cc4e67273ce6e272330101f1931f3e2c604745cc0"
 "705e632023276ecce0b09f01c3e272338cee373320605e733171e1c3327654dc"
@@ -122,9 +141,10 @@ def main():
     ap = argparse.ArgumentParser()
     specs = (
         ('skate', SKATE), ('lamp', LAMP), ('knight', KNIGHT), ('clock', CLOCK),
-        ('big-nose', BIG_NOSE), ('wasp', WASP), ('bubble', BUBBLE),
-        ('sad-ghost', SAD_GHOST), ('kettle', KETTLE), ('smiley', SMILEY),
-        ('hand', HAND), ('jelly-fish', JELLY_FISH),
+        ('big-nose', BIG_NOSE), ('rubik', RUBIK), ('pi-pie', PI_PIE),
+        ('wasp', WASP), ('bubble', BUBBLE), ('sad-ghost', SAD_GHOST),
+        ('kettle', KETTLE), ('smiley', SMILEY), ('hand', HAND), ('tank', TANK),
+        ('jelly-fish', JELLY_FISH),
     )
     for name, _ in specs:
         ap.add_argument('--' + name, type=Path, required=True)
@@ -132,7 +152,7 @@ def main():
     for name, blob in specs:
         path = getattr(a, name.replace('-', '_'))
         path.write_bytes(build8(blob))
-    print('Rooms00-05 enemies: 12 authentic C64 types -> 12 x 8 PCE frames')
+    print('Rooms00-08 enemies: 15 authentic C64 types -> 15 x 8 PCE frames')
 
 
 if __name__ == '__main__':
