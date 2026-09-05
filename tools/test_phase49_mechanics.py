@@ -16,7 +16,6 @@ def main():
     sweep = (ROOT/'src/jump_collision_sweep.asm').read_text()
     cloud = (ROOT/'src/rising_cloud.asm').read_text()
     bollard = (ROOT/'src/rising_bollard.asm').read_text()
-    pile = (ROOT/'src/standard_piledriver.asm').read_text()
     static = (ROOT/'src/standard_piledriver_static.asm').read_text()
     bundle = (ROOT/'src/standard_piledriver_bundle.asm').read_text()
     life = (ROOT/'src/game_life.asm').read_text()
@@ -43,41 +42,53 @@ def main():
     assert 'include "standard_piledriver_bundle.asm"' in bollard
     assert 'include "standard_piledriver_static.asm"' in bundle
 
-    # Safe staged rebuild: only original SeedGlyphs + DrawShaft is active.
+    # Proven static DrawShaft is retained; only the safe regenerated-char
+    # animation is now ticked. Old mutable-buffer runtime remains unused.
     assert 'jmp     piledriver_static_init' in bollard
     assert 'jmp     piledriver_static_room_sync' in bollard
+    assert 'call    piledriver_static_update' in bollard
     assert 'call    piledriver_update' not in bollard
     assert 'call    piledriver_room_sync' not in bollard
-    assert 'jmp     piledriver_init' not in bollard
 
-    # Exact currently visible C64 configs.
+    # Exact C64 configs for current rooms.
     assert 'room $01: col $07,row $05,height 4,char $10' in static
     assert 'col $1f,row $0c,height 6,char $22' in static
     assert 'room $02: col $15,row $05,height 4,char $10' in static
     assert 'room $0b: col $13,row $11,height 4,char $10' in static
+    assert 'lda     #$1f' in static
+    assert 'lda     #$2f' in static
 
-    # Initial charset has only first char of each 48-byte column seeded.
-    assert 'PILE_STATIC_CHR0 = CHR_GAME + 64' in static
-    assert 'PILE_STATIC_CHR1 = PILE_STATIC_CHR0 + 18' in static
-    assert 'cmp     #0' in static and 'cmp     #6' in static and 'cmp     #12' in static
+    # Original state machine: random delay $14..$53, position starts 5,
+    # descends/retracts in 2px steps. Visible shift is exactly position-5.
+    assert 'piledriver_static_update:' in static
+    assert 'and     #$3f' in static and 'adc     #$14' in static
+    assert 'lda     #5\n        sta     <pile_static_position' in static
+    assert static.count('inc     <pile_static_position') == 2
+    assert static.count('dec     <pile_static_position') == 2
+    assert static.count('sbc     #5\n        sta     <pile_static_shift') == 2
+    assert 'lda     #2\n        sta     <pile_static_state' in static
+
+    # Safe renderer regenerates the C64 48-byte-column shift directly, avoiding
+    # the crash-prone 144-byte RAM pointer walks.
+    assert 'piledriver_static_upload_selected:' in static
+    assert 'piledriver_static_global' in static
+    assert 'sbc     <pile_static_shift' in static
+    assert 'piledriver_buf0' not in static
+    assert 'piledriver_buf1' not in static
+
+    # Exact source seed glyphs and proven DrawShaft BAT high bytes.
     assert 'db $0f,$0f,$00,$ff,$ff,$ff,$7f,$00' in static
     assert 'db $ff,$ff,$00,$ff,$ff,$ff,$ff,$00' in static
     assert 'db $f0,$f0,$00,$ff,$ff,$ff,$fe,$00' in static
-
-    # DrawShaft uses fixed ZP row counter across VDC calls and original BAT coords.
     assert 'piledriver_static_draw:' in static
-    assert 'stz     <pile_static_i' in static
-    assert 'call    vdc_di_to_mawr' in static
-    assert 'cmp     <pile_static_height' in static
     assert 'lda     #$61' in static
     assert 'lda     #$51' in static
     assert 'lda     #$41' in static
 
-    # Full dynamic source remains in-tree, but intentionally gated until static
-    # Room01 geometry/art is confirmed stable in emulator.
-    assert '; $01,$07,$05,$04,$10 and $01,$1f,$0c,$06,$22' in pile
-    assert 'piledriver_shift_down:' in pile
-    assert 'piledriver_shift_up:' in pile
+    # This stage is visuals/state only. Standard Piledriver death collision is
+    # deliberately not wired until emulator confirms stable motion.
+    update = static[static.index('piledriver_static_update:'):static.index('piledriver_static_upload_selected:')]
+    assert 'monty_action_counter' not in update
 
     cells0d = decode_room(ROOM0D_RLE)
     assert len(cells0d) == 640
@@ -88,7 +99,7 @@ def main():
     for event in ('#2','#3','#4','#5','#7'):
         assert f'cmp     {event}' in life
 
-    print('OK: Room01 stable + safe static original SeedGlyphs/DrawShaft at both Piledriver configs; animation still gated')
+    print('OK: Room01 proven DrawShaft + safe original Piledriver 2px down/up animation; collision still gated')
 
 
 if __name__ == '__main__':
