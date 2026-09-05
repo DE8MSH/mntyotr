@@ -53,30 +53,26 @@ def main():
     assert 'BANK(room02_collision_map_rom)' in loader
     assert 'world_room_supported:' in world
 
-    # Runtime testing can make Room02 look like a jump-height bug, but its C64
-    # geometry deliberately contains a tall central solid wall. Entering from
-    # Room01 reaches the right-hand section; normal jumping is not supposed to
-    # turn this into a direct Room01->Room03 corridor.
+    # Exact source geometry remains pinned even though generated Phase-48 data
+    # overlays a temporary right-side traversal ladder for runtime testing.
     for y in range(9, 16):
         assert cells[y*32 + 16:y*32 + 21] == [2,2,2,2,2]
     for y in range(12, 18):
-        assert cells[y*32 + 25] == 4       # right-hand property-3 climb strip
+        assert cells[y*32 + 25] == 4
 
-    # The PCE port intentionally uses the exact C64 20-pixel ascent arc. Do not
-    # solve Room02 by increasing jump height and thereby breaking later rooms.
+    # Preserve the original C64 20-pixel ascent arc globally.
     exact_up = '$00,$03,$02,$02,$01,$02,$01,$01,$00,$01,$01,$01\n        db $00,$01,$01,$01,$00,$01,$00,$01,$00,$00,$ff'
     assert exact_up in physics
     assert sum((0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0)) == 20
 
-    # Room02 remains an interior room. The pre-world jump guard must not encode
-    # any Room02-specific topology; Phase 46 special-cases only Room00 right.
-    guard = main_asm.split('; Phase 46 opens the original continuation', 1)[1]
+    # Pre-world jump guard is topology-independent and only protects Room00 right.
+    guard = main_asm.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
-    assert 'cmp     #2' in guard          # exit direction: right
-    assert 'cmp     #4' not in guard      # no Room04 special case anymore
+    assert 'cmp     #2' in guard
+    assert 'cmp     #4' not in guard
     assert 'lda     #$9b' in guard
 
-    print('OK: Room 02 exact split geometry + original 20-pixel jump arc preserved')
+    print('OK: Room 02 exact source geometry + original 20-pixel jump arc preserved')
 
 
 if __name__ == '__main__':
