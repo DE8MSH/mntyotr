@@ -14,8 +14,8 @@ from room_rle import ROOM_CELLS, SCREEN_W, CHR_GAME, decode_room
 ROOM0D_RLE = bytes.fromhex(
     "f1 f1 81 f0 60 41 f0 a0 f0 f0 f0 f0 f1 21 c0 81 "
     "70 71 24 31 f0 50 21 20 31 f0 b0 31 f0 e0 01 f0 "
-    "f0 f0 f0 f0 22 20 12 f0 70 50 32 f0 50 53 52 f0 "
-    "30 23 a2 23 22 b0 13 f2 52 70 f2 b2 30 f2 f2 ff ff"
+    "f0 f0 f0 f0 f0 22 20 12 f0 70 50 32 f0 50 53 52 "
+    "f0 30 23 a2 23 22 b0 13 f2 52 70 f2 b2 30 f2 f2 ff ff"
 )
 
 ROOM0D_TILE_IDS = (0x05, 0x0F, 0x4F, 0x19, 0x00, 0x00, 0x00, 0x00)
