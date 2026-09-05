@@ -6,9 +6,10 @@
 ;   him two pixels upward.
 ; - UpdateRide then moves Monty upward one pixel per logical tick until Y<$62.
 ;
-; IMPORTANT: the new standard-Piledriver dynamic-BG renderer is temporarily
-; gated out of runtime after a reproducible Room-$01 entry crash. Keep its
-; source included while the static DrawShaft path is rebuilt in isolation.
+; Standard Piledriver rebuild status:
+; - crash-prone dynamic MoveDown/MoveUp path remains gated;
+; - safe static SeedGlyphs + DrawShaft runs only on room entry so the original
+;   shaft geometry/art can be verified before animation is re-enabled.
 
 .zp
 rising_bollard_active: ds 1
@@ -20,7 +21,7 @@ rising_bollard_init:
         stz     <rising_bollard_active
         lda     #$ff
         sta     <rising_bollard_last_room
-        rts
+        jmp     piledriver_static_init
 
 rising_bollard_room_sync:
         lda     <monty_room
@@ -30,9 +31,10 @@ rising_bollard_room_sync:
 .changed:
         sta     <rising_bollard_last_room
         stz     <rising_bollard_active
-        rts
+        jmp     piledriver_static_room_sync
 
-; Run after normal movement with the real room id restored.
+; Run after normal movement with the real room id restored. The standard
+; Piledriver is intentionally STATIC in this stage; no per-tick update runs.
 rising_bollard_update:
         lda     <monty_room
         cmp     #$0c
