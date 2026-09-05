@@ -33,8 +33,21 @@ enemy00_init:
         stz     enemy00_active
         stz     enemy00_smiley_anim
         stz     enemy00_skate_anim
+        ; Sprite assets are banked ROM data. Preserve the caller's MPR3/MPR4
+        ; mapping across both 2 KiB uploads, like the other bank-safe assets.
+        php
+        sei
+        tma3
+        pha
+        tma4
+        pha
         call    enemy00_upload_skate
         call    enemy00_upload_smiley
+        pla
+        tam4
+        pla
+        tam3
+        plp
         rts
 
 enemy00_room_sync:
