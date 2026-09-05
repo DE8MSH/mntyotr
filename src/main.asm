@@ -29,6 +29,8 @@
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
         include "room04_assets_tail.asm"
+        include "room0a_assets_tail.asm"
+        include "room0b_assets_tail.asm"
         include "room0d_assets_tail.asm"
         include "room0e_assets_tail.asm"
 
@@ -109,8 +111,9 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Active route now includes the original detour $03 -> $0E -> $0D -> $04.
-        ; Room $04 left still points at unloaded $05, and Room $00 right is $ff.
+        ; Active route now includes the lower house cells $01->$0A and
+        ; $02->$0B->$0E->$0D->$04. Room $04 left still points at unloaded $05,
+        ; and Room $00 right is the original $ff outside cell.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -161,8 +164,8 @@ main_loop:
 .after_jump_exit_guard:
 
         ; The original movement engine emits a down-room exit at Y=$DA.
-        ; This was the missing traversal piece that hid the real route around
-        ; Room $03's wall: $03 down->$0E, left->$0D, up->$04.
+        ; Besides the $03->$0E detour, this is required for the visible floor
+        ; openings $01->$0A and $02->$0B discovered by runtime testing.
         call    monty_check_down_room_edge
         call    collision_bank_exit
 
