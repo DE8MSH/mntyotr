@@ -433,7 +433,9 @@ enemy_tmp_xhi:            ds 1
         jsr     .move_horizontal
 .animate:
         ldy     enemy_tmp_slot
-        inc     enemy_anim_timer_tbl,y
+        lda     enemy_anim_timer_tbl,y
+        ina
+        sta     enemy_anim_timer_tbl,y
         rts
 
 .move_vertical:
