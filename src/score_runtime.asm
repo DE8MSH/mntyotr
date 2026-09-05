@@ -9,13 +9,18 @@ score_digits:           ds 5
 score_lsb:              ds 1
 
 .code
+; Startup and the later arrested-ending reset are identical operations.
+; Keep both public labels, but share one 11-byte implementation. Besides
+; avoiding duplicate code, this leaves enough Bank 0 tail room for pceas
+; --newproc's generated .PROC thunk at $FF6F-$FF74.
 score_init:
-        ldx     #4
+score_zero:
+        ldy     #4
         lda     #$30
-.init_loop:
-        sta     score_digits,x
-        dex
-        bpl     .init_loop
+.zero_loop:
+        sta     score_digits,y
+        dey
+        bpl     .zero_loop
         rts
 
 ; In: A=value to add at digit Y. Clobbers A/Y; matches C64 carry cascade.
@@ -57,14 +62,4 @@ score_decrement:
         sta     score_digits,y
         dey
         bpl     .dec_loop
-        rts
-
-; Helper used by the arrested ending later: reset the underflowed score to zero.
-score_zero:
-        ldy     #$04
-        lda     #$30
-.zero_loop:
-        sta     score_digits,y
-        dey
-        bpl     .zero_loop
         rts
