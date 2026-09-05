@@ -276,6 +276,15 @@ enemy_col_frame:        ds 1
         ldy     #BANK(enemy_type09_patterns)
         rts
 .enemy_not09:
+        cmp     #$0a
+        bne     .enemy_not0a
+        lda     #<enemy_type0a_patterns
+        sta     <_bp
+        lda     #>enemy_type0a_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type0a_patterns)
+        rts
+.enemy_not0a:
         cmp     #$0e
         bne     .enemy_not0e
         lda     #<enemy_type0e_patterns
@@ -304,19 +313,37 @@ enemy_col_frame:        ds 1
         rts
 .enemy_not14:
         cmp     #$18
-        bne     .enemy_type19
+        bne     .enemy_not18
         lda     #<enemy_type18_patterns
         sta     <_bp
         lda     #>enemy_type18_patterns
         jsr     .add_frame_high
         ldy     #BANK(enemy_type18_patterns)
         rts
-.enemy_type19:
+.enemy_not18:
+        cmp     #$19
+        bne     .enemy_not19
         lda     #<enemy_type19_patterns
         sta     <_bp
         lda     #>enemy_type19_patterns
         jsr     .add_frame_high
         ldy     #BANK(enemy_type19_patterns)
+        rts
+.enemy_not19:
+        cmp     #$1b
+        bne     .enemy_type1d
+        lda     #<enemy_type1b_patterns
+        sta     <_bp
+        lda     #>enemy_type1b_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type1b_patterns)
+        rts
+.enemy_type1d:
+        lda     #<enemy_type1d_patterns
+        sta     <_bp
+        lda     #>enemy_type1d_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type1d_patterns)
         rts
 
 .add_frame_high:
