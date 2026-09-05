@@ -42,11 +42,16 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Phase 44 intentionally enables the original detour around Room $03's wall:
-; $03 down->$0E, $0E left->$0D, $0D up->$04.
+; Phase 45 adds the lower house cells that the C64 world grid reaches through
+; the floor openings: $01 down->$0A and $02 down->$0B. Room $0B connects left
+; into the already active $0E->$0D->$04 lower route.
 world_room_supported:
         cmp     #5
         bcc     .yes
+        cmp     #$0a
+        beq     .yes
+        cmp     #$0b
+        beq     .yes
         cmp     #$0d
         beq     .yes
         cmp     #$0e
