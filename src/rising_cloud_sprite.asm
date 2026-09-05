@@ -148,15 +148,14 @@ rising_cloud_sprite_hide:
         dex
         bne     .hide_one
 
-; This is the final SAT writer in main_loop. Repaint the 7-digit commit overlay
-; immediately afterwards so any earlier BAT writer can never leave row-0 debris
-; over the diagnostic commit id. SAT DMA is already armed by register $13 here;
-; changing MAWR afterwards does not alter the queued SAT source address.
+; Final SAT writer in main_loop. Arm one SAT DMA and return immediately.
+; Debug/HUD BAT text is static between state changes and must not be redrawn on
+; every frame; doing so wasted VDC bandwidth and bank-switch time.
 rising_cloud_sprite_sat_dma:
         st0     #$13
         st1     #<SAT_ADDR
         st2     #>SAT_ADDR
-        jmp     debug_commit_bank_safe_draw
+        rts
 
 .data
 rising_cloud_sprite_cycle:
