@@ -83,7 +83,11 @@ def main():
         assert f'call    room{room}_draw_native' in loader
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
-        assert f'cmp     #${room}' in world_asm
+
+    # Support is compactly represented as one contiguous $00-$0E range now.
+    compact_world = ''.join(world_asm.lower().split())
+    assert 'world_room_supported:' in world_asm
+    assert 'cmp#$0f' in compact_world
 
     # Growing selector tables must use long jumps to their common helpers.
     assert loader.count('jmp     room_tail_cache_collision') >= 6

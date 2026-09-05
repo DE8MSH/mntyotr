@@ -25,12 +25,11 @@ def main():
     assert 'db$ff,$2f,$2e,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$22,$ff,$ff,$ff,$ff,$ff,$ff,$06,$07,$08,$09,$ff,$ff' in compact
     assert 'db$2d,$2c,$27,$26,$33,$32,$31,$25,$24,$20,$21,$ff,$ff,$ff,$ff,$ff,$05,$04,$03,$02,$01,$00,$ff' in compact
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
-    for room in ('$09','$0a','$0b','$0c','$0d','$0e'):
-        assert f'cmp#{room}' in compact
-    assert 'cmp#6' in compact
+    # All currently implemented rooms form one compact contiguous $00-$0E range.
     assert 'world_room_supported:' in world
+    assert 'cmp#$0f' in compact
 
-    print('OK: vertical exits require actual downward motion + exact supported $01<->$09 and lower routes')
+    print('OK: vertical exits require actual downward motion + contiguous exact $00-$0E routes')
 
 
 if __name__ == '__main__':

@@ -12,3 +12,8 @@ room05_tile_properties_rom:
 
 room05_screen_bat:
         incbin "room05-screen-bat.dat"
+
+; Keep the newly restored contiguous upper-house rooms adjacent in the ROM tail.
+        include "room06_assets_tail.asm"
+        include "room07_assets_tail.asm"
+        include "room08_assets_tail.asm"

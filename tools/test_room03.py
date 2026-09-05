@@ -51,11 +51,14 @@ def main():
     assert 'cmp     #3' in banking and 'bcc     .select_room' in banking
     assert 'lda     #2' in banking and 'sta     <monty_room' in banking
 
-    # The actual route around the Room03 wall now goes DOWN into Room0E.
+    # The actual route around the Room03 wall goes DOWN into Room0E. Room support
+    # is now represented compactly as one contiguous $00-$0E range.
     assert 'call    monty_check_down_room_edge' in main_asm
     assert 'cmp     #$da' in edge and 'lda     #4' in edge
     compact = ''.join(world.lower().split())
-    assert 'cmp#$0e' in compact and 'world_room_supported:' in world
+    assert 'world_room_supported:' in world
+    assert 'cmp#$0f' in compact
+    assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
 
     print('OK: exact Room 03 active with downward route into Room 0E')
 

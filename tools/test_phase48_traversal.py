@@ -105,18 +105,21 @@ def main():
     assert 'BANK(room01_collision_map_rom)' in cloud
     assert 'cmp     #$52' in cloud and 'cmp     #$da' in cloud
 
-    assert 'cmp     #$09' in ext and '.room09:' in ext
-    assert 'room09_cache_collision:' in ext
+    # Room09 is now one entry in the compact far-pointer tail loader rather than
+    # a dedicated .room09 wrapper. Verify all three descriptors are present.
+    assert 'room_ext_patterns_lo:' in ext and '<room09_patterns' in ext
+    assert 'room_ext_bat_lo:' in ext and '<room09_screen_bat' in ext
+    assert 'room_ext_collision_lo:' in ext and '<room09_collision_map_rom' in ext
     assert 'room09_collision_map_rom:' in tail09
-    assert 'cmp     #$09' in world
-    assert '$01 up->$09' in world
+    # World support is now the contiguous exact block $00-$0E.
+    assert 'cmp     #$0f' in world
     assert 'DEBUG_FOOTER_VISIBLE_BAT = 23*BAT_LINE' in footer
 
     compact = ''.join(world.split())
     assert 'db$ff,$2f,$2e,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$22,$ff,$ff,$ff,$ff,$ff,$ff,$06,$07,$08,$09,$ff,$ff' in compact
     assert 'db$2d,$2c,$27,$26,$33,$32,$31,$25,$24,$20,$21,$ff,$ff,$ff,$ff,$ff,$05,$04,$03,$02,$01,$00,$ff' in compact
 
-    print('OK: dynamic Room01 rising cloud + access bridge + Room02/09 traversal aids + exact Room09 route')
+    print('OK: dynamic Room01 rising cloud + Room02/09 traversal + compact upper-house loader')
 
 
 if __name__ == '__main__':

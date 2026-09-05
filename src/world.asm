@@ -42,23 +42,11 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Phase 48 also opens the exact upward neighbour $01 up->$09 so the newly
-; unblocked Room-$01 traversal path can be tested in both directions.
+; Rooms $00-$0E are now a contiguous supported block, including the newly
+; restored upper-house chain $06->$07->$08->$09.
 world_room_supported:
-        cmp     #6
+        cmp     #$0f
         bcc     .yes
-        cmp     #$09
-        beq     .yes
-        cmp     #$0a
-        beq     .yes
-        cmp     #$0b
-        beq     .yes
-        cmp     #$0c
-        beq     .yes
-        cmp     #$0d
-        beq     .yes
-        cmp     #$0e
-        beq     .yes
         clc
         rts
 .yes:
