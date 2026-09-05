@@ -42,12 +42,13 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Phase 46 extends the confirmed lower-house path beyond Room $04:
-; $04 left->$05 and $05 down->$0C. The older $01/$02 floor exits and the
-; $0B->$0E->$0D section remain active.
+; Phase 48 also opens the exact upward neighbour $01 up->$09 so the newly
+; unblocked Room-$01 traversal path can be tested in both directions.
 world_room_supported:
         cmp     #6
         bcc     .yes
+        cmp     #$09
+        beq     .yes
         cmp     #$0a
         beq     .yes
         cmp     #$0b
