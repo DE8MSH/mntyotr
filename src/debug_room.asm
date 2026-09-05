@@ -3,6 +3,11 @@
 ; Top-right: current room id as two hexadecimal digits.
 ; Bottom-left: fixed port signature "A thE rZA PCE port".
 ; Uses only the reserved diagnostic-font VRAM region below CHR_GAME.
+;
+; IMPORTANT: debug_footer_visible.asm is the single bank-safe writer for the
+; commit id and footer. Keeping duplicate writers here previously wasted code
+; space and could overwrite the visible commit row. debug_room_draw now owns
+; only the room id at top-right.
 
 DEBUG_COMMIT_BAT = 0
 DEBUG_ROOM_BAT   = 38
@@ -55,29 +60,9 @@ debug_room_init:
 
         jmp     debug_room_draw
 
-; Draw all persistent diagnostics. Palette 7 is the existing white-on-black
-; 1bpp palette. All overlay character indices stay below 256, so BAT high tile
-; bits remain zero.
+; Draw only the room id. Commit id and footer are deliberately owned by
+; debug_footer_visible.asm, which remaps their banked data before reading it.
 debug_room_draw:
-        ; Seven hexadecimal nibbles generated from git rev-parse --short=7 HEAD.
-        lda     #<DEBUG_COMMIT_BAT
-        sta     <_di
-        lda     #>DEBUG_COMMIT_BAT
-        sta     <_di+1
-        call    vdc_di_to_mawr
-        ldx     #0
-.commit_loop:
-        lda     build_commit_nibbles,x
-        clc
-        adc     #DEBUG_HEX_CHR
-        sta     VDC_DL
-        lda     #$70
-        sta     VDC_DH
-        inx
-        cpx     #7
-        bne     .commit_loop
-
-        ; Current room id as 00, 01, 0A, ... at the top-right.
         lda     #<DEBUG_ROOM_BAT
         sta     <_di
         lda     #>DEBUG_ROOM_BAT
@@ -102,24 +87,6 @@ debug_room_draw:
         sta     VDC_DL
         lda     #$70
         sta     VDC_DH
-
-        ; Fixed signature on the last visible 8-pixel row.
-        lda     #<DEBUG_FOOTER_BAT
-        sta     <_di
-        lda     #>DEBUG_FOOTER_BAT
-        sta     <_di+1
-        call    vdc_di_to_mawr
-        ldx     #0
-.footer_loop:
-        lda     debug_footer_tiles,x
-        clc
-        adc     #DEBUG_HEX_CHR
-        sta     VDC_DL
-        lda     #$70
-        sta     VDC_DH
-        inx
-        cpx     #18
-        bne     .footer_loop
         rts
 
 .data
