@@ -19,6 +19,7 @@
         include "jump_collision_sweep.asm"
         include "collision_banking.asm"
         include "rising_cloud.asm"
+        include "rising_bollard.asm"
         include "world.asm"
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
@@ -107,6 +108,8 @@ bare_main:
         call    world_init
         call    rising_cloud_init
         call    rising_cloud_room_sync
+        call    rising_bollard_init
+        call    rising_bollard_room_sync
         call    debug_room_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
@@ -181,18 +184,19 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
-        ; Dynamic room mechanisms update while monty_room is the real room id.
-        ; The cloud changes collision after this tick's movement, ready for the
-        ; next tick exactly like the C64's mutable screen-character map.
+        ; Dynamic mechanisms run with the real room id restored. The cloud edits
+        ; Room01 collision for the next tick; the Room0C bollard carries Monty
+        ; directly, matching the C64 mechanism's game-mode-locked ride.
         call    rising_cloud_update
+        call    rising_bollard_update
 
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
-        ; Detect room changes after loading; Room01 entry restores mutable base
-        ; collision and seeds the moving cloud at the bottom of its real path.
+        ; Room-entry sync restores mutable/dynamic mechanism state after loading.
         call    rising_cloud_room_sync
+        call    rising_bollard_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
