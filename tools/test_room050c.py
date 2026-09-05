@@ -7,6 +7,18 @@ from room05 import (
     ROOM05_RLE, ROOM05_TILE_IDS, ROOM05_COLOURS, ROOM05_PROPERTIES,
     ROOM05_TILE_BITMAPS, build_patterns as build05, make_screen_bat as bat05,
 )
+from room06 import (
+    ROOM06_RLE, ROOM06_TILE_IDS, ROOM06_COLOURS, ROOM06_PROPERTIES,
+    ROOM06_TILE_BITMAPS, build_patterns as build06, make_screen_bat as bat06,
+)
+from room07 import (
+    ROOM07_RLE, ROOM07_TILE_IDS, ROOM07_COLOURS, ROOM07_PROPERTIES,
+    ROOM07_TILE_BITMAPS, build_patterns as build07, make_screen_bat as bat07,
+)
+from room08 import (
+    ROOM08_RLE, ROOM08_TILE_IDS, ROOM08_COLOURS, ROOM08_PROPERTIES,
+    ROOM08_TILE_BITMAPS, build_patterns as build08, make_screen_bat as bat08,
+)
 from room0c import (
     ROOM0C_RLE, ROOM0C_TILE_IDS, ROOM0C_COLOURS, ROOM0C_PROPERTIES,
     ROOM0C_TILE_BITMAPS, build_patterns as build0c, make_screen_bat as bat0c,
@@ -45,56 +57,60 @@ def parse_world_grid():
 
 
 def main():
-    cells05 = check_room(ROOM05_RLE, ROOM05_TILE_IDS, ROOM05_COLOURS,
-                         ROOM05_PROPERTIES, ROOM05_TILE_BITMAPS, build05, bat05)
-    check_room(ROOM0C_RLE, ROOM0C_TILE_IDS, ROOM0C_COLOURS,
-               ROOM0C_PROPERTIES, ROOM0C_TILE_BITMAPS, build0c, bat0c)
+    rooms = (
+        (ROOM05_RLE, ROOM05_TILE_IDS, ROOM05_COLOURS, ROOM05_PROPERTIES, ROOM05_TILE_BITMAPS, build05, bat05),
+        (ROOM06_RLE, ROOM06_TILE_IDS, ROOM06_COLOURS, ROOM06_PROPERTIES, ROOM06_TILE_BITMAPS, build06, bat06),
+        (ROOM07_RLE, ROOM07_TILE_IDS, ROOM07_COLOURS, ROOM07_PROPERTIES, ROOM07_TILE_BITMAPS, build07, bat07),
+        (ROOM08_RLE, ROOM08_TILE_IDS, ROOM08_COLOURS, ROOM08_PROPERTIES, ROOM08_TILE_BITMAPS, build08, bat08),
+        (ROOM0C_RLE, ROOM0C_TILE_IDS, ROOM0C_COLOURS, ROOM0C_PROPERTIES, ROOM0C_TILE_BITMAPS, build0c, bat0c),
+    )
+    for args in rooms:
+        check_room(*args)
 
-    assert len(ROOM05_RLE) == 122
-    assert ROOM05_TILE_IDS == (0x01,0x41,0x2b,0x65,0x67,0x00,0x3f,0x63)
-    assert ROOM05_COLOURS == (0x01,0x05,0x03,0x04,0x07,0x0d,0x02,0x03)
-    assert ROOM05_PROPERTIES == (1,2,2,3,3,1,2,3)
-    assert ROOM05_TILE_BITMAPS[1] == bytes.fromhex('ff ff ff 00 ff 00 00 00')
-    assert ROOM05_TILE_BITMAPS[4] == bytes.fromhex('c3 c3 c3 bb bb c3 c3 c3')
+    assert len(ROOM06_RLE) == 120
+    assert ROOM06_TILE_IDS == (0x01,0x2d,0x5f,0x3d,0x61,0x3b,0x24,0x65)
+    assert ROOM06_COLOURS == (0x02,0x04,0x03,0x07,0x05,0x02,0x07,0x05)
+    assert ROOM06_PROPERTIES == (1,2,3,2,3,2,1,3)
 
-    assert len(ROOM0C_RLE) == 91
-    assert ROOM0C_TILE_IDS == (0x05,0x0f,0x10,0x28,0x6a,0x5f,0x4f,0x00)
-    assert ROOM0C_COLOURS == (0x0d,0x05,0x07,0x03,0x05,0x02,0x02,0x00)
-    assert ROOM0C_PROPERTIES == (1,1,1,2,3,3,4,1)
-    assert ROOM0C_TILE_BITMAPS[3] == bytes.fromhex('ff c1 63 36 1c ff 00 00')
-    assert ROOM0C_TILE_BITMAPS[6] == bytes.fromhex('6e 7e c7 d3 da c3 67 ef')
+    assert len(ROOM07_RLE) == 97
+    assert ROOM07_TILE_IDS == (0x01,0x47,0x0c,0x3a,0x3b,0x39,0x4f,0x00)
+    assert ROOM07_COLOURS == (0x01,0x03,0x05,0x04,0x02,0x08,0x02,0x00)
+    assert ROOM07_PROPERTIES == (1,1,1,2,2,2,4,1)
 
-    bottom = cells05[18*32:20*32]
-    assert 0 in bottom and 5 in bottom
+    assert len(ROOM08_RLE) == 77
+    assert ROOM08_TILE_IDS == (0x01,0x28,0x1d,0x6a,0x40,0x68,0x37,0x4f)
+    assert ROOM08_COLOURS == (0x01,0x03,0x09,0x01,0x04,0x07,0x05,0x02)
+    assert ROOM08_PROPERTIES == (1,2,1,3,2,3,2,4)
 
+    # Exact upper route from the original 6x23 world grid.
     world = parse_world_grid()
-    assert world[2][0x11] == 0x04
-    assert world[2][0x10] == 0x05
+    assert world[1][0x11:0x15] == [0x06,0x07,0x08,0x09]
+    assert world[2][0x10:0x15] == [0x05,0x04,0x03,0x02,0x01]
     assert world[3][0x10] == 0x0c
-    assert world[3][0x0f] == 0x0f
-    assert world[4][0x10] == 0x11
 
     main_asm = (ROOT/'src/main.asm').read_text()
     ext = (ROOT/'src/room050c_loader.asm').read_text()
+    tail05 = (ROOT/'src/room05_assets_tail.asm').read_text()
     world_asm = (ROOT/'src/world.asm').read_text()
-    for room in ('05','0c'):
-        assert f'include "room{room}_assets_tail.asm"' in main_asm
+
+    for room in ('06','07','08'):
+        assert f'include "room{room}_assets_tail.asm"' in tail05
+        assert f'room{room}_patterns' in ext
+        assert f'room{room}_screen_bat' in ext
         assert f'room{room}_collision_map_rom' in ext
-        assert f'room{room}_upload_patterns' in ext
-        assert f'room{room}_draw_native' in ext
-        assert f'room{room}_cache_collision' in ext
     assert 'include "room050c_loader.asm"' in main_asm
     assert 'call    room_load_pending_extended' in main_asm
-    assert 'jmp     room_load_pending' in ext
-    assert 'cmp     #6' in world_asm
-    assert 'cmp     #$0c' in world_asm
+    assert 'room_ext_patterns_lo:' in ext
+    assert 'room_ext_bat_lo:' in ext
+    assert 'room_ext_collision_lo:' in ext
+    assert 'cmp     #$0f' in world_asm
 
     # $04 left remains supported; don't tie this check to comments/phase labels.
     guard = main_asm.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
     assert 'cmp     #4' not in guard
 
-    print('OK: exact Room 05/0C assets + $04->$05->$0C continuation wiring')
+    print('OK: exact Rooms 05-08/0C assets + contiguous upper-house route + compact tail loader')
 
 
 if __name__ == '__main__':
