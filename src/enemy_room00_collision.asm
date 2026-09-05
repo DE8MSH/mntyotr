@@ -57,7 +57,9 @@ enemy_col_frame:        ds 1
         sta     enemy_col_state
         lda     enemy_col_slot
         cmp     #4
-        beq     .done_unmapped
+        bne     .scan_more
+        jmp     .done_unmapped
+.scan_more:
         jmp     .scan_slot
 
 .prepare_masks:
