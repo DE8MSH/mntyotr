@@ -1,11 +1,12 @@
         include "standard_piledriver.asm"
         include "standard_piledriver_bat_fix.asm"
         include "standard_piledriver_static.asm"
+        include "standard_piledriver_exact_runtime.asm"
 
-; Standard piledrivers are original-style dynamic BG charset tiles, not sprites.
-; The safe runtime stage currently uses only static SeedGlyphs + DrawShaft; the
-; crash-prone MoveDown/MoveUp buffer path remains gated until static geometry is
-; confirmed in the emulator.
+; Standard piledrivers use original-style dynamic BG charset tiles, not sprites.
+; The safe renderer regenerates VRAM directly; exact_runtime restores the C64
+; independent RNG draws and CheckTiles death semantics without the old mutable
+; 144-byte pointer walk that crashed Room $01.
 .code
 piledriver_palette_init:
         rts
