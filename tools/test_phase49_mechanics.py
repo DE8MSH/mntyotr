@@ -16,6 +16,7 @@ def main():
     sweep = (ROOT/'src/jump_collision_sweep.asm').read_text()
     cloud = (ROOT/'src/rising_cloud.asm').read_text()
     bollard = (ROOT/'src/rising_bollard.asm').read_text()
+    life = (ROOT/'src/game_life.asm').read_text()
 
     # Core platform bug: authentic jump deltas are preserved, but each 1..3 px
     # delta is now swept one pixel at a time with collision before every pixel.
@@ -68,7 +69,23 @@ def main():
     assert len(cells0d) == 640
     assert ROOM0D_RLE[30:39] == bytes.fromhex('01 f0 f0 f0 f0 f0 f0 22 20')
 
-    print('OK: Phase49 pixel-swept jump + moving Room01 cloud + Room0C rising bollard + exact Room0D RLE')
+    # Shared death foundation: all currently relevant C64 death events decrement
+    # lives and reload the same room at its saved entry position. Completion event
+    # 6 must not be treated as death.
+    assert 'include "game_life.asm"' in main_asm
+    assert 'call    game_life_init' in main_asm
+    assert 'call    game_life_check' in main_asm
+    assert 'call    game_life_reload' in main_asm
+    assert 'call    game_life_room_sync' in main_asm
+    assert 'lda     #5' in life and 'sta     <game_lives' in life
+    for event in ('#2','#3','#4','#5','#7'):
+        assert f'cmp     {event}' in life
+    assert 'cmp     #6' not in life
+    assert 'dec     <game_lives' in life
+    assert 'sta     <world_pending_room' in life
+    assert 'call    room_load_pending_extended' in life
+
+    print('OK: Phase49 swept collision + cloud/bollard + exact Room0D + shared life/respawn')
 
 
 if __name__ == '__main__':
