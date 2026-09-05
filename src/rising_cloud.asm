@@ -1,4 +1,4 @@
-; Phase 50: Room $01 rising cloud collision + stateless moving-platform push.
+; Phase 50: Room $01 rising cloud collision + stateless moving-platform support.
 ;
 ; C64 SpecialItems.UpdateRisingCloud:
 ;   - active only in Room $01
@@ -7,12 +7,15 @@
 ;   - writes screen code $08 (Room01 tile $64 / property 3) into its row
 ;   - clears the row below as the cloud rises
 ;
-; The PCE port keeps the authentic mutable property-3 strip. The visual sprite
-; follows rising_cloud_y separately. A small stateless push keeps a player who
-; is exactly on the cloud top aligned with its 1px motion. Before that push the
-; COMPLETE prospective 2x3/3x3 tile footprint is checked for property-1 solids;
-; this prevents the cloud from pushing Monty through a ceiling/wall that enters
-; the middle of his footprint before the normal aligned CheckTileAbove can see it.
+; The PCE port keeps the authentic mutable property-3 strip for source parity,
+; but separates "standing on the moving cloud" from generic monty_tile_state.
+; rising_cloud_support_update is called from the input path after UpdateTileFlags;
+; exact cloud support clears the generic tile-state for that tick so the cloud
+; cannot behave like a climb/ladder surface while still suppressing auto-fall.
+;
+; Before a 1px upward push the COMPLETE prospective 2x3/3x3 tile footprint is
+; checked for property-1 solids. This prevents the cloud from pushing Monty into
+; a ceiling/wall that enters the middle of his footprint.
 
 CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12
@@ -25,6 +28,7 @@ rising_cloud_last_room:  ds 1
 rising_cloud_y:          ds 1
 rising_cloud_tick:       ds 1
 rising_cloud_row:        ds 1
+rising_cloud_support:    ds 1
 rising_cloud_push:       ds 1
 rising_cloud_tmp_row:    ds 1
 rising_cloud_top_y:      ds 1
@@ -43,6 +47,7 @@ rising_cloud_init:
         lda     #$d9
         sta     <rising_cloud_y
         stz     <rising_cloud_tick
+        stz     <rising_cloud_support
         stz     <rising_cloud_push
         rts
 
@@ -53,6 +58,7 @@ rising_cloud_room_sync:
         rts
 .changed:
         sta     <rising_cloud_last_room
+        stz     <rising_cloud_support
         stz     <rising_cloud_push
         cmp     #1
         beq     .enter_room01
@@ -75,19 +81,16 @@ rising_cloud_copy_room01_map:
         pha
         tma4
         pha
-
         lda     #<room01_collision_map_rom
         sta     <_bp
         lda     #>room01_collision_map_rom
         sta     <_bp+1
         ldy     #BANK(room01_collision_map_rom)
         call    map_bp_to_mpr34
-
         lda     #<room01_collision_map
         sta     <_di
         lda     #>room01_collision_map
         sta     <_di+1
-
         ldx     #2
         cly
 .copy_page:
@@ -99,7 +102,6 @@ rising_cloud_copy_room01_map:
         inc     <_di+1
         dex
         bne     .copy_page
-
         cly
         ldx     #128
 .copy_tail:
@@ -108,12 +110,44 @@ rising_cloud_copy_room01_map:
         iny
         dex
         bne     .copy_tail
-
         pla
         tam4
         pla
         tam3
         plp
+        rts
+
+; Called from monty_update_input directly after monty_update_tile_state.
+; This does not move Monty. It only reports exact moving-platform support and
+; removes the cloud's dynamic property-3 cell from generic climb semantics.
+rising_cloud_support_update:
+        stz     <rising_cloud_support
+        lda     <monty_room
+        cmp     #1
+        bne     .done
+        lda     <rising_cloud_y
+        cmp     #$da
+        bcs     .done
+        cmp     #$52
+        bcc     .done
+        lda     <monty_jump_phase
+        bne     .done
+        lda     <monty_falling
+        bne     .done
+        lda     <monty_x
+        cmp     #$36
+        bcc     .done
+        cmp     #$49
+        bcs     .done
+        lda     <rising_cloud_y
+        sec
+        sbc     #$10
+        cmp     <monty_y
+        bne     .done
+        lda     #1
+        sta     <rising_cloud_support
+        stz     <monty_tile_state
+.done:
         rts
 
 rising_cloud_update:
@@ -140,9 +174,6 @@ rising_cloud_update:
 .refresh:
         jmp     rising_cloud_refresh_row
 
-; Stateless support test. Walking changes X before this routine runs; jumping
-; changes jump_phase before this routine runs, so either action releases without
-; any persistent attach state.
 rising_cloud_detect_push:
         stz     <rising_cloud_push
         lda     <monty_jump_phase
@@ -166,9 +197,7 @@ rising_cloud_detect_push:
         rts
 
 ; C=1 if moving Monty upward by one pixel would make ANY tile in his complete
-; prospective footprint overlap a property-1 solid. Unlike CheckTileAbove this
-; deliberately does not depend on an 8px alignment gate. This is needed for a
-; moving platform because a ceiling row can enter the middle of the footprint.
+; prospective footprint overlap a property-1 solid. No 8px alignment gate.
 rising_cloud_can_push_up:
         lda     <monty_y
         sec
@@ -179,7 +208,6 @@ rising_cloud_can_push_up:
         lsr     a
         lsr     a
         sta     <rising_cloud_probe_y
-
         lda     <monty_x
         sec
         sbc     #$0c
@@ -198,7 +226,6 @@ rising_cloud_can_push_up:
         sta     <rising_cloud_probe_cols
         lda     #3
         sta     <rising_cloud_probe_rows
-
 .row_loop:
         lda     <rising_cloud_probe_cols
         sta     <rising_cloud_probe_ctr
@@ -240,7 +267,6 @@ rising_cloud_refresh_row:
         cmp     <rising_cloud_row
         bne     .replace_row
         rts
-
 .no_new_row:
         lda     <rising_cloud_row
         cmp     #$ff
@@ -250,7 +276,6 @@ rising_cloud_refresh_row:
         sta     <rising_cloud_row
 .row_done:
         rts
-
 .replace_row:
         sta     <rising_cloud_tmp_row
         lda     <rising_cloud_row
@@ -279,7 +304,6 @@ rising_cloud_clear_row:
         sta     [_di],y
         iny
         sta     [_di],y
-
         lda     <rising_cloud_tmp_row
         tax
         lda     rising_cloud_bat_lo,x
@@ -313,7 +337,6 @@ rising_cloud_set_row:
         sta     [_di],y
         iny
         sta     [_di],y
-
         lda     <rising_cloud_row
         tax
         lda     rising_cloud_bat_lo,x
@@ -336,7 +359,6 @@ rising_cloud_row_lo:
         db $00,$20,$40,$60,$80,$a0,$c0,$e0,$00,$20,$40,$60,$80,$a0,$c0,$e0,$00,$20,$40,$60
 rising_cloud_row_hi:
         db $00,$00,$00,$00,$00,$00,$00,$00,$01,$01,$01,$01,$01,$01,$01,$01,$02,$02,$02,$02
-
 rising_cloud_bat_lo:
         db <(3*BAT_LINE+CLOUD_VIS_COL),<(4*BAT_LINE+CLOUD_VIS_COL),<(5*BAT_LINE+CLOUD_VIS_COL),<(6*BAT_LINE+CLOUD_VIS_COL)
         db <(7*BAT_LINE+CLOUD_VIS_COL),<(8*BAT_LINE+CLOUD_VIS_COL),<(9*BAT_LINE+CLOUD_VIS_COL),<(10*BAT_LINE+CLOUD_VIS_COL)
