@@ -6,7 +6,8 @@ Room $01 is immediately left of room $00 in the original world grid.
 
 The compressed source stream remains byte-exact. Until the original rising-cloud
 mechanic is fully ported, generated collision/BAT output adds an explicit debug
-scaffold along the cloud's original columns so runtime testing can reach Room $09.
+route: a climb shaft along the cloud's real columns plus a short bridge from the
+normal right-hand entry platform. These generated-only cells are temporary.
 """
 from __future__ import annotations
 
@@ -43,18 +44,23 @@ ROOM01_TILE_BITMAPS = (
 PAL_BY_C64 = {0x04: 13, 0x03: 3, 0x05: 12, 0x01: 7, 0x0A: 10, 0x06: 14}
 
 # C64 UpdateRisingCloud writes tile $08 at screen columns $0C-$0E, which map
-# to logical room columns 8..10. The exact dynamic cloud is still pending; this
-# temporary test scaffold uses the same property-3 tile and path, plus one
-# approach cell beside the lower platform. Remove when the cloud is fully live.
-ROOM01_DEBUG_SCAFFOLD = tuple(
-    [(y, x) for y in range(0, 19) for x in (8, 9, 10)] + [(13, 11)]
-)
+# to logical room columns 8..10. Code 8 is native tile $64 / property 3.
+ROOM01_DEBUG_CLIMB = tuple((y, x) for y in range(0, 19) for x in (8, 9, 10))
+
+# The normal Room-$00 -> Room-$01 entry lands on the right-hand lower structure,
+# separated from the cloud columns by the floor opening. Add a generated-only
+# bridge at logical row 17 from the original right platform (x25+) to the cloud.
+# Code 5 is native tile $40 / property 2, so it behaves as a normal platform.
+ROOM01_DEBUG_BRIDGE = tuple((17, x) for x in range(11, 25))
+ROOM01_DEBUG_SCAFFOLD = ROOM01_DEBUG_CLIMB + ROOM01_DEBUG_BRIDGE
 
 
 def apply_debug_scaffold(cells: list[int]) -> list[int]:
     out = list(cells)
-    for y, x in ROOM01_DEBUG_SCAFFOLD:
+    for y, x in ROOM01_DEBUG_CLIMB:
         out[y * 32 + x] = 8
+    for y, x in ROOM01_DEBUG_BRIDGE:
+        out[y * 32 + x] = 5
     return out
 
 
@@ -102,7 +108,7 @@ def main() -> None:
     args.map.write_bytes(bytes(cells))
     args.screen_bat.write_bytes(make_screen_bat(cells))
     args.patterns.write_bytes(build_patterns())
-    print(f'room 01: {len(ROOM01_RLE)} exact compressed bytes -> {len(cells)} cells + temporary cloud-path scaffold')
+    print(f'room 01: {len(ROOM01_RLE)} exact compressed bytes -> {len(cells)} cells + temporary cloud climb/bridge route')
 
 
 if __name__ == '__main__':
