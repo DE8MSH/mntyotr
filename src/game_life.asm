@@ -97,12 +97,13 @@ game_life_check:
 ; Reload graphics/collision/mechanisms after game_life_check returns C=1.
 game_life_reload:
         call    room_load_pending_extended
-        ; Force all room-scoped mechanisms to re-seed even though room id did not
-        ; numerically change during a same-room death.
+        ; C64 room reload reruns every room-scoped setup routine, including the
+        ; complete four-slot enemy SetupRoom pass.
         lda     #$ff
         sta     <rising_cloud_last_room
         sta     <rising_bollard_last_room
         sta     <moving_lift_last_room
+        sta     enemy_smiley_last_room
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
