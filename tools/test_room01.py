@@ -66,9 +66,11 @@ def main():
     assert not [w for w in bat if (w & 0x0fff) == CHR_GAME + 2]
 
     main_asm = (ROOT/'src/main.asm').read_text()
+    ext = (ROOT/'src/room050c_loader.asm').read_text()
     physics = (ROOT/'src/monty_physics.asm').read_text()
     assets = (ROOT/'src/room01_assets.asm').read_text()
-    assert 'call    room_load_pending' in main_asm
+    assert 'call    room_load_pending_extended' in main_asm
+    assert 'jmp     room_load_pending' in ext
     assert 'room01_collision_map' in physics and 'room01_tile_properties' in physics
     assert 'db $01,$03,$01,$01,$02,$01,$04,$03' in assets
 
