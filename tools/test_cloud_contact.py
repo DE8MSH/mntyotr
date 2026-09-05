@@ -1,7 +1,45 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from room_rle import decode_room
+from room01 import ROOM01_RLE, ROOM01_PROPERTIES
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def prop_for_code(code: int) -> int:
+    if code == 0 or code >= 9:
+        return 0
+    return ROOM01_PROPERTIES[code - 1]
+
+
+def room01_prop_at_screen(screen_x: int, screen_y: int) -> int:
+    # Match room00_get_tile_xy border semantics used by the runtime.
+    if screen_y < 3 or screen_y >= 23:
+        return 0
+    if screen_x < 2 or screen_x >= 38:
+        return 0
+    if screen_x < 4:
+        screen_x = 4
+    elif screen_x >= 36:
+        screen_x = 35
+    logical_x = screen_x - 4
+    logical_y = screen_y - 3
+    cells = decode_room(ROOM01_RLE)
+    return prop_for_code(cells[logical_y * 32 + logical_x])
+
+
+def prospective_push_blocked(monty_x: int, monty_y: int) -> bool:
+    # Python mirror of rising_cloud_can_push_up for the exact Room01 head-bump
+    # boundary. monty_y here is the current Y before a 1px upward cloud push.
+    probe_y = ((monty_y - 1 - 0x32) & 0xFF) >> 3
+    xraw = (monty_x - 0x0C) & 0xFF
+    probe_x = xraw >> 2
+    cols = 2 if (xraw & 3) == 0 else 3
+    for sy in range(probe_y, probe_y + 3):
+        for sx in range(probe_x, probe_x + cols):
+            if room01_prop_at_screen(sx, sy) == 1:
+                return True
+    return False
 
 
 def main():
@@ -59,7 +97,16 @@ def main():
     assert 'dec     <rising_cloud_y' in cloud
     assert 'dec     <monty_y' in cloud
 
-    print('OK: Room01 cloud support no longer owns tile/climb state; jump/walk stay live; full-footprint ceiling guard')
+    # Concrete Room01 head-bump geometry at the real cloud columns. Row 1 is
+    # empty, row 0 is a property-1 ceiling. At cloud_y=$63 Monty may still move
+    # from Y=$53 to $52. On the next odd cloud tick (cloud_y=$62, Monty Y=$52),
+    # the prospective Y=$51 footprint reaches row 0 and MUST be blocked.
+    assert room01_prop_at_screen(12, 4) == 0
+    assert room01_prop_at_screen(12, 3) == 1
+    assert not prospective_push_blocked(0x3C, 0x53)
+    assert prospective_push_blocked(0x3C, 0x52)
+
+    print('OK: Room01 cloud walk/jump free; exact $63->$62 ceiling boundary blocks head push without clipping')
 
 
 if __name__ == '__main__':
