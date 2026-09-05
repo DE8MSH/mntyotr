@@ -53,6 +53,21 @@ def main():
     assert 'BANK(room02_collision_map_rom)' in loader
     assert 'world_room_supported:' in world
 
+    # Runtime testing can make Room02 look like a jump-height bug, but its C64
+    # geometry deliberately contains a tall central solid wall. Entering from
+    # Room01 reaches the right-hand section; normal jumping is not supposed to
+    # turn this into a direct Room01->Room03 corridor.
+    for y in range(9, 16):
+        assert cells[y*32 + 17:y*32 + 22] == [2,2,2,2,2]
+    for y in range(12, 18):
+        assert cells[y*32 + 25] == 4       # right-hand property-3 climb strip
+
+    # The PCE port intentionally uses the exact C64 20-pixel ascent arc. Do not
+    # solve Room02 by increasing jump height and thereby breaking later rooms.
+    exact_up = '$00,$03,$02,$02,$01,$02,$01,$01,$00,$01,$01,$01\n        db $00,$01,$01,$01,$00,$01,$00,$01,$00,$00,$ff'
+    assert exact_up in physics
+    assert sum((0,3,2,2,1,2,1,1,0,1,1,1,0,1,1,1,0,1,0,1,0,0)) == 20
+
     # Room02 remains an interior room. The pre-world jump guard must not encode
     # any Room02-specific topology; Phase 46 special-cases only Room00 right.
     guard = main_asm.split('; Phase 46 opens the original continuation', 1)[1]
@@ -61,7 +76,7 @@ def main():
     assert 'cmp     #4' not in guard      # no Room04 special case anymore
     assert 'lda     #$9b' in guard
 
-    print('OK: Room 02 remains stable and topology-agnostic inside active route')
+    print('OK: Room 02 exact split geometry + original 20-pixel jump arc preserved')
 
 
 if __name__ == '__main__':
