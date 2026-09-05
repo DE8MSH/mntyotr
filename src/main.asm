@@ -23,9 +23,7 @@
         include "rising_cloud_sprite.asm"
         include "rising_bollard.asm"
         include "moving_lift.asm"
-        ; Room00 enemy source is retained but temporarily gated until its runtime
-        ; is moved into a dedicated bank. Keeping it out of the primary .code
-        ; group restores the proven pre-enemy bank layout.
+        include "enemy_room00_gate.asm"
         include "world.asm"
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
@@ -134,6 +132,30 @@ bare_main:
         sta     <_bp + 1
         ldy     #^rising_cloud_sprite_palette
         call    load_palettes
+
+        ; Sprite palette 19: Room00 Skate, C64 purple $04.
+        lda     #19
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy00_skate_palette
+        sta     <_bp + 0
+        lda     #>enemy00_skate_palette
+        sta     <_bp + 1
+        ldy     #BANK(enemy00_skate_palette)
+        call    load_palettes
+
+        ; Sprite palette 20: Room00 Smiley, C64 cyan $03.
+        lda     #20
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy00_smiley_palette
+        sta     <_bp + 0
+        lda     #>enemy00_smiley_palette
+        sta     <_bp + 1
+        ldy     #BANK(enemy00_smiley_palette)
+        call    load_palettes
         call    xfer_palettes
 
         call    draw_room00_native
@@ -147,6 +169,8 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
+        call    enemy00_gate_init
+        call    enemy00_gate_room_sync
         call    game_life_init
         call    debug_room_init
         call    debug_footer_visible_draw
@@ -154,6 +178,7 @@ bare_main:
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    rising_cloud_sprite_update_satb
+        call    enemy00_gate_update_satb
         call    set_dspon
 
 main_loop:
@@ -164,16 +189,12 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
-        ; Preserve Y so the external bottom-edge helper only runs after actual
-        ; downward motion, matching the C64 UpdateMovement_down semantics.
         lda     <monty_y
         sta     <main_y_before_step
 
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Only the confirmed outer edge at Room $00 right is special-cased
-        ; before world navigation. Supported room exits otherwise remain live.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -190,7 +211,6 @@ main_loop:
         sta     <main_exit_before_jump
         lda     <monty_x
         sta     <main_jump_x_before_step
-        ; C64 jump deltas are consumed one pixel at a time with collision checks.
         call    monty_jump_step_swept
 
         lda     <main_exit_before_jump
@@ -214,8 +234,6 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; Non-jump downward movement (fall/climb) still uses the shared helper.
-        ; The swept jump routine already checks $DA after every descent pixel.
         lda     <monty_y
         cmp     <main_y_before_step
         bcc     .after_down_room_edge
@@ -229,9 +247,8 @@ main_loop:
         call    rising_cloud_update
         call    rising_bollard_update
         call    moving_lift_update
+        call    enemy00_gate_update
 
-        ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
-        ; death reloads the same room at its saved entry point and skips topology.
         call    game_life_check
         bcc     .no_death
         call    game_life_reload
@@ -241,18 +258,18 @@ main_loop:
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
-        ; Room-entry sync restores mutable/dynamic mechanism state after loading.
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
+        call    enemy00_gate_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; Mechanism sprites use SAT entries after Monty's two entries.
         call    moving_lift_update_satb
         call    rising_cloud_sprite_update_satb
+        call    enemy00_gate_update_satb
         jmp     main_loop
 
 init_c64_video:
@@ -263,3 +280,7 @@ init_c64_video:
         st1     #<VDC_HDR_320
         st2     #>VDC_HDR_320
         rts
+
+; Dedicated Room00 enemy bank. Nothing after this include may rely on the
+; primary automatic .code placement.
+        include "enemy_room00.asm"
