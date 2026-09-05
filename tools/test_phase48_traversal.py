@@ -84,7 +84,8 @@ def main():
     assert 'call    rising_cloud_init' in main_asm
     assert 'call    rising_cloud_update' in main_asm
     assert main_asm.count('call    rising_cloud_room_sync') >= 2
-    assert main_asm.count('call    debug_footer_visible_draw') >= 2
+    # Footer/commit are static debug text: draw once at startup, never per frame.
+    assert main_asm.count('call    debug_footer_visible_draw') == 1
     assert 'main_y_before_step:        ds 1' in main_asm
     assert 'cmp     <main_y_before_step' in main_asm
     assert 'beq     .after_down_room_edge' in main_asm
