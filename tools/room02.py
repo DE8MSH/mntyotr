@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Generate exact C64 room-$02 map, PCE BAT and room-custom patterns.
+"""Generate C64 room-$02 map, PCE BAT and room-custom patterns.
 
 Primary reference: refactored/src/subsystems/room_data.asm + tiles.asm.
 Room $02 is immediately left of room $01 in the original world grid.
+
+The source RLE remains exact. Because the original death/respawn and piledriver
+mechanics are not ported yet, generated runtime data adds a temporary property-3
+ladder extension on the right side so testers cannot become progression-blocked.
 """
 from __future__ import annotations
 
@@ -24,20 +28,32 @@ ROOM02_TILE_IDS = (0x02, 0x01, 0x27, 0x60, 0x3D, 0x42, 0x77, 0x55)
 ROOM02_COLOURS = (0x05, 0x04, 0x07, 0x04, 0x06, 0x01, 0x06, 0x06)
 ROOM02_PROPERTIES = (1, 1, 2, 3, 2, 2, 0, 4)
 
-# Exact entries from Tiles.tile_library for the room definition above.
 ROOM02_TILE_BITMAPS = (
-    bytes.fromhex("00 ee ee ee 00 ee ee ee"),  # $02
-    bytes.fromhex("00 fe fe fe 00 ef ef ef"),  # $01
-    bytes.fromhex("ff 01 6d 01 ff 00 00 00"),  # $27
-    bytes.fromhex("38 20 70 20 70 10 38 08"),  # $60
-    bytes.fromhex("c1 2b ab eb c1 00 00 00"),  # $3d
-    bytes.fromhex("fb f3 36 24 ec c8 98 f0"),  # $42
-    bytes.fromhex("ff ff ff ff ff ff ff ff"),  # $77
-    bytes.fromhex("18 7e ff ff ff ff ff ff"),  # $55
+    bytes.fromhex("00 ee ee ee 00 ee ee ee"),
+    bytes.fromhex("00 fe fe fe 00 ef ef ef"),
+    bytes.fromhex("ff 01 6d 01 ff 00 00 00"),
+    bytes.fromhex("38 20 70 20 70 10 38 08"),
+    bytes.fromhex("c1 2b ab eb c1 00 00 00"),
+    bytes.fromhex("fb f3 36 24 ec c8 98 f0"),
+    bytes.fromhex("ff ff ff ff ff ff ff ff"),
+    bytes.fromhex("18 7e ff ff ff ff ff ff"),
 )
 
-# All colours are already present in the shared Room00/Room01 palette setup.
 PAL_BY_C64 = {0x05: 12, 0x04: 13, 0x07: 8, 0x06: 14, 0x01: 7}
+
+# Temporary debug ladder: extend the existing code-4/property-3 strip at col25
+# upward, with a parallel col24 strip that emerges beside the solid upper-right
+# platform. This keeps the exact source map inspectable while unblocking testing.
+ROOM02_DEBUG_SCAFFOLD = tuple(
+    [(y, 24) for y in range(7, 18)] + [(y, 25) for y in range(7, 12)]
+)
+
+
+def apply_debug_scaffold(cells: list[int]) -> list[int]:
+    out = list(cells)
+    for y, x in ROOM02_DEBUG_SCAFFOLD:
+        out[y * 32 + x] = 4
+    return out
 
 
 def c64_char_to_pce_tile(char: bytes) -> bytes:
@@ -46,7 +62,7 @@ def c64_char_to_pce_tile(char: bytes) -> bytes:
 
 
 def build_patterns() -> bytes:
-    out = bytearray(32)  # screen code 0 is blank
+    out = bytearray(32)
     for char in ROOM02_TILE_BITMAPS:
         out += c64_char_to_pce_tile(char)
     assert len(out) == 9 * 32
@@ -78,12 +94,13 @@ def main() -> None:
     ap.add_argument('--screen-bat', type=Path, required=True)
     ap.add_argument('--patterns', type=Path, required=True)
     args = ap.parse_args()
-    cells = decode_room(ROOM02_RLE)
-    assert len(cells) == ROOM_CELLS
+    source_cells = decode_room(ROOM02_RLE)
+    assert len(source_cells) == ROOM_CELLS
+    cells = apply_debug_scaffold(source_cells)
     args.map.write_bytes(bytes(cells))
     args.screen_bat.write_bytes(make_screen_bat(cells))
     args.patterns.write_bytes(build_patterns())
-    print(f'room 02: {len(ROOM02_RLE)} compressed bytes -> {len(cells)} cells; 9 patterns')
+    print(f'room 02: {len(ROOM02_RLE)} exact compressed bytes -> {len(cells)} cells + temporary traversal scaffold')
 
 
 if __name__ == '__main__':
