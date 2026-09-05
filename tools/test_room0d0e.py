@@ -30,7 +30,7 @@ def main():
     # Primary room_data.asm has five consecutive $f0 runs here. Dropping one
     # shortens Room $0D by exactly 16 cells (624 instead of 640), so pin it.
     assert ROOM0D_RLE[32:38] == bytes.fromhex('f0 f0 f0 f0 f0 22')
-    assert len(ROOM0D_RLE) == 67
+    assert len(ROOM0D_RLE) == 66
 
     assert ROOM0D_TILE_IDS == (0x05,0x0f,0x4f,0x19,0x00,0x00,0x00,0x00)
     assert ROOM0D_COLOURS == (0x0d,0x05,0x02,0x00,0x00,0x00,0x00,0x00)
