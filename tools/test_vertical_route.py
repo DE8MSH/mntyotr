@@ -15,14 +15,19 @@ def main():
     assert 'lda     #4' in edge and 'sta     <monty_room_exit' in edge
     assert 'lda     #$4c' in edge and 'sta     <monty_y' in edge
 
-    # Exact world-grid route around the wall in room $03:
-    # row2 col18=$03; down row3 col18=$0E; left col17=$0D; up row2 col17=$04.
     compact = ''.join(world.lower().split())
+    # Exact C64 lower-house row: ... $0D,$0E,$0B,$0A under $04,$03,$02,$01.
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
-    assert 'cmp#$0d' in compact and 'cmp#$0e' in compact
+    for room in ('$0a','$0b','$0d','$0e'):
+        assert f'cmp#{room}' in compact
     assert 'world_room_supported:' in world
 
-    print('OK: downward edge + supported $03->$0E->$0D->$04 world route')
+    # Runtime report exposed the important floor exit from Room $01. The active
+    # lower chain is $01 down->$0A left->$0B left->$0E left->$0D up->$04.
+    assert '$01->$0a' in main_asm.lower()
+    assert '$02->$0b' in main_asm.lower()
+
+    print('OK: downward edge + supported $01->$0A->$0B->$0E->$0D->$04 lower route')
 
 
 if __name__ == '__main__':
