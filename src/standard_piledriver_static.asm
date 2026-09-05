@@ -4,15 +4,23 @@
 ; MoveDown/MoveUp shifts the 8-byte head bitmap through three 48-byte charset
 ; columns. This implementation preserves that visible/state behaviour but avoids
 ; mutable 144-byte pointer walks: each animation tick regenerates the selected
-; 18-tile PCE charset directly from the exact C64 shift position.
+; 18-tile PCE charset directly from the exact C64 state.
+;
+; IMPORTANT original MoveDown detail: it copies byte N to N+1 but never clears
+; byte 0. Therefore the first bitmap row is replicated above the descending head,
+; producing the visible piledriver body. The previous PCE formula incorrectly
+; zeroed that region and showed only the moving head.
 ;
 ; Original configs:
 ;   room $01: col $07,row $05,height 4,char $10
 ;             col $1f,row $0c,height 6,char $22
 ;   room $02: col $15,row $05,height 4,char $10
 ;   room $0b: col $13,row $11,height 4,char $10
-
-PILE_STATIC_CHR0 = CHR_GAME + 64
+;
+; Room $02 decor occupies CHR_GAME+9..+65. Keep both dynamic piledriver charsets
+; above all currently generated decor so animation can never overwrite a pot/
+; flower/decor tile.
+PILE_STATIC_CHR0 = CHR_GAME + 96
 PILE_STATIC_CHR1 = PILE_STATIC_CHR0 + 18
 
 .zp
@@ -48,7 +56,6 @@ piledriver_static_init:
         call    piledriver_static_upload_set0
         jmp     piledriver_static_upload_set1
 
-; Only reinitialize on actual room entry. main calls room_sync every logical tick.
 piledriver_static_room_sync:
         lda     <monty_room
         cmp     <pile_static_last_room
@@ -77,9 +84,9 @@ piledriver_static_room_sync:
 .room01:
         lda     #2
         sta     <pile_static_count
-        lda     #$1f                    ; height4*8-1
+        lda     #$1f
         sta     <pile_static_limit0
-        lda     #$2f                    ; height6*8-1
+        lda     #$2f
         sta     <pile_static_limit1
 
         lda     #$07
@@ -170,7 +177,6 @@ piledriver_static_update:
         cmp     #2
         beq     .move_up
 
-        ; C64 Animate increments position twice, then performs MoveDown twice.
         inc     <pile_static_position
         inc     <pile_static_position
         ldx     <pile_static_index
@@ -203,7 +209,8 @@ piledriver_static_update:
         stz     <pile_static_shift
         lda     #$ff
         sta     <pile_static_index
-        rts
+        ; Restore exact SeedGlyphs state after the cycle.
+        jmp     piledriver_static_upload_selected
 .up_shift:
         sec
         sbc     #5
@@ -213,7 +220,10 @@ piledriver_static_update:
 piledriver_static_upload_selected:
         lda     <pile_static_index
         beq     piledriver_static_upload_set0
-        jmp     piledriver_static_upload_set1
+        cmp     #1
+        beq     piledriver_static_upload_set1
+        ; index=$ff at end of cycle: no selected buffer remains to upload.
+        rts
 
 piledriver_static_upload_set0:
         lda     #<(PILE_STATIC_CHR0*16)
@@ -227,8 +237,10 @@ piledriver_static_upload_set1:
         lda     #>(PILE_STATIC_CHR1*16)
         sta     <_di+1
 
-; Generate 18 chars = left[6], middle[6], right[6]. For each 48-byte C64
-; column, only bytes shift..shift+7 contain the original 8-byte head bitmap.
+; Generate 18 chars = left[6], middle[6], right[6]. Original MoveDown leaves
+; byte0 untouched while shifting everything else down. Thus for global offsets
+; <= shift the rendered byte is seed[0]; offsets shift+1..shift+7 use the rest
+; of the seed. This is the missing visible body from the previous PCE pass.
 piledriver_static_upload_common:
         call    vdc_di_to_mawr
         stz     <pile_static_tile
@@ -255,7 +267,6 @@ piledriver_static_upload_common:
         sec
         sbc     #6
 .tile_in_col:
-        ; global byte offset inside this C64 48-byte charset column.
         asl     a
         asl     a
         asl     a
@@ -265,12 +276,18 @@ piledriver_static_upload_common:
         lda     <pile_static_global
         clc
         adc     <pile_static_i
+        cmp     <pile_static_shift
+        bcc     .body_row
+        beq     .body_row
         sec
         sbc     <pile_static_shift
-        bcc     .zero_row
         cmp     #8
         bcs     .zero_row
         tay
+        bra     .seed_row
+.body_row:
+        cly                             ; seed row 0 is replicated by MoveDown
+.seed_row:
         lda     <pile_static_seed_sel
         beq     .get_left
         cmp     #1
@@ -306,8 +323,6 @@ piledriver_static_upload_common:
         bne     .tile_loop
         rts
 
-; Fixed DrawShaft: original absolute C64 screen col,row. No X/Y loop state is
-; assumed to survive the VDC helper call.
 piledriver_static_draw:
         stz     <pile_static_i
 .row_loop:
@@ -328,7 +343,7 @@ piledriver_static_draw:
         clc
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$61                    ; palette6 + tile bit8
+        lda     #$61                    ; C64 light grey $0f
         sta     VDC_DH
 
         lda     <pile_static_base_lo
@@ -336,7 +351,7 @@ piledriver_static_draw:
         adc     #6
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$51                    ; palette5 + tile bit8
+        lda     #$51                    ; C64 medium grey $0c
         sta     VDC_DH
 
         lda     <pile_static_base_lo
@@ -344,7 +359,7 @@ piledriver_static_draw:
         adc     #12
         adc     <pile_static_i
         sta     VDC_DL
-        lda     #$41                    ; palette4 + tile bit8
+        lda     #$41                    ; C64 dark grey $0b
         sta     VDC_DH
 
         inc     <pile_static_i
@@ -354,7 +369,6 @@ piledriver_static_draw:
         rts
 
 .data
-; Exact normal piledriver_frame_data from mechanisms_data.asm.
 piledriver_static_seed_left:
         db $0f,$0f,$00,$ff,$ff,$ff,$7f,$00
 piledriver_static_seed_mid:
