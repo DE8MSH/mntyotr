@@ -22,6 +22,17 @@ def main():
     assert 'lda     <monty_falling' in contact
     assert 'dec     <monty_y' not in contact
 
+    # Exact C64 Room01 head-block result above the cloud route: at this X range
+    # CheckTileAbove sees property-1 row 0 and cannot pass Y=$52. If the generic
+    # PCE edge path already synthesized UP exit 3, cancel it and restore Y=$52.
+    assert 'cmp     #$36' in contact and 'cmp     #$49' in contact
+    assert 'lda     <monty_room_exit' in contact
+    assert 'cmp     #3' in contact
+    assert 'lda     #$52' in contact
+    assert 'sta     <monty_y' in contact
+    assert 'stz     <monty_room_exit' in contact
+    assert 'lda     #2' in contact and 'sta     <monty_jump_phase' in contact
+
     # Anti-stick adaptation: exact support is separated from property-3 climb
     # semantics while normal jump/left/right input remains in the common path.
     assert 'rising_cloud_support:   ds 1' in cloud
@@ -53,7 +64,7 @@ def main():
     assert 'ldy     #8' in cloud
     assert cloud.count('sta     [_di],y') >= 6
 
-    print('OK: Room01 cloud matches C64 update: cloud moves after Monty; no direct Monty Y push or cloud-created UP exit')
+    print('OK: Room01 cloud matches C64 update; exact Y=$52 ceiling cancels stray UP exit')
 
 
 if __name__ == '__main__':
