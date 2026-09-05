@@ -23,11 +23,11 @@ ROOM0D_COLOURS = (0x0D, 0x05, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00)
 ROOM0D_PROPERTIES = (1, 1, 4, 1, 1, 1, 1, 1)
 
 ROOM0D_TILE_BITMAPS = (
-    bytes.fromhex("3d 79 1b db d9 9d b5 b5"),  # $05
-    bytes.fromhex("c3 01 3c b5 98 01 c7 ef"),  # $0f
-    bytes.fromhex("6e 7e c7 d3 da c3 67 ef"),  # $4f
-    bytes.fromhex("00 00 00 00 00 00 00 00"),  # $19
-    bytes.fromhex("30 ff 03 ff 30 ff 03 ff"),  # $00
+    bytes.fromhex("3d 79 1b db d9 9d b5 b5"),
+    bytes.fromhex("c3 01 3c b5 98 01 c7 ef"),
+    bytes.fromhex("6e 7e c7 d3 da c3 67 ef"),
+    bytes.fromhex("00 00 00 00 00 00 00 00"),
+    bytes.fromhex("30 ff 03 ff 30 ff 03 ff"),
     bytes.fromhex("30 ff 03 ff 30 ff 03 ff"),
     bytes.fromhex("30 ff 03 ff 30 ff 03 ff"),
     bytes.fromhex("30 ff 03 ff 30 ff 03 ff"),
@@ -61,6 +61,7 @@ def make_screen_bat(cells: list[int]) -> bytes:
     for y in range(20):
         row = cells[y*32:(y+1)*32]
         expanded = [row[0], row[0], *row, row[-1], row[-1]]
+        assert len(expanded) == SCREEN_W
         for code in expanded:
             data += struct.pack('<H', bat_word(code))
     return bytes(data)
