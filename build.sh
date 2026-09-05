@@ -38,6 +38,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room03.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0a0b.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
@@ -53,6 +54,8 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02.py" --map "$BUILD/room02-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room02_decor.py" --screen-bat "$BUILD/room02-screen-bat.dat" --patterns "$BUILD/room02-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room03.py" --map "$BUILD/room03-map.dat" --screen-bat "$BUILD/room03-screen-bat.dat" --patterns "$BUILD/room03-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room04.py" --map "$BUILD/room04-map.dat" --screen-bat "$BUILD/room04-screen-bat.dat" --patterns "$BUILD/room04-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0a.py" --map "$BUILD/room0a-map.dat" --screen-bat "$BUILD/room0a-screen-bat.dat" --patterns "$BUILD/room0a-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b.py" --map "$BUILD/room0b-map.dat" --screen-bat "$BUILD/room0b-screen-bat.dat" --patterns "$BUILD/room0b-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
