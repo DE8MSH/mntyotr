@@ -16,10 +16,11 @@ def main():
     sweep = (ROOT/'src/jump_collision_sweep.asm').read_text()
     cloud = (ROOT/'src/rising_cloud.asm').read_text()
     bollard = (ROOT/'src/rising_bollard.asm').read_text()
+    pile = (ROOT/'src/standard_piledriver.asm').read_text()
+    pile_assets = (ROOT/'src/standard_piledriver_assets_tail.asm').read_text()
+    footer = (ROOT/'src/debug_footer_visible.asm').read_text()
     life = (ROOT/'src/game_life.asm').read_text()
 
-    # Core platform bug: authentic jump deltas are preserved, but each 1..3 px
-    # delta is now swept one pixel at a time with collision before every pixel.
     assert 'call    monty_jump_step_swept' in main_asm
     assert '.up_pixel:' in sweep and '.down_pixel:' in sweep
     assert 'call    monty_check_tile_above' in sweep
@@ -29,8 +30,6 @@ def main():
     assert 'lda     monty_jump_arc_up,x' in sweep
     assert 'lda     monty_jump_arc_down,x' in sweep
 
-    # First genuine moving Room01 mechanism: odd-tick, 1px rising cloud using
-    # exact screen columns $0C-$0E and code 8/property 3 collision.
     assert 'include "rising_cloud.asm"' in main_asm
     assert 'call    rising_cloud_update' in main_asm
     assert 'CLOUD_VIS_COL       = 12' in cloud
@@ -39,9 +38,6 @@ def main():
     assert 'inc     <rising_cloud_tick' in cloud and 'and     #1' in cloud
     assert 'dec     <rising_cloud_y' in cloud
 
-    # Room0C exact source stays 640 cells. InitState's raw C64 $62 head is
-    # represented at the exact logical equivalent (row12,col23) by local code5,
-    # which has the same property-3 semantics.
     base0c = decode_room(ROOM0C_RLE)
     assert len(base0c) == ROOM_CELLS == 640
     assert ROOM0C_BOLLARD_HEAD == (12, 23)
@@ -51,9 +47,6 @@ def main():
     run0c = apply_bollard_head(base0c)
     assert run0c[12*32+23] == 5
 
-    # C64 piledriver dual-use ride semantics: contact snaps X=$75, pulls up 2px,
-    # then rides 1px/tick until Monty Y drops below $62. It does NOT transition
-    # directly from Room0C into Room05.
     assert 'include "rising_bollard.asm"' in main_asm
     assert 'call    rising_bollard_update' in main_asm
     assert 'cmp     #$0c' in bollard
@@ -63,15 +56,30 @@ def main():
     assert 'rising_bollard_active' in bollard
     assert 'sta     <monty_climbing' in bollard
 
-    # Room0D latent source regression: exact refactored stream has SIX $F0 runs
-    # after $01. This must decode to 640, not 624 cells.
+    # Standard Piledriver configs copied from original mechanisms_data.asm.
+    assert 'include "standard_piledriver_bundle.asm"' in bollard
+    assert 'call    piledriver_palette_init' in bollard
+    assert 'jmp     piledriver_init' in bollard
+    assert 'call    piledriver_room_sync' in bollard
+    assert 'call    piledriver_update' in bollard
+    for needle in ('lda #$07','lda #$1f','lda #$15','lda #$13'):
+        assert needle in pile
+    assert 'lda #$1f\n        sta <piledriver_limit0' in pile
+    assert 'lda #$2f\n        sta <piledriver_limit1' in pile
+    assert pile.count('inc <piledriver_position') >= 2
+    assert pile.count('dec <piledriver_position') >= 2
+    assert 'adc #$14' in pile and 'and #$3f' in pile
+    assert 'lda #4\n        sta <monty_action_counter' in pile
+    assert 'PILE_SAT0_L   = SAT_ADDR+32' in pile
+    assert 'PILE_SAT1_R   = SAT_ADDR+44' in pile
+    assert 'jmp     piledriver_update_satb' in footer
+    assert 'piledriver_patterns:' in pile_assets
+    assert 'db $0f,$ff,$0f,$ff' in pile_assets
+
     cells0d = decode_room(ROOM0D_RLE)
     assert len(cells0d) == 640
     assert ROOM0D_RLE[30:39] == bytes.fromhex('01 f0 f0 f0 f0 f0 f0 22 20')
 
-    # Shared death foundation: all currently relevant C64 death events decrement
-    # lives and reload the same room at its saved entry position. Completion event
-    # 6 must not be treated as death.
     assert 'include "game_life.asm"' in main_asm
     assert 'call    game_life_init' in main_asm
     assert 'call    game_life_check' in main_asm
@@ -85,7 +93,7 @@ def main():
     assert 'sta     <world_pending_room' in life
     assert 'call    room_load_pending_extended' in life
 
-    print('OK: Phase49 swept collision + cloud/bollard + exact Room0D + shared life/respawn')
+    print('OK: swept collision + cloud/bollard + standard Piledriver $01/$02/$0B + life/respawn')
 
 
 if __name__ == '__main__':
