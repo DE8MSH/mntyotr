@@ -22,15 +22,14 @@ def main():
     assert 'call    init_c64_video' in text
     assert 'bsr     init_c64_video' not in text
 
-    # Phase 46 opens Room $04 left -> Room $05. The pre-world jump guard now
-    # special-cases only the true outer edge at Room $00 right.
-    guard = text.split('; Phase 46 opens the original continuation', 1)[1]
+    # Only the true outer edge at Room $00 right is special-cased before world.
+    guard = text.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
     assert 'cmp     #4' not in guard
     assert 'cmp     #2' in guard
     assert 'bne     .after_unsupported_jump_edge' in guard
 
-    print('OK: Room04->05 jump exit open; only Room00 outer-right edge is pre-guarded')
+    print('OK: supported jump exits open; only Room00 outer-right edge is pre-guarded')
 
 
 if __name__ == '__main__':
