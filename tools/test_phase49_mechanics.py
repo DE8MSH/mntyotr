@@ -42,8 +42,6 @@ def main():
     assert 'include "standard_piledriver_bundle.asm"' in bollard
     assert 'include "standard_piledriver_static.asm"' in bundle
 
-    # Proven DrawShaft is retained; only the safe regenerated-char animation is
-    # ticked. The old mutable-buffer runtime stays disconnected.
     assert 'jmp     piledriver_static_init' in bollard
     assert 'jmp     piledriver_static_room_sync' in bollard
     assert 'call    piledriver_static_update' in bollard
@@ -58,26 +56,34 @@ def main():
     assert 'lda     #$1f' in static
     assert 'lda     #$2f' in static
 
+    # Room02 decor reaches CHR_GAME+65, so piledriver dynamic chars must live
+    # safely above that range. This prevents animated flower/pot corruption.
+    assert 'PILE_STATIC_CHR0 = CHR_GAME + 96' in static
+    assert 'PILE_STATIC_CHR1 = PILE_STATIC_CHR0 + 18' in static
+
     # Original state machine: delay $14..$53, position starts at 5 and changes
-    # by two pixels per update. Visible displacement is exactly position-5.
+    # by two pixels per update.
     assert 'piledriver_static_update:' in static
     assert 'and     #$3f' in static and 'adc     #$14' in static
     assert 'lda     #5\n        sta     <pile_static_position' in static
     assert static.count('inc     <pile_static_position') == 2
     assert static.count('dec     <pile_static_position') == 2
-    assert static.count('sbc     #5\n        sta     <pile_static_shift') == 2
     assert 'lda     #2\n        sta     <pile_static_state' in static
 
-    # Safe renderer regenerates each 18-tile set directly from the C64 seed and
-    # shift. Test behaviour/structure rather than private scratch-symbol names.
+    # Exact MoveDown side effect: byte0 is never cleared, so seed row 0 repeats
+    # above the shifted 8-byte head and forms the visible piledriver body.
+    assert '.body_row:' in static
+    assert 'cmp     <pile_static_shift' in static
+    assert 'cly                             ; seed row 0 is replicated by MoveDown' in static
+
+    # Safe renderer regenerates each 18-tile set directly from the C64 state.
     assert 'piledriver_static_upload_selected:' in static
     assert 'piledriver_static_upload_common:' in static
-    assert 'sbc     <pile_static_shift' in static
     assert 'cmp     #6' in static and 'cmp     #12' in static
     assert 'piledriver_buf0' not in static
     assert 'piledriver_buf1' not in static
 
-    # Exact source seed glyphs and proven DrawShaft BAT high bytes.
+    # Exact source seed glyphs and DrawShaft palettes: $0f/$0c/$0b.
     assert 'db $0f,$0f,$00,$ff,$ff,$ff,$7f,$00' in static
     assert 'db $ff,$ff,$00,$ff,$ff,$ff,$ff,$00' in static
     assert 'db $f0,$f0,$00,$ff,$ff,$ff,$fe,$00' in static
@@ -86,8 +92,7 @@ def main():
     assert 'lda     #$51' in static
     assert 'lda     #$41' in static
 
-    # This stage is visuals/state only. Standard Piledriver death collision is
-    # deliberately not wired until emulator confirms stable motion.
+    # Collision remains gated until the corrected body/art is emulator-confirmed.
     update = static[static.index('piledriver_static_update:'):static.index('piledriver_static_upload_selected:')]
     assert 'monty_action_counter' not in update
 
@@ -100,7 +105,7 @@ def main():
     for event in ('#2','#3','#4','#5','#7'):
         assert f'cmp     {event}' in life
 
-    print('OK: Room01 DrawShaft + safe original Piledriver 2px down/up animation; collision still gated')
+    print('OK: exact Piledriver body replication + safe VRAM beyond Room02 decor; collision still gated')
 
 
 if __name__ == '__main__':
