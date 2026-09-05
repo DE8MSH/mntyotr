@@ -232,7 +232,7 @@ main_loop:
         ; Lift uses SAT entries 2..5; update after Monty's entries 0..1, then
         ; re-arm SAT DMA from the shared SAT_ADDR.
         call    moving_lift_update_satb
-        bra     main_loop
+        jmp     main_loop
 
 init_c64_video:
         st0     #$0a
