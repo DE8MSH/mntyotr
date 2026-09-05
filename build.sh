@@ -105,12 +105,15 @@ python3 "$ROOT/tools/enemy_room00.py" \
   --knight "$BUILD/enemy-type0b-knight.dat" \
   --clock "$BUILD/enemy-type0e-clock.dat" \
   --big-nose "$BUILD/enemy-type0f-big-nose.dat" \
+  --rubik "$BUILD/enemy-type11-rubik.dat" \
+  --pi-pie "$BUILD/enemy-type13-pi-pie.dat" \
   --wasp "$BUILD/enemy-type14-wasp.dat" \
   --bubble "$BUILD/enemy-type15-bubble.dat" \
   --sad-ghost "$BUILD/enemy-type16-sad-ghost.dat" \
   --kettle "$BUILD/enemy-type18-kettle.dat" \
   --smiley "$BUILD/enemy-type19-smiley.dat" \
   --hand "$BUILD/enemy-type1b-hand.dat" \
+  --tank "$BUILD/enemy-type1c-tank.dat" \
   --jelly-fish "$BUILD/enemy-type1d-jelly-fish.dat" >/dev/null
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
