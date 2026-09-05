@@ -18,6 +18,7 @@
         include "monty_physics.asm"
         include "jump_collision_sweep.asm"
         include "collision_banking.asm"
+        include "rising_cloud.asm"
         include "world.asm"
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
@@ -104,6 +105,8 @@ bare_main:
         call    game_clock_init
         call    monty_physics_init
         call    world_init
+        call    rising_cloud_init
+        call    rising_cloud_room_sync
         call    debug_room_init
         call    debug_footer_visible_draw
         call    monty_sprite_init
@@ -126,8 +129,8 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Phase 48 keeps only the confirmed outer edge at Room $00 right as a
-        ; pre-world special case. Room $01 up->$09 is now a real supported edge.
+        ; Only the confirmed outer edge at Room $00 right is special-cased
+        ; before world navigation. Supported room exits otherwise remain live.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -169,8 +172,7 @@ main_loop:
 .after_jump_exit_guard:
 
         ; Non-jump downward movement (fall/climb) still uses the shared helper.
-        ; The swept jump routine already checks $DA after every descent pixel;
-        ; monty_check_down_room_edge is idempotent when an exit already exists.
+        ; The swept jump routine already checks $DA after every descent pixel.
         lda     <monty_y
         cmp     <main_y_before_step
         bcc     .after_down_room_edge
@@ -179,10 +181,18 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
+        ; Dynamic room mechanisms update while monty_room is the real room id.
+        ; The cloud changes collision after this tick's movement, ready for the
+        ; next tick exactly like the C64's mutable screen-character map.
+        call    rising_cloud_update
+
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
+        ; Detect room changes after loading; Room01 entry restores mutable base
+        ; collision and seeds the moving cloud at the bottom of its real path.
+        call    rising_cloud_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
