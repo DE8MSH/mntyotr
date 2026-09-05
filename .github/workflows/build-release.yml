@@ -4,17 +4,28 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
 
 jobs:
   build-release:
-    if: startsWith(github.event.head_commit.message, '[release]')
+    if: >-
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[release]')) ||
+      (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release/'))
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install HuC toolchain
         run: ./install.sh
@@ -25,7 +36,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: monty-pce-${{ github.sha }}
+          name: monty-pce-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             build/monty.pce
             build/monty.sym
@@ -35,16 +46,18 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          short="${GITHUB_SHA::7}"
+          target="${PR_HEAD_SHA:-$GITHUB_SHA}"
+          short="${target::7}"
           tag="wip-${short}"
           gh release create "$tag" \
             build/monty.pce \
             build/monty.sym \
             build/monty.lst \
-            --target "$GITHUB_SHA" \
+            --target "$target" \
             --title "Monty on the Run PCE WIP ${short}" \
             --notes "PC Engine WIP build. Fixes the pceas --newproc .PROC thunk overlap in Bank 0 by sharing the score reset implementation, preserving score behaviour while freeing 11 bytes in Bank 0." \
             --prerelease
