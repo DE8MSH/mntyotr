@@ -5,10 +5,10 @@
 ; sequence are still pending, but hazards, lift squash and enemies now share the
 ; correct gameplay consequence instead of leaving Monty in a softlocked state.
 
-        ; Room07 can already use the generic enemy renderer/collision unchanged
-        ; because all four original enemies are Bubble type $15. Keep the small
-        ; room seed shim here until Rooms06-08 move into one generic selector.
+        ; Rooms06-08 use small exact seed shims while the shared enemy engine
+        ; continues to own movement, SAT rendering and collision.
         include "enemy_room07_runtime.asm"
+        include "enemy_room0608_runtime.asm"
 
 .zp
 game_lives:             ds 1
@@ -33,8 +33,9 @@ game_life_init:
 ; position to which a life loss in that room should return.
 game_life_room_sync:
         ; enemy_smiley_room_sync runs immediately before this routine in the
-        ; main loop. It clears unsupported legacy slots on Room07 entry/reload;
-        ; seed the exact four Bubble records before checking the life checkpoint.
+        ; main loop. It clears unsupported legacy slots on Rooms06-08 entry;
+        ; seed the exact C64 records before checking the life checkpoint.
+        call    enemy_room0608_room_sync
         call    enemy_room07_room_sync
         lda     <monty_room
         cmp     <game_life_last_room
