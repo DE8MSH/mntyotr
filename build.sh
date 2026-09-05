@@ -39,6 +39,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room02_decor.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_phase48_traversal.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_phase49_mechanics.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_moving_lift.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room03.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room050c.py"
@@ -51,8 +52,6 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
 
-# Embed the exact source revision used for this ROM. The overlay font only needs
-# hexadecimal glyphs, so store the seven short-SHA characters as nibble bytes.
 COMMIT_HEX="$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || printf '0000000')"
 COMMIT_HEX="$(printf '%s' "$COMMIT_HEX" | tr '[:lower:]' '[:upper:]')"
 case "$COMMIT_HEX" in
@@ -91,6 +90,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
+python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
