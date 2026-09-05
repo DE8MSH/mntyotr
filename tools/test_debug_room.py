@@ -8,6 +8,7 @@ def main():
     main_asm = (ROOT/'src/main.asm').read_text()
     debug = (ROOT/'src/debug_room.asm').read_text()
     visible = (ROOT/'src/debug_footer_visible.asm').read_text()
+    cloud = (ROOT/'src/rising_cloud_sprite.asm').read_text()
     platform = (ROOT/'src/platform.inc').read_text()
     build = (ROOT/'build.sh').read_text()
 
@@ -16,6 +17,13 @@ def main():
     assert 'call    debug_room_init' in main_asm
     assert 'call    debug_room_draw' in main_asm
     assert 'call    debug_footer_visible_draw' in main_asm
+
+    # Static footer/commit are startup diagnostics, not a per-frame workload.
+    assert main_asm.count('call    debug_footer_visible_draw') == 1
+    assert 'jmp     debug_commit_bank_safe_draw' not in cloud
+    assert 'rising_cloud_sprite_sat_dma:' in cloud
+    assert 'st0     #$13' in cloud
+    assert 'rts' in cloud.split('rising_cloud_sprite_sat_dma:',1)[1].split('.data',1)[0]
 
     # Live top-row HUD: lives left, room right. Build id moved under the footer.
     assert 'DEBUG_COMMIT_BAT    = 24*BAT_LINE' in debug
@@ -48,7 +56,7 @@ def main():
 
     assert 'CHR_FONT' in platform and 'CHR_GAME        = CHR_FONT + 112' in platform
 
-    print('OK: live Lx/rXX HUD + footer row23 + bank-safe commit row24')
+    print('OK: live Lx/rXX HUD + static footer/commit + single SAT DMA trigger')
 
 
 if __name__ == '__main__':
