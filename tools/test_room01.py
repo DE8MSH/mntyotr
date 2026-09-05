@@ -36,13 +36,9 @@ def main():
     assert ROOM01_PROPERTIES == (1,3,1,1,2,1,4,3)
     assert ROOM01_PROPERTIES == tuple(classify(tile) for tile in ROOM01_TILE_IDS)
 
-    # $63 and $64 are both in the C64 property-3 range ($56-$76). Room $01
-    # uses screen code 8 ($64) down at the lower opening reached from Room $0A.
     assert classify(0x63) == classify(0x64) == 3
     assert 8 in cells
 
-    # The exact room-$01 RLE does not use every custom slot. Screen code 2 is
-    # absent even though SetupTileGraphics still installs all eight chars.
     used_codes = set(cells)
     assert used_codes == {0,1,3,4,5,6,7,8}
 
@@ -70,7 +66,8 @@ def main():
     physics = (ROOT/'src/monty_physics.asm').read_text()
     assets = (ROOT/'src/room01_assets.asm').read_text()
     assert 'call    room_load_pending_extended' in main_asm
-    assert 'jmp     room_load_pending' in ext
+    assert '.proc room_load_pending_extended' in ext
+    assert 'call    room_load_pending' in ext and 'leave' in ext
     assert 'room01_collision_map' in physics and 'room01_tile_properties' in physics
     assert 'db $01,$03,$01,$01,$02,$01,$04,$03' in assets
 
