@@ -30,13 +30,19 @@ enemy_type1b_patterns:
 enemy_type1d_patterns:
         incbin "enemy-type1d-jelly-fish.dat"
 
-; PCE sprite palettes 19..22 -> SAT palette indices 3..6.
-; These approximate the C64 single-colour sprite values used by the current rooms.
-enemy_palette_cyan:                  ; C64 $03
+; PCE sprite palettes 19..25 -> SAT palette indices 3..9.
+; Values use the same unified C64 -> PCE GGGRRRBBB quantization as room art.
+enemy_palette_cyan:                  ; C64 $03 -> $19d
         dw $000,$19d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-enemy_palette_purple:                ; C64 $04
+enemy_palette_purple:                ; C64 $04 -> $0a4
         dw $000,$0a4,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-enemy_palette_white:                 ; C64 $01
+enemy_palette_white:                 ; C64 $01 -> $1ff
         dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
-enemy_palette_yellow:                ; C64 $07
+enemy_palette_yellow:                ; C64 $07 -> $1fb
         dw $000,$1fb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+enemy_palette_red:                   ; C64 $02 -> $062
+        dw $000,$062,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+enemy_palette_green:                 ; C64 $05 -> $152
+        dw $000,$152,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+enemy_palette_light_blue:            ; C64 $0e -> $0de
+        dw $000,$0de,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
