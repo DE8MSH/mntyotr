@@ -16,6 +16,7 @@ CLOUD_OFFSCREEN_ROW = $ff
 CLOUD_VIS_COL       = 12              ; exact C64 screen column $0C
 CLOUD_CODE          = 8
 CLOUD_PAL           = 12              ; Room01 code 8 uses C64 green $05
+CLOUD_BAT_WORD      = $c000+CHR_GAME+CLOUD_CODE
 
 .zp
 rising_cloud_last_room: ds 1
@@ -214,7 +215,6 @@ rising_cloud_clear_row:
         lda     #>room01_collision_map
         adc     rising_cloud_row_hi,x
         sta     <_di+1
-        cly
         ldy     #8
         cla
         sta     [_di],y
@@ -266,9 +266,9 @@ rising_cloud_set_row:
         call    vdc_di_to_mawr
         ldx     #3
 .draw_word:
-        lda     #<((CLOUD_PAL<<12)+(CHR_GAME+CLOUD_CODE))
+        lda     #<CLOUD_BAT_WORD
         sta     VDC_DL
-        lda     #>((CLOUD_PAL<<12)+(CHR_GAME+CLOUD_CODE))
+        lda     #>CLOUD_BAT_WORD
         sta     VDC_DH
         dex
         bne     .draw_word
