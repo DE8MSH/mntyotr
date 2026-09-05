@@ -26,8 +26,9 @@ ROOM01_RLE = bytes.fromhex(
 ROOM01_TILE_IDS = (0x02, 0x63, 0x01, 0x0A, 0x40, 0x05, 0x55, 0x64)
 ROOM01_COLOURS = (0x04, 0x03, 0x03, 0x05, 0x01, 0x0A, 0x06, 0x05)
 
-# SetTileProperty classification for the above source char codes.
-ROOM01_PROPERTIES = (1, 0, 1, 1, 2, 1, 4, 0)
+# Exact Monty.SetTileProperty classification for the source tile IDs above.
+# $56-$76 are property 3, so $63 and $64 are both climbable/vertical tiles.
+ROOM01_PROPERTIES = (1, 3, 1, 1, 2, 1, 4, 3)
 
 # Exact 8-byte entries from Tiles.tile_library.
 ROOM01_TILE_BITMAPS = (
