@@ -14,22 +14,41 @@ def words(blob):
     return list(struct.unpack('<' + 'H'*(len(blob)//2), blob))
 
 
+def classify(tile):
+    if 0x47 <= tile < 0x4e:
+        return 1
+    if tile < 0x27:
+        return 1
+    if tile < 0x47:
+        return 2
+    if tile < 0x56:
+        return 4
+    if tile < 0x77:
+        return 3
+    return 0
+
+
 def main():
     cells = decode_room(ROOM01_RLE)
     assert len(cells) == ROOM_CELLS == 640
     assert ROOM01_TILE_IDS == (0x02,0x63,0x01,0x0a,0x40,0x05,0x55,0x64)
     assert ROOM01_COLOURS == (0x04,0x03,0x03,0x05,0x01,0x0a,0x06,0x05)
-    assert ROOM01_PROPERTIES == (1,0,1,1,2,1,4,0)
+    assert ROOM01_PROPERTIES == (1,3,1,1,2,1,4,3)
+    assert ROOM01_PROPERTIES == tuple(classify(tile) for tile in ROOM01_TILE_IDS)
 
-    # The exact room-$01 RLE does not use every custom slot. In particular
-    # screen code 2 is absent even though SetupTileGraphics still installs all
-    # eight room-custom characters from room_defs. Keep that distinction exact.
+    # $63 and $64 are both in the C64 property-3 range ($56-$76). Room $01
+    # uses screen code 8 ($64) down at the lower opening reached from Room $0A.
+    assert classify(0x63) == classify(0x64) == 3
+    assert 8 in cells
+
+    # The exact room-$01 RLE does not use every custom slot. Screen code 2 is
+    # absent even though SetupTileGraphics still installs all eight chars.
     used_codes = set(cells)
     assert used_codes == {0,1,3,4,5,6,7,8}
 
     patterns = build_patterns()
     assert len(patterns) == 9*32
-    assert patterns[:32] == bytes(32)  # screen code 0 remains blank
+    assert patterns[:32] == bytes(32)
 
     bat = words(make_screen_bat(cells))
     assert len(bat) == SCREEN_W*20
@@ -38,25 +57,22 @@ def main():
         assert row[0] == row[1] == row[2]
         assert row[-1] == row[-2] == row[-3]
 
-    # Verify palette selection for every custom code that actually occurs in
-    # this room. Do not require unused SetupTileGraphics slots to appear in BAT.
     for code in sorted(used_codes - {0}):
         expected_pal = PAL_BY_C64[ROOM01_COLOURS[code-1] & 0x0f]
         samples = [w for w in bat if (w & 0x0fff) == CHR_GAME + code]
         assert samples, f'room01 used code {code} missing from BAT'
         assert all((w >> 12) == expected_pal for w in samples)
 
-    # Code 2 is intentionally unused by the exact rm_01 tilemap.
     assert not [w for w in bat if (w & 0x0fff) == CHR_GAME + 2]
 
     main_asm = (ROOT/'src/main.asm').read_text()
     physics = (ROOT/'src/monty_physics.asm').read_text()
-    world = (ROOT/'src/world.asm').read_text()
+    assets = (ROOT/'src/room01_assets.asm').read_text()
     assert 'call    room_load_pending' in main_asm
     assert 'room01_collision_map' in physics and 'room01_tile_properties' in physics
-    assert 'cmp     #2' in world  # unsupported rooms are gated until loaded
+    assert 'db $01,$03,$01,$01,$02,$01,$04,$03' in assets
 
-    print('OK: exact room 01 RLE/tiles/colours/properties + 00<->01 loader wiring')
+    print('OK: exact room 01 RLE/tiles/colours + corrected C64 climb properties')
 
 
 if __name__ == '__main__':
