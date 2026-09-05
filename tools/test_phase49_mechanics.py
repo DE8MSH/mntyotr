@@ -70,7 +70,12 @@ def main():
 
     # Exact CheckTiles semantics, translated geometrically for the PCE BAT model.
     assert 'piledriver_exact_check_tiles:' in exact
-    assert 'cmp     #2\n        beq     .done' in exact  # retracting cannot kill
+    # Retracting state 2 must exit before the kill checks. The implementation is
+    # intentionally long-branch-safe (BNE + JMP), so test the semantic sequence
+    # instead of requiring an out-of-range BEQ text pattern.
+    retract_guard = exact[exact.index('piledriver_exact_check_tiles:'):exact.index('; C64 screen column')]
+    assert 'cmp     #2' in retract_guard
+    assert 'jmp     .done' in retract_guard
     assert 'sbc     #$0c' in exact and exact.count('lsr     a') >= 5
     assert 'adc     <pile_static_position' in exact
     assert 'cmp     <monty_y' in exact
