@@ -1,53 +1,29 @@
 ; Authentic Room $00 enemies: Smiley (slot0) and Skate (slot1).
+; Dedicated 8 KiB ROM bank. Home-bank entry points live in enemy_room00_gate.asm.
 ; Spawn records copied from C64 room_data.asm:
 ;   05 b8 8f 04 19 02 25  -> Smiley
 ;   03 78 37 03 09 03 13  -> Skate
-; SetupRoom conversion and MoveVertical state machine follow the original.
 
 ENEMY00_SKATE_VRAM  = $3800
 ENEMY00_SMILEY_VRAM = $3c00
-ENEMY00_SMILEY_L    = SAT_ADDR+32     ; SAT entry 8
-ENEMY00_SMILEY_R    = SAT_ADDR+36     ; SAT entry 9
-ENEMY00_SKATE_L     = SAT_ADDR+40     ; SAT entry 10
-ENEMY00_SKATE_R     = SAT_ADDR+44     ; SAT entry 11
-
-.bss
-enemy00_last_room:      ds 1
-enemy00_active:         ds 1
-enemy00_smiley_x:       ds 1
-enemy00_smiley_y:       ds 1
-enemy00_smiley_flags:   ds 1
-enemy00_smiley_count:   ds 1
-enemy00_smiley_anim:    ds 1
-enemy00_skate_x:        ds 1
-enemy00_skate_y:        ds 1
-enemy00_skate_flags:    ds 1
-enemy00_skate_count:    ds 1
-enemy00_skate_anim:     ds 1
-enemy00_tmp:            ds 1
+ENEMY00_SMILEY_L    = SAT_ADDR+32
+ENEMY00_SMILEY_R    = SAT_ADDR+36
+ENEMY00_SKATE_L     = SAT_ADDR+40
+ENEMY00_SKATE_R     = SAT_ADDR+44
 
 .code
-enemy00_init:
+.bank 40
+.org $8000
+
+enemy00_banked_init:
         lda     #$ff
         sta     enemy00_last_room
         stz     enemy00_active
-        ; Anim counters are initialized by room_sync before Room00 can render.
-        ; Preserve caller MPR3/MPR4 across both banked asset uploads. Init runs
-        ; before the gameplay/VBlank loop, so interrupt-status save/restore is
-        ; unnecessary here and would waste bytes in the nearly-full code bank.
-        tma3
-        pha
-        tma4
-        pha
         call    enemy00_upload_skate
         call    enemy00_upload_smiley
-        pla
-        tam4
-        pla
-        tam3
         rts
 
-enemy00_room_sync:
+enemy00_banked_room_sync:
         lda     <monty_room
         cmp     enemy00_last_room
         bne     .changed
@@ -84,12 +60,12 @@ enemy00_room_sync:
         stz     enemy00_skate_anim
         rts
 
-enemy00_update:
+enemy00_banked_update:
         lda     enemy00_active
         bne     .active
         rts
 .active:
-        ; Slot0 Smiley: speed 2, range $25.
+        ; Smiley: vertical, speed 2, range $25.
         lda     enemy00_smiley_flags
         bmi     .smiley_up
         inc     enemy00_smiley_count
@@ -121,7 +97,7 @@ enemy00_update:
 .smiley_done:
         inc     enemy00_smiley_anim
 
-        ; Slot1 Skate: speed 3, range $13.
+        ; Skate: vertical, speed 3, range $13.
         lda     enemy00_skate_flags
         bmi     .skate_up
         inc     enemy00_skate_count
@@ -154,14 +130,12 @@ enemy00_update:
         inc     enemy00_skate_anim
         rts
 
-; Upload four 512-byte PCE frames (2048 bytes) per type.
+; Code and art share this bank, already mapped into MPR4 by the gate.
 enemy00_upload_skate:
         lda     #<enemy00_skate_patterns
         sta     <_bp
         lda     #>enemy00_skate_patterns
         sta     <_bp+1
-        ldy     #BANK(enemy00_skate_patterns)
-        call    map_bp_to_mpr34
         lda     #<ENEMY00_SKATE_VRAM
         sta     <_di
         lda     #>ENEMY00_SKATE_VRAM
@@ -173,8 +147,6 @@ enemy00_upload_smiley:
         sta     <_bp
         lda     #>enemy00_smiley_patterns
         sta     <_bp+1
-        ldy     #BANK(enemy00_smiley_patterns)
-        call    map_bp_to_mpr34
         lda     #<ENEMY00_SMILEY_VRAM
         sta     <_di
         lda     #>ENEMY00_SMILEY_VRAM
@@ -197,8 +169,7 @@ enemy00_upload_2k:
         bne     .page
         rts
 
-; C64 sprite animation: timer++, (timer & 6)>>1 gives frame 0..3, each for two ticks.
-enemy00_update_satb:
+enemy00_banked_update_satb:
         lda     enemy00_active
         bne     .show
         jmp     enemy00_hide
@@ -208,6 +179,7 @@ enemy00_update_satb:
         lda     #>ENEMY00_SMILEY_L
         sta     <_di+1
         call    vdc_di_to_mawr
+
         lda     enemy00_smiley_anim
         and     #$06
         lsr     a
@@ -309,7 +281,6 @@ enemy00_sat_dma:
         st2     #>SAT_ADDR
         rts
 
-; Pattern number is VRAM word address >>5. Each frame is $100 words; right half +$40.
 enemy00_smiley_pat_left:
         lda     enemy00_tmp
         asl     a
@@ -358,3 +329,15 @@ enemy00_skate_pat_right:
         adc     #0
         sta     VDC_DH
         rts
+
+; Four unique authentic frames per type. enemy_copy_flag duplicates the same
+; four frames for the opposite direction in the original.
+enemy00_skate_patterns:
+        incbin "enemy00-skate.dat"
+enemy00_smiley_patterns:
+        incbin "enemy00-smiley.dat"
+
+enemy00_skate_palette:
+        dw $000,$0a4,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+enemy00_smiley_palette:
+        dw $000,$19d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
