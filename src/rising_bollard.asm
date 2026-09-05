@@ -6,8 +6,9 @@
 ;   him two pixels upward.
 ; - UpdateRide then moves Monty upward one pixel per logical tick until Y<$62.
 ;
-; Standard piledrivers share this mechanism family. Their runtime is included
-; below and is advanced from the same lifecycle hooks so main.asm stays stable.
+; IMPORTANT: the new standard-Piledriver dynamic-BG renderer is temporarily
+; gated out of runtime after a reproducible Room-$01 entry crash. Keep its
+; source included while the static DrawShaft path is rebuilt in isolation.
 
 .zp
 rising_bollard_active: ds 1
@@ -19,32 +20,20 @@ rising_bollard_init:
         stz     <rising_bollard_active
         lda     #$ff
         sta     <rising_bollard_last_room
-        call    piledriver_palette_init
-        jmp     piledriver_init
+        rts
 
 rising_bollard_room_sync:
         lda     <monty_room
         cmp     <rising_bollard_last_room
         bne     .changed
-        call    piledriver_room_sync
         rts
 .changed:
         sta     <rising_bollard_last_room
         stz     <rising_bollard_active
-        ; A forced same-room reload (death/respawn) invalidates this family via
-        ; rising_bollard_last_room=$ff. Force the standard Piledriver to re-run
-        ; RoomInit too, matching the C64 room-entry reset.
-        lda     #$ff
-        sta     <piledriver_last_room
-        call    piledriver_room_sync
-        ; Dynamic piledriver tiles live above $ff; redraw the static shaft BAT
-        ; words with their tile-high bit after DrawShaft has established geometry.
-        jmp     piledriver_fix_bat_hi
+        rts
 
-; Run after normal movement with the real room id restored. Standard piledriver
-; animation/collision advances first, then the special Room0C bollard behaviour.
+; Run after normal movement with the real room id restored.
 rising_bollard_update:
-        call    piledriver_update
         lda     <monty_room
         cmp     #$0c
         beq     .room0c
