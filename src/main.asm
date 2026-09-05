@@ -43,6 +43,7 @@
 .zp
 main_jump_x_before_step:   ds 1
 main_exit_before_jump:     ds 1
+main_y_before_step:        ds 1
 
         .code
 
@@ -116,6 +117,11 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
+        ; Preserve Y so the external bottom-edge helper only runs after actual
+        ; downward motion, matching the C64 UpdateMovement_down semantics.
+        lda     <monty_y
+        sta     <main_y_before_step
+
         call    collision_bank_enter
         call    monty_update_input
 
@@ -160,8 +166,15 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; Original downward edge semantics remain active for all loaded cells.
+        ; C64 only evaluates the lower room edge while Y is moving downward.
+        ; This prevents an UP transition that spawns at Y=$DA from immediately
+        ; bouncing back down on the next stationary/horizontal tick.
+        lda     <monty_y
+        cmp     <main_y_before_step
+        bcc     .after_down_room_edge
+        beq     .after_down_room_edge
         call    monty_check_down_room_edge
+.after_down_room_edge:
         call    collision_bank_exit
 
         call    world_resolve_exit
