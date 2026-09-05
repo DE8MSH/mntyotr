@@ -27,9 +27,10 @@ def main():
     check_room(ROOM0D_RLE, ROOM0D_TILE_IDS, ROOM0D_COLOURS, ROOM0D_PROPERTIES, ROOM0D_TILE_BITMAPS, build0d, bat0d)
     check_room(ROOM0E_RLE, ROOM0E_TILE_IDS, ROOM0E_COLOURS, ROOM0E_PROPERTIES, ROOM0E_TILE_BITMAPS, build0e, bat0e)
 
-    # Primary room_data.asm has five consecutive $f0 runs here. Dropping one
-    # shortens Room $0D by exactly 16 cells (624 instead of 640), so pin it.
-    assert ROOM0D_RLE[32:38] == bytes.fromhex('f0 f0 f0 f0 f0 22')
+    # Primary refactored room_data.asm bytes at $9C9F-$9CA5 are:
+    #   $01,$F0,$F0,$F0,$F0,$F0,$F0,$22
+    # i.e. SIX consecutive $F0 runs after $01. Five decodes to only 624 cells.
+    assert ROOM0D_RLE[30:39] == bytes.fromhex('01 f0 f0 f0 f0 f0 f0 22 20')
     assert len(ROOM0D_RLE) == 66
 
     assert ROOM0D_TILE_IDS == (0x05,0x0f,0x4f,0x19,0x00,0x00,0x00,0x00)
@@ -52,7 +53,7 @@ def main():
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
 
-    print('OK: exact Room 0D/0E assets + tail-cache loader wiring')
+    print('OK: exact Room 0D/0E assets + six-run Room0D RLE + tail-cache loader wiring')
 
 
 if __name__ == '__main__':
