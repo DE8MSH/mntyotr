@@ -1,4 +1,4 @@
-; Authentic C64 four-slot enemy engine for Rooms $00-$03.
+; Authentic C64 four-slot enemy engine for Rooms $00-$05.
 ; State mirrors original enemy_state_tbl: 4 slots x 8 bytes:
 ; +0 X half-coordinate, +1 VIC Y, +2 C64 colour, +3 type_id,
 ; +4 flags(bit0 axis, bit7 direction), +5 range, +6 step, +7 speed.
@@ -19,7 +19,7 @@ ENEMY_SAT_BASE   = SAT_ADDR+32        ; entries 8..15, two PCE halves per C64 sl
 enemy_state_tbl:          ds 32
 enemy_xmsb_tbl:           ds 4
 enemy_anim_timer_tbl:     ds 4
-enemy_palette_tbl:        ds 4        ; PCE SAT palette index 3..6
+enemy_palette_tbl:        ds 4        ; PCE SAT palette index 3..9
 enemy_smiley_last_room:   ds 1        ; generic enemy room cache; old name retained
 enemy_tmp_slot:           ds 1
 enemy_tmp_state:          ds 1
@@ -35,7 +35,7 @@ enemy_tmp_xhi:            ds 1
 
 .code
 
-; Load the four C64 colours needed by Rooms $00-$03, then seed current room.
+; Load all C64 single-colour sprite palettes needed by Rooms $00-$05.
 .proc enemy_smiley_init
         lda     #$ff
         sta     enemy_smiley_last_room
@@ -83,6 +83,39 @@ enemy_tmp_xhi:            ds 1
         sta     <_bp+1
         ldy     #BANK(enemy_palette_yellow)
         call    load_palettes
+
+        lda     #23
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy_palette_red
+        sta     <_bp
+        lda     #>enemy_palette_red
+        sta     <_bp+1
+        ldy     #BANK(enemy_palette_red)
+        call    load_palettes
+
+        lda     #24
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy_palette_green
+        sta     <_bp
+        lda     #>enemy_palette_green
+        sta     <_bp+1
+        ldy     #BANK(enemy_palette_green)
+        call    load_palettes
+
+        lda     #25
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy_palette_light_blue
+        sta     <_bp
+        lda     #>enemy_palette_light_blue
+        sta     <_bp+1
+        ldy     #BANK(enemy_palette_light_blue)
+        call    load_palettes
         call    xfer_palettes
 
         call    enemy_smiley_room_sync
@@ -128,10 +161,26 @@ enemy_tmp_xhi:            ds 1
         jmp     .seed_selected
 .not_room02:
         cmp     #$03
-        bne     .no_supported_enemies
+        bne     .not_room03
         lda     #<.room03_records
         sta     <_bp
         lda     #>.room03_records
+        sta     <_bp+1
+        jmp     .seed_selected
+.not_room03:
+        cmp     #$04
+        bne     .not_room04
+        lda     #<.room04_records
+        sta     <_bp
+        lda     #>.room04_records
+        sta     <_bp+1
+        jmp     .seed_selected
+.not_room04:
+        cmp     #$05
+        bne     .no_supported_enemies
+        lda     #<.room05_records
+        sta     <_bp
+        lda     #>.room05_records
         sta     <_bp+1
 
 .seed_selected:
@@ -176,7 +225,7 @@ enemy_tmp_xhi:            ds 1
         ldx     enemy_tmp_state
         sta     enemy_state_tbl+2,x
 
-        ; PCE palette mapping for the exact C64 colours used in rooms 00..03.
+        ; SAT palette indices map one-for-one to the C64 colours used in $00-$05.
         ldy     enemy_tmp_slot
         lda     enemy_tmp_color
         cmp     #$03
@@ -190,11 +239,26 @@ enemy_tmp_xhi:            ds 1
         bra     .pal_store
 .pal_not_purple:
         cmp     #$01
-        bne     .pal_yellow
+        bne     .pal_not_white
         lda     #5
         bra     .pal_store
-.pal_yellow:
+.pal_not_white:
+        cmp     #$07
+        bne     .pal_not_yellow
         lda     #6
+        bra     .pal_store
+.pal_not_yellow:
+        cmp     #$02
+        bne     .pal_not_red
+        lda     #7
+        bra     .pal_store
+.pal_not_red:
+        cmp     #$05
+        bne     .pal_light_blue
+        lda     #8
+        bra     .pal_store
+.pal_light_blue:
+        lda     #9
 .pal_store:
         sta     enemy_palette_tbl,y
 
@@ -343,6 +407,15 @@ enemy_tmp_xhi:            ds 1
         ldy     #BANK(enemy_type0a_patterns)
         rts
 .asset_not0a:
+        cmp     #$0b
+        bne     .asset_not0b
+        lda     #<enemy_type0b_patterns
+        sta     <_bp
+        lda     #>enemy_type0b_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type0b_patterns)
+        rts
+.asset_not0b:
         cmp     #$0e
         bne     .asset_not0e
         lda     #<enemy_type0e_patterns
@@ -370,6 +443,24 @@ enemy_tmp_xhi:            ds 1
         ldy     #BANK(enemy_type14_patterns)
         rts
 .asset_not14:
+        cmp     #$15
+        bne     .asset_not15
+        lda     #<enemy_type15_patterns
+        sta     <_bp
+        lda     #>enemy_type15_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type15_patterns)
+        rts
+.asset_not15:
+        cmp     #$16
+        bne     .asset_not16
+        lda     #<enemy_type16_patterns
+        sta     <_bp
+        lda     #>enemy_type16_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type16_patterns)
+        rts
+.asset_not16:
         cmp     #$18
         bne     .asset_not18
         lda     #<enemy_type18_patterns
@@ -429,6 +520,18 @@ enemy_tmp_xhi:            ds 1
         db $06,$58,$2f,$01,$0a,$01,$20
         db $05,$60,$97,$02,$0e,$02,$48
         db $03,$30,$a7,$04,$1d,$01,$20
+        db $ff
+.room04_records:
+        db $05,$48,$47,$02,$18,$03,$20
+        db $0e,$88,$9f,$04,$0e,$04,$16
+        db $06,$ff,$5f,$04,$0b,$02,$17
+        db $04,$70,$77,$01,$15,$01,$30
+        db $ff
+.room05_records:
+        db $05,$70,$67,$02,$18,$02,$24
+        db $07,$40,$2f,$03,$14,$03,$20
+        db $02,$3e,$97,$01,$1d,$01,$20
+        db $06,$c8,$2f,$03,$16,$02,$20
         db $ff
 .endp
 
