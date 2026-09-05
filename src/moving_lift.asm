@@ -366,7 +366,7 @@ moving_lift_update_satb:
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
-        bra     .sat_dma
+        jmp     moving_lift_sat_dma
 
 moving_lift_hide_satb:
         lda     #<LIFT_SAT_TL
@@ -389,7 +389,7 @@ moving_lift_hide_satb:
         sta     VDC_DH
         dex
         bne     .hide_one
-.sat_dma:
+moving_lift_sat_dma:
         st0     #$13
         st1     #<SAT_ADDR
         st2     #>SAT_ADDR
