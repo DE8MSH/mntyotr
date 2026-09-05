@@ -1,7 +1,8 @@
 ; Pixel-accurate enemy collision for the four authentic C64 enemy slots.
 ; C64 latches VIC sprite/sprite collisions in $D01E. Monty is sprite 3 and
 ; enemies are sprites 4..7, so a hit only exists where opaque 24x21 pixels
-; overlap. Masks are reconstructed from the exact PCE frames used for render.
+; overlap. A cheap C64-coordinate broadphase now runs before any bank mapping
+; or mask reconstruction; exact opaque-pixel collision is unchanged.
 ;
 ; --newproc note: top-level exit uses LEAVE. Internal JSR helpers use RTS.
 
@@ -31,23 +32,37 @@ enemy_col_frame:        ds 1
 
 .code
 .proc enemy_room00_collision_update
-        lda     enemy_state_tbl
-        cmp     #$ff
-        bne     .prepare
-        lda     enemy_state_tbl+8
-        cmp     #$ff
-        bne     .prepare
-        lda     enemy_state_tbl+16
-        cmp     #$ff
-        bne     .prepare
-        lda     enemy_state_tbl+24
-        cmp     #$ff
-        bne     .prepare
-        leave
-
-.prepare:
+        ; First pass is state-only. If no active enemy is within the 24x21 VIC
+        ; sprite rectangle, do no ROM mapping and build no 63-byte masks.
         stz     enemy_col_hit
+        stz     enemy_col_slot
+        stz     enemy_col_state
 
+.scan_slot:
+        ldx     enemy_col_state
+        lda     enemy_state_tbl,x
+        cmp     #$ff
+        beq     .scan_next
+        sta     enemy_col_enemy_x
+        lda     enemy_state_tbl+1,x
+        sta     enemy_col_enemy_y
+        jsr     .coarse_overlap
+        bcs     .prepare_masks
+
+.scan_next:
+        inc     enemy_col_slot
+        lda     enemy_col_state
+        clc
+        adc     #8
+        sta     enemy_col_state
+        lda     enemy_col_slot
+        cmp     #4
+        beq     .done_unmapped
+        jmp     .scan_slot
+
+.prepare_masks:
+        ; Only a real broadphase candidate pays for bank switching and Monty's
+        ; current-frame mask. The current slot/state already names candidate #1.
         php
         sei
         tma3
@@ -59,32 +74,18 @@ enemy_col_frame:        ds 1
         call    map_bp_to_mpr34
         jsr     .convert_monty_mask
 
-        stz     enemy_col_slot
-        stz     enemy_col_state
-
-.try_slot:
-        ldx     enemy_col_state
-        lda     enemy_state_tbl,x
-        cmp     #$ff
-        beq     .next_slot
-        sta     enemy_col_enemy_x
-        lda     enemy_state_tbl+1,x
-        sta     enemy_col_enemy_y
-
-        jsr     .coarse_overlap
-        bcc     .next_slot
-
+.precise_slot:
         jsr     .select_enemy_source
         call    map_bp_to_mpr34
         jsr     .convert_enemy_mask
         jsr     .opaque_overlap
-        bcc     .next_slot
+        bcc     .precise_next
 
         lda     #1
         sta     enemy_col_hit
         jmp     .restore_maps
 
-.next_slot:
+.precise_next:
         inc     enemy_col_slot
         lda     enemy_col_state
         clc
@@ -93,7 +94,28 @@ enemy_col_frame:        ds 1
         lda     enemy_col_slot
         cmp     #4
         beq     .restore_maps
-        jmp     .try_slot
+
+.precise_scan:
+        ldx     enemy_col_state
+        lda     enemy_state_tbl,x
+        cmp     #$ff
+        beq     .precise_advance
+        sta     enemy_col_enemy_x
+        lda     enemy_state_tbl+1,x
+        sta     enemy_col_enemy_y
+        jsr     .coarse_overlap
+        bcs     .precise_slot
+
+.precise_advance:
+        inc     enemy_col_slot
+        lda     enemy_col_state
+        clc
+        adc     #8
+        sta     enemy_col_state
+        lda     enemy_col_slot
+        cmp     #4
+        beq     .restore_maps
+        jmp     .precise_scan
 
 .restore_maps:
         pla
@@ -111,6 +133,9 @@ enemy_col_frame:        ds 1
         lda     #$ff
         sta     enemy_smiley_last_room
 .done:
+        leave
+
+.done_unmapped:
         leave
 
 ; Fast rectangle reject before doing banked frame conversion.
