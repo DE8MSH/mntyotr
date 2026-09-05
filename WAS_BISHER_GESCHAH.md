@@ -1,10 +1,10 @@
 # Was bisher geschah
 
-Stand: 2026-09-05 — Phase 46
+Stand: 2026-09-05 — Phase 47
 
 ## Portierungsstand
 
-**Gesamtport: ca. 60 %**
+**Gesamtport: ca. 61 %**
 
 Primaere Referenz bleibt `Dave-Agent/monty-on-the-run/refactored/src`; `byte-perfect` ist zusaetzliche Ground-Truth. Die PC-Engine-Portierung verwendet weiterhin C64-Spielkoordinaten, PAL-logische Ticks und einen gemeinsamen 648-Byte-RAM-Collision-Cache fuer banked Tail-Raeume.
 
@@ -21,7 +21,7 @@ Primaere Referenz bleibt `Dave-Agent/monty-on-the-run/refactored/src`; `byte-per
 
 - Fallen aus `$01` nach `$0A` funktioniert.
 - Rueckweg `$0A UP -> $01` funktioniert nach Korrektur der Room-$01-Kletterproperties.
-- Oben rechts wird dauerhaft die aktuelle Raum-ID zweistellig hexadezimal angezeigt (`00`, `01`, `0A`, ...). Das bleibt fuer die weitere Portierung aktiv.
+- Oben rechts wird dauerhaft die aktuelle Raum-ID zweistellig hexadezimal angezeigt (`00`, `01`, `0A`, ...).
 
 ## Wichtige Fixes seit Phase 44
 
@@ -69,7 +69,7 @@ Die Weltkarte hat `$05` auf Zeile 2 / Spalte $10, direkt links von `$04`; darunt
 - Farben: `$0d,$05,$07,$03,$05,$02,$02,$00`
 - Properties: `1,1,1,2,3,3,4,1`
 
-Die Properties wurden erneut direkt gegen `Monty.SetTileProperty` geprueft. Beide Raeume brauchen keine neuen BG-Paletten; alle Farben sind bereits vorhanden.
+Die Properties wurden direkt gegen `Monty.SetTileProperty` geprueft. Beide Raeume brauchen keine neuen BG-Paletten; alle Farben sind bereits vorhanden.
 
 ## Phase-46-Architektur
 
@@ -81,36 +81,55 @@ Die Properties wurden erneut direkt gegen `Monty.SetTileProperty` geprueft. Beid
 
 Der alte Jump-Guard, der `$04 LEFT` absichtlich blockierte solange `$05` nicht geladen war, ist entfernt. Der echte Aussenrand `$00 RIGHT` bleibt vorab gesperrt; weitere nicht portierte Ziele blockiert `world_resolve_exit` selbst.
 
-## Neue/aktualisierte Phase-46-Tests
+## Phase 47 — Room `$02` Runtime-Befund
 
-- `tools/test_room050c.py` — exakte RLE/Tile/Property-Daten, Weltpositionen, Loader-Extension und offene `$04->$05`-Kante
-- `tools/test_vertical_route.py` — untere Route bis `$05->$0C`
-- `tools/test_collision_banking.py` — `$05/$0C` im gemeinsamen RAM-Cache
-- `tools/test_jump_edge_guard.py` — `$04->$05` darf nicht wieder vorab blockiert werden
-- `tools/test_room02.py` — Edge-Test wieder topology-agnostisch
-- `tools/test_room01.py` — neuer Loader-Dispatcher faellt korrekt auf den bestaetigten alten Loader zurueck
+Der Nutzer meldete, dass man aus Room `$02` nicht auf die hoeheren Bereiche kommt. Der Abgleich mit der C64-Referenz zeigt, dass dies **kein zu niedriger PCE-Sprung** ist:
 
-`build.sh` erzeugt jetzt auch `room05-*.dat` und `room0c-*.dat` und fuehrt `test_room050c.py` vor PCEAS aus.
+- `Monty.Data.jump_arc_tbl` hat im Original exakt dieselbe Aufwaertskurve wie der Port.
+- Die Summe der positiven Aufwaerts-Deltas betraegt 20 Pixel.
+- Room `$02` besitzt in der exakten C64-RLE eine massive zentrale Wand, die den rechten und linken Bereich weitgehend trennt.
+- Rechts liegt eine Property-3-Kletterflaeche, aber sie macht die Mittelwand nicht zu einem direkten `$01 -> $03`-Durchgang.
+- Fuer Room `$02` existiert kein Jetpack-/Freedom-Kit-Raumeffekt, der die normale Sprunghoehe veraendert.
 
-## Erwarteter lokaler Test fuer Phase 46
+Daher wird die Sprunghoehe **nicht** kuenstlich erhoeht. Der derzeitige Hauptfortschritt bleibt der bereits bestaetigte untere Weg aus `$01`. `tools/test_room02.py` pinnt jetzt die zentrale Solid-Geometrie, die rechte Kletterflaeche und die originale 20-Pixel-Sprungkurve fest.
+
+## Phase 47 — permanente Build-/Debug-Anzeige
+
+Die bisherige Raumnummer oben rechts bleibt erhalten und wurde erweitert:
+
+- oben links: **7-stellige Git-Commit-ID** des ROM-Builds,
+- oben rechts: aktuelle zweistellige Hex-Raumnummer,
+- unten links: **`A thE rZA PCE port`**.
+
+Die Commit-ID wird nicht manuell gepflegt. `build.sh` fuehrt `git rev-parse --short=7 HEAD` aus, wandelt die sieben Hex-Zeichen in Nibble-Bytes um und schreibt `build/build-commit.dat`. `debug_room.asm` bindet diese sieben Nibbles ein und rendert sie mit dem reservierten Diagnose-Font. Damit identifiziert jedes lokal gebaute ROM exakt seinen Git-Stand.
+
+Der Overlay-Font belegt 32 der bereits reservierten 112 Diagnose-Glyphen unterhalb von `CHR_GAME`; Raumgrafiken ueberschreiben ihn nicht. Die Commit-ID liegt in BAT-Zeile 0 links, die Room-ID in Zeile 0 rechts und die Signatur in der letzten sichtbaren Zeile 27 links.
+
+## Phase-47-Commits
+
+- `7c9c6fb355f954c98ae050fc989480b64e275475` — Commit-ID und Port-Signatur in Debug-Overlay
+- `26af5b1a42ee3804af5b5108699cabc505c8c808` — Git-Short-SHA automatisch in ROM-Build einbetten
+- `4e9ffae09f9a66c172c998b9ab0dd5620655673c` — Overlay-Regressionstest erweitert
+- `86ffdcd0191ebbcba1a687b35bfaf33066dd47c3` — Room-$02`-Geometrie/Sprungkurve als Regression aufgenommen
+- `26b03f66d9ca4d374be9dc0b386241dfb7474403` — Room-$02-Wandspalten im Test korrigiert
+
+## Erwarteter lokaler Test fuer Phase 47
 
 Nach:
 
 `git pull && ./build.sh`
 
-soll zusaetzlich erscheinen:
+soll im Build eine Zeile wie
 
-`OK: exact Room 05/0C assets + $04->$05->$0C continuation wiring`
+`ROM commit overlay: ABC1234`
 
-Danach in Mednafen den bestaetigten Weg bis `$04` laufen und weiter testen:
+erscheinen. Im Emulator muessen danach gleichzeitig sichtbar sein:
 
-1. `$04` nach links -> Debug-ID muss auf `05` wechseln und dort bleiben.
-2. In `$05` Gehen, Springen, Collision und Rueckweg rechts -> `$04` testen.
-3. Den unteren Durchstieg in `$05` finden und nach `$0C` fallen; Debug-ID muss `0C` anzeigen.
-4. Falls ein Aufstieg `$0C -> $05` moeglich ist, ebenfalls testen und auf Flackern/sofortigen Rueckfall achten.
-5. In `$0C` noch nicht erwarten, dass Gegner, Decors oder alle Mechanismen vorhanden sind.
+- oben links dieselbe 7-stellige Commit-ID,
+- oben rechts die aktuelle Room-ID,
+- unten links `A thE rZA PCE port`.
 
-Die Weltkarte verzweigt von `$0C` weiter nach `$0F` (links), `$11` (unten) und `$0D` (rechts). Welcher dieser Zweige als naechstes portiert wird, wird nach dem Runtime-Test von `$05/$0C` entschieden.
+Fuer den Spielweg nicht versuchen, Room `$02` durch eine kuenstlich hoeher gedachte Sprungpassage nach links zu verlassen. Stattdessen aus `$01` in den unteren Weg wechseln und von dort bis `$04`, `$05` und `$0C` weitertesten.
 
 ## Noch fehlend / spaeter
 
