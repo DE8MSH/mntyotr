@@ -32,6 +32,7 @@
         include "room03_assets_tail.asm"
         include "room04_assets_tail.asm"
         include "room05_assets_tail.asm"
+        include "room09_assets_tail.asm"
         include "room0a_assets_tail.asm"
         include "room0b_assets_tail.asm"
         include "room0c_assets_tail.asm"
@@ -116,9 +117,8 @@ main_loop:
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Phase 46 opens the original continuation $04 left->$05. Only the
-        ; confirmed outer edge at Room $00 right is special-cased here; all
-        ; other unsupported targets are rejected by world_resolve_exit itself.
+        ; Phase 48 keeps only the confirmed outer edge at Room $00 right as a
+        ; pre-world special case. Room $01 up->$09 is now a real supported edge.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -158,9 +158,7 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; The original movement engine emits a down-room exit at Y=$DA.
-        ; Active floor openings now include $01->$0A, $02->$0B, $03->$0E and
-        ; the Phase-46 continuation $05->$0C.
+        ; Original downward edge semantics remain active for all loaded cells.
         call    monty_check_down_room_edge
         call    collision_bank_exit
 
@@ -168,7 +166,6 @@ main_loop:
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
-        ; Persistent runtime diagnostic: two-digit hexadecimal current room id.
         call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
