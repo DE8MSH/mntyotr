@@ -24,7 +24,7 @@ for needle in (
 ):
     assert needle in src, needle
 
-# Exact C64 spawn streams active for rooms 00..03.
+# Exact C64 spawn streams active for rooms 00..05.
 for needle in (
     "db $05,$b8,$8f,$04,$19,$02,$25",
     "db $03,$78,$37,$03,$09,$03,$13",
@@ -39,10 +39,30 @@ for needle in (
     "db $06,$58,$2f,$01,$0a,$01,$20",
     "db $05,$60,$97,$02,$0e,$02,$48",
     "db $03,$30,$a7,$04,$1d,$01,$20",
+    "db $05,$48,$47,$02,$18,$03,$20",
+    "db $0e,$88,$9f,$04,$0e,$04,$16",
+    "db $06,$ff,$5f,$04,$0b,$02,$17",
+    "db $04,$70,$77,$01,$15,$01,$30",
+    "db $05,$70,$67,$02,$18,$02,$24",
+    "db $07,$40,$2f,$03,$14,$03,$20",
+    "db $02,$3e,$97,$01,$1d,$01,$20",
+    "db $06,$c8,$2f,$03,$16,$02,$20",
 ):
     assert needle in src, needle
-assert "cmp     #$03" in src
-assert "#<.room03_records" in src
+for room in range(6):
+    assert f"cmp     #${room:02x}" in src
+    assert f"#<.room{room:02x}_records" in src
+
+# Seven exact C64 single-colour sprite palettes cover Rooms00-05.
+for needle in (
+    "enemy_palette_cyan", "enemy_palette_purple", "enemy_palette_white",
+    "enemy_palette_yellow", "enemy_palette_red", "enemy_palette_green",
+    "enemy_palette_light_blue",
+    "cmp     #$02", "cmp     #$05", "lda     #9",
+):
+    assert needle in src or needle in assets, needle
+for value in ("$19d", "$0a4", "$1ff", "$1fb", "$062", "$152", "$0de"):
+    assert value in assets, value
 
 # SetupRoom transforms and reverse-direction initial step=range.
 for needle in (
@@ -95,17 +115,13 @@ for needle in (
 ):
     assert needle in src, needle
 
-# Room03 graphics must be selected in both uploader and exact collision source.
-for needle in (
-    "enemy_type0a_patterns",
-    "enemy_type1b_patterns",
-    "enemy_type1d_patterns",
-):
+# Every type needed through Room05 must select its own upload and exact collision frame.
+for type_id in (0x09,0x0a,0x0b,0x0e,0x0f,0x14,0x15,0x16,0x18,0x19,0x1b,0x1d):
+    needle = f"enemy_type{type_id:02x}_patterns"
     assert needle in src, needle
     assert needle in collision, needle
 
-# Collision still iterates all four slots and selects the same current 0..7
-# type frame, but it must reject by coordinates before paying for banked masks.
+# Collision still iterates all four slots and rejects by coordinates before masks.
 for needle in (
     ".proc enemy_room00_collision_update",
     ".scan_slot:",
@@ -115,12 +131,6 @@ for needle in (
     "inc     enemy_col_slot",
     "jsr     .coarse_overlap",
     "jsr     .select_enemy_source",
-    "enemy_type09_patterns",
-    "enemy_type0e_patterns",
-    "enemy_type0f_patterns",
-    "enemy_type14_patterns",
-    "enemy_type18_patterns",
-    "enemy_type19_patterns",
     "jsr     .opaque_overlap",
     "sta     <monty_action_counter",
 ):
@@ -161,8 +171,6 @@ for needle in (
     'incbin "enemy-type19-smiley.dat"',
     'incbin "enemy-type1b-hand.dat"',
     'incbin "enemy-type1d-jelly-fish.dat"',
-    "enemy_palette_white:",
-    "enemy_palette_yellow:",
 ):
     assert needle in assets, needle
 
@@ -175,4 +183,4 @@ for arg in (
 # Any death reload reruns the C64 SetupRoom enemy pass, not only enemy deaths.
 assert "sta     enemy_smiley_last_room" in life
 
-print("OK: exact four-slot C64 enemies Rooms00-03 + Room04-05 art + broadphase collision")
+print("OK: exact four-slot C64 enemies active for Rooms00-05 + pixel collision")
