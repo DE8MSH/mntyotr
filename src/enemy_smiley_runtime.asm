@@ -1,4 +1,4 @@
-; Authentic C64 four-slot enemy engine for Rooms $00-$02.
+; Authentic C64 four-slot enemy engine for Rooms $00-$03.
 ; State mirrors original enemy_state_tbl: 4 slots x 8 bytes:
 ; +0 X half-coordinate, +1 VIC Y, +2 C64 colour, +3 type_id,
 ; +4 flags(bit0 axis, bit7 direction), +5 range, +6 step, +7 speed.
@@ -35,7 +35,7 @@ enemy_tmp_xhi:            ds 1
 
 .code
 
-; Load the four C64 colours needed by Rooms $00-$02, then seed current room.
+; Load the four C64 colours needed by Rooms $00-$03, then seed current room.
 .proc enemy_smiley_init
         lda     #$ff
         sta     enemy_smiley_last_room
@@ -120,10 +120,18 @@ enemy_tmp_xhi:            ds 1
         jmp     .seed_selected
 .not_room01:
         cmp     #$02
-        bne     .no_supported_enemies
+        bne     .not_room02
         lda     #<.room02_records
         sta     <_bp
         lda     #>.room02_records
+        sta     <_bp+1
+        jmp     .seed_selected
+.not_room02:
+        cmp     #$03
+        bne     .no_supported_enemies
+        lda     #<.room03_records
+        sta     <_bp
+        lda     #>.room03_records
         sta     <_bp+1
 
 .seed_selected:
@@ -168,7 +176,7 @@ enemy_tmp_xhi:            ds 1
         ldx     enemy_tmp_state
         sta     enemy_state_tbl+2,x
 
-        ; PCE palette mapping for the exact C64 colours used in rooms 00..02.
+        ; PCE palette mapping for the exact C64 colours used in rooms 00..03.
         ldy     enemy_tmp_slot
         lda     enemy_tmp_color
         cmp     #$03
@@ -326,6 +334,15 @@ enemy_tmp_xhi:            ds 1
         ldy     #BANK(enemy_type09_patterns)
         rts
 .asset_not09:
+        cmp     #$0a
+        bne     .asset_not0a
+        lda     #<enemy_type0a_patterns
+        sta     <_bp
+        lda     #>enemy_type0a_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type0a_patterns)
+        rts
+.asset_not0a:
         cmp     #$0e
         bne     .asset_not0e
         lda     #<enemy_type0e_patterns
@@ -354,19 +371,37 @@ enemy_tmp_xhi:            ds 1
         rts
 .asset_not14:
         cmp     #$18
-        bne     .asset_type19
+        bne     .asset_not18
         lda     #<enemy_type18_patterns
         sta     <_bp
         lda     #>enemy_type18_patterns
         sta     <_bp+1
         ldy     #BANK(enemy_type18_patterns)
         rts
-.asset_type19:
+.asset_not18:
+        cmp     #$19
+        bne     .asset_not19
         lda     #<enemy_type19_patterns
         sta     <_bp
         lda     #>enemy_type19_patterns
         sta     <_bp+1
         ldy     #BANK(enemy_type19_patterns)
+        rts
+.asset_not19:
+        cmp     #$1b
+        bne     .asset_type1d
+        lda     #<enemy_type1b_patterns
+        sta     <_bp
+        lda     #>enemy_type1b_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type1b_patterns)
+        rts
+.asset_type1d:
+        lda     #<enemy_type1d_patterns
+        sta     <_bp
+        lda     #>enemy_type1d_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy_type1d_patterns)
         rts
 
 .dir_flags:
@@ -388,6 +423,12 @@ enemy_tmp_xhi:            ds 1
         db $07,$68,$27,$03,$14,$02,$3c
         db $06,$a8,$57,$02,$09,$01,$1f
         db $05,$28,$67,$03,$19,$04,$0e
+        db $ff
+.room03_records:
+        db $07,$70,$2f,$03,$1b,$02,$1a
+        db $06,$58,$2f,$01,$0a,$01,$20
+        db $05,$60,$97,$02,$0e,$02,$48
+        db $03,$30,$a7,$04,$1d,$01,$20
         db $ff
 .endp
 
