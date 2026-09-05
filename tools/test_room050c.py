@@ -82,7 +82,6 @@ def main():
     assert ROOM08_COLOURS == (0x01,0x03,0x09,0x01,0x04,0x07,0x05,0x02)
     assert ROOM08_PROPERTIES == (1,2,1,3,2,3,2,4)
 
-    # Exact upper route from the original 6x23 world grid.
     world = parse_world_grid()
     assert world[1][0x11:0x15] == [0x06,0x07,0x08,0x09]
     assert world[2][0x10:0x15] == [0x05,0x04,0x03,0x02,0x01]
@@ -100,17 +99,19 @@ def main():
         assert f'room{room}_collision_map_rom' in ext
     assert 'include "room050c_loader.asm"' in main_asm
     assert 'call    room_load_pending_extended' in main_asm
+    assert '.proc room_load_pending_extended' in ext
+    assert 'room_ext_ids:' in ext
     assert 'room_ext_patterns_lo:' in ext
     assert 'room_ext_bat_lo:' in ext
     assert 'room_ext_collision_lo:' in ext
-    assert 'cmp     #$0f' in world_asm
+    assert '$0f' in ext and 'room0f_patterns' in ext
+    assert 'cmp     #$10' in world_asm
 
-    # $04 left remains supported; don't tie this check to comments/phase labels.
     guard = main_asm.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
     assert 'cmp     #4' not in guard
 
-    print('OK: exact Rooms 05-08/0C assets + contiguous upper-house route + compact tail loader')
+    print('OK: exact Rooms 05-08/0C assets + Room0F descriptor + compact tail loader')
 
 
 if __name__ == '__main__':

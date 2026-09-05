@@ -66,7 +66,6 @@ def main():
 
     world = parse_world_grid()
     assert len(world) == 6 and all(len(row) == 23 for row in world)
-    # Exact C64 topology around the newly exposed floor openings.
     assert world[2][0x14] == 0x01 and world[3][0x14] == 0x0a
     assert world[2][0x13] == 0x02 and world[3][0x13] == 0x0b
     assert world[3][0x12] == 0x0e
@@ -84,12 +83,10 @@ def main():
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
 
-    # Support is compactly represented as one contiguous $00-$0E range now.
     compact_world = ''.join(world_asm.lower().split())
     assert 'world_room_supported:' in world_asm
-    assert 'cmp#$0f' in compact_world
+    assert 'cmp#$10' in compact_world
 
-    # Growing selector tables must use long jumps to their common helpers.
     assert loader.count('jmp     room_tail_cache_collision') >= 6
     assert loader.count('jmp     room_upload_9_patterns') >= 7
     assert loader.count('jmp     room_draw_native_36x20') >= 7

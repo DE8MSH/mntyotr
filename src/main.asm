@@ -51,6 +51,7 @@
         include "room0c_assets_tail.asm"
         include "room0d_assets_tail.asm"
         include "room0e_assets_tail.asm"
+        include "room0f_assets_tail.asm"
 
 .zp
 main_jump_x_before_step:   ds 1
@@ -148,8 +149,9 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
-        ; Banked Room00 enemy init owns sprite palettes 19+ and active GFX sets.
+        ; Banked enemy init owns sprite palettes 19+ and active GFX sets.
         call    enemy_smiley_init
+        call    enemy_room0f_palette_init
         call    game_life_init
         call    debug_room_init
         call    debug_room_warp_init

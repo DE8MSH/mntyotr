@@ -47,6 +47,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room04.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room050c.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0a0b.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0f.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
@@ -56,9 +57,6 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_score_runtime.py"
 
 cp "$ROOT"/src/*.asm "$ROOT"/src/*.inc "$BUILD"/
 cp "$ROOT"/src/*.dat "$BUILD"/ 2>/dev/null || true
-# Extend only the build copy of the stable shared collision routine. This keeps
-# the current source layout small while enabling exact masks for the three enemy
-# types first encountered in Rooms $06/$08.
 python3 "$ROOT/tools/patch_enemy_collision_0608.py" "$BUILD/enemy_room00_collision.asm"
 
 COMMIT_HEX="$(git -C "$ROOT" rev-parse --short=7 HEAD 2>/dev/null || printf '0000000')"
@@ -100,6 +98,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b.py" --map "$BUILD/room0b-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0c.py" --map "$BUILD/room0c-map.dat" --screen-bat "$BUILD/room0c-screen-bat.dat" --patterns "$BUILD/room0c-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-map.dat" --screen-bat "$BUILD/room0f-screen-bat.dat" --patterns "$BUILD/room0f-patterns.dat" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null

@@ -38,7 +38,7 @@ debug_room_warp_init:
 .warp_next:
         lda     <monty_room
         inc     a
-        cmp     #$0f                    ; current supported block is $00-$0E
+        cmp     #$10                    ; current supported block is $00-$0F
         bcc     .room_ok
         cla
 .room_ok:
@@ -86,16 +86,16 @@ debug_room_warp_init:
 .endp
 
 .data
-; Exact coordinates of rooms $00-$0E in Room.Data.room_exit_dest_tbl.
+; Exact coordinates of rooms $00-$0F in Room.Data.room_exit_dest_tbl.
 debug_room_world_row:
-        db $02,$02,$02,$02,$02,$02,$01,$01,$01,$01,$03,$03,$03,$03,$03
+        db $02,$02,$02,$02,$02,$02,$01,$01,$01,$01,$03,$03,$03,$03,$03,$03
 debug_room_world_col:
-        db $15,$14,$13,$12,$11,$10,$11,$12,$13,$14,$14,$13,$10,$11,$12
+        db $15,$14,$13,$12,$11,$10,$11,$12,$13,$14,$14,$13,$10,$11,$12,$0f
 
 ; Development-only starting points used after SELECT warps.
 ; $00 is the original C64 cold start. The remaining rooms use the same neutral
 ; interior coordinate so verification begins away from edge-transition guards.
 debug_room_spawn_x:
-        db $86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86
+        db $86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86,$86
 debug_room_spawn_y:
-        db $b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0
+        db $b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0,$b0
