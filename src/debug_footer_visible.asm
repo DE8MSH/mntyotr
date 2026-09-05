@@ -104,8 +104,4 @@ debug_commit_bank_safe_draw:
         pla
         tam3
         plp
-
-        ; Standard piledrivers occupy SAT entries 8..11. This diagnostic pass
-        ; already runs every logical tick after mechanism updates, so it is a
-        ; stable place to refresh those entries without growing main.asm again.
-        jmp     piledriver_update_satb
+        rts
