@@ -23,7 +23,9 @@
         include "rising_cloud_sprite.asm"
         include "rising_bollard.asm"
         include "moving_lift.asm"
-        include "enemy_room00.asm"
+        ; Room00 enemy source is retained but temporarily gated until its runtime
+        ; is moved into a dedicated bank. Keeping it out of the primary .code
+        ; group restores the proven pre-enemy bank layout.
         include "world.asm"
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
@@ -38,7 +40,6 @@
         ; adding new content cannot move the confirmed physics/collision layout.
         include "moving_lift_assets_tail.asm"
         include "rising_cloud_sprite_assets_tail.asm"
-        include "enemy_room00_assets_tail.asm"
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
@@ -133,30 +134,6 @@ bare_main:
         sta     <_bp + 1
         ldy     #^rising_cloud_sprite_palette
         call    load_palettes
-
-        ; Sprite palette 19: Room00 Skate (C64 purple $04).
-        lda     #19
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<enemy00_skate_palette
-        sta     <_bp + 0
-        lda     #>enemy00_skate_palette
-        sta     <_bp + 1
-        ldy     #^enemy00_skate_palette
-        call    load_palettes
-
-        ; Sprite palette 20: Room00 Smiley (C64 cyan $03).
-        lda     #20
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<enemy00_smiley_palette
-        sta     <_bp + 0
-        lda     #>enemy00_smiley_palette
-        sta     <_bp + 1
-        ldy     #^enemy00_smiley_palette
-        call    load_palettes
         call    xfer_palettes
 
         call    draw_room00_native
@@ -170,8 +147,6 @@ bare_main:
         call    rising_bollard_room_sync
         call    moving_lift_init
         call    moving_lift_room_sync
-        call    enemy00_init
-        call    enemy00_room_sync
         call    game_life_init
         call    debug_room_init
         call    debug_footer_visible_draw
@@ -179,7 +154,6 @@ bare_main:
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    rising_cloud_sprite_update_satb
-        call    enemy00_update_satb
         call    set_dspon
 
 main_loop:
@@ -255,7 +229,6 @@ main_loop:
         call    rising_cloud_update
         call    rising_bollard_update
         call    moving_lift_update
-        call    enemy00_update
 
         ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
         ; death reloads the same room at its saved entry point and skips topology.
@@ -272,16 +245,14 @@ main_loop:
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
-        call    enemy00_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    debug_footer_visible_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; Mechanism/enemy sprites use SAT entries after Monty's two entries.
+        ; Mechanism sprites use SAT entries after Monty's two entries.
         call    moving_lift_update_satb
         call    rising_cloud_sprite_update_satb
-        call    enemy00_update_satb
         jmp     main_loop
 
 init_c64_video:
