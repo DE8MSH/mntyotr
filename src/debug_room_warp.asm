@@ -3,10 +3,8 @@
 ; PCE pad bit $04 is SELECT. A software latch makes this edge-triggered even though
 ; the rest of the port reads the current joypad state through joynow.
 ;
-; The warp updates the world-grid coordinates as well as monty_room, reloads the
-; room's graphics/collision data, resets transient movement/death state, and
-; invalidates every room-scoped cache so the normal sync path rebuilds enemies
-; and mechanisms exactly as if the room had been entered normally.
+; The poll/warp body is a --newproc routine so Bank 0 only pays for the small
+; generated thunk. Internal helpers use RTS; externally returning paths use LEAVE.
 
 .zp
 debug_room_select_latch: ds 1
@@ -18,7 +16,7 @@ debug_room_warp_init:
         rts
 
 ; C=1 when a room warp was performed this frame.
-debug_room_warp_poll:
+.proc debug_room_warp_poll
         lda     joynow
         and     #$04                    ; SELECT
         beq     .released
@@ -27,17 +25,17 @@ debug_room_warp_poll:
         bne     .no_warp
         lda     #1
         sta     <debug_room_select_latch
-        jsr     debug_room_warp_next
+        jsr     .warp_next
         sec
-        rts
+        leave
 
 .released:
         stz     <debug_room_select_latch
 .no_warp:
         clc
-        rts
+        leave
 
-debug_room_warp_next:
+.warp_next:
         lda     <monty_room
         inc     a
         cmp     #$0f                    ; current supported block is $00-$0E
@@ -55,7 +53,7 @@ debug_room_warp_next:
         sta     <world_exit_col
 
         ; QA spawn points. Room $00 retains the authentic cold-start position;
-        ; other rooms use a neutral open-area start used only by the test warp.
+        ; other rooms use a neutral interior start used only by the test warp.
         lda     debug_room_spawn_x,x
         sta     <monty_x
         lda     debug_room_spawn_y,x
@@ -85,6 +83,7 @@ debug_room_warp_next:
         sta     enemy_smiley_last_room
         sta     <game_life_last_room
         rts
+.endp
 
 .data
 ; Exact coordinates of rooms $00-$0E in Room.Data.room_exit_dest_tbl.
