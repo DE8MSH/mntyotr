@@ -16,6 +16,6 @@ room03_tile_properties_rom:
 room03_screen_bat:
         incbin "room03-screen-bat.dat"
 
-; PCE BG palette slot 15: C64 light blue $0e.
+; PCE BG palette slot 15: C64 light blue $0e -> unified GGGRRRBBB $0de.
 room03_extra_palette:
-        dw $000,$16f,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+        dw $000,$0de,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
