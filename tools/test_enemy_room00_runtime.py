@@ -67,7 +67,7 @@ for needle in (
 ):
     assert needle in src, needle
 assert "inc     enemy_anim_timer_tbl,y" not in src
-assert "ina" not in src
+assert not re.search(r"(?m)^\s*ina\s*(?:;.*)?$", src), "raw INA instruction remains"
 
 # --newproc externally returns with LEAVE; internal helper RTS is intentional.
 procs = re.findall(r"(?ms)^\.proc\s+([^\n]+)\n(.*?)^\.endp\s*$", src)
