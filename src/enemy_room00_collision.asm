@@ -1,12 +1,9 @@
-; Pixel-accurate Room $00 enemy collision against the actual rendered frames.
-; C64 latches VIC sprite/sprite collisions in $D01E.  Monty is sprite 3 and
-; Room00 enemies occupy sprites 4/5, so a hit only exists where opaque 24x21
-; sprite pixels overlap.  This proc reconstructs the 24x21 occupancy masks from
-; the same 512-byte PCE frames already used for rendering, then performs the
-; overlap in software.  No rectangular hitbox approximation is used.
+; Pixel-accurate enemy collision for the four authentic C64 enemy slots.
+; C64 latches VIC sprite/sprite collisions in $D01E. Monty is sprite 3 and
+; enemies are sprites 4..7, so a hit only exists where opaque 24x21 pixels
+; overlap. Masks are reconstructed from the exact PCE frames used for render.
 ;
-; --newproc note: this top-level proc exits with LEAVE.  Internal JSR helpers
-; use normal RTS because they return within the already-mapped MPR6 proc bank.
+; --newproc note: top-level exit uses LEAVE. Internal JSR helpers use RTS.
 
 .bss
 enemy_col_monty_mask:   ds 63
@@ -17,7 +14,7 @@ enemy_col_enemy_x:      ds 1
 enemy_col_enemy_y:      ds 1
 enemy_col_shift:        ds 1
 enemy_col_shift_work:   ds 1
-enemy_col_shift_side:   ds 1      ; 0=shift enemy row, 1=shift Monty row
+enemy_col_shift_side:   ds 1
 enemy_col_rows:         ds 1
 enemy_col_mrow:         ds 1
 enemy_col_erow:         ds 1
@@ -28,22 +25,29 @@ enemy_col_m2:           ds 1
 enemy_col_e0:           ds 1
 enemy_col_e1:           ds 1
 enemy_col_e2:           ds 1
+enemy_col_slot:         ds 1
+enemy_col_state:        ds 1
+enemy_col_frame:        ds 1
 
 .code
 .proc enemy_room00_collision_update
-        lda     <monty_room
-        beq     .room00
-        leave
-.room00:
-        lda     enemy_smiley_active
-        ora     enemy_skate_active
+        lda     enemy_state_tbl
+        cmp     #$ff
+        bne     .prepare
+        lda     enemy_state_tbl+8
+        cmp     #$ff
+        bne     .prepare
+        lda     enemy_state_tbl+16
+        cmp     #$ff
+        bne     .prepare
+        lda     enemy_state_tbl+24
+        cmp     #$ff
         bne     .prepare
         leave
 
 .prepare:
         stz     enemy_col_hit
 
-        ; map/copy source frame masks without disturbing the runtime mappings
         php
         sei
         tma3
@@ -55,35 +59,41 @@ enemy_col_e2:           ds 1
         call    map_bp_to_mpr34
         jsr     .convert_monty_mask
 
-        lda     enemy_smiley_active
-        beq     .try_skate
-        jsr     .select_smiley_source
-        call    map_bp_to_mpr34
-        jsr     .convert_enemy_mask
-        lda     enemy_smiley_x
-        sta     enemy_col_enemy_x
-        lda     enemy_smiley_y
-        sta     enemy_col_enemy_y
-        jsr     .opaque_overlap
-        bcc     .try_skate
-        lda     #1
-        sta     enemy_col_hit
-        bra     .restore_maps
+        stz     enemy_col_slot
+        stz     enemy_col_state
 
-.try_skate:
-        lda     enemy_skate_active
-        beq     .restore_maps
-        jsr     .select_skate_source
+.try_slot:
+        ldx     enemy_col_state
+        lda     enemy_state_tbl,x
+        cmp     #$ff
+        beq     .next_slot
+        sta     enemy_col_enemy_x
+        lda     enemy_state_tbl+1,x
+        sta     enemy_col_enemy_y
+
+        jsr     .coarse_overlap
+        bcc     .next_slot
+
+        jsr     .select_enemy_source
         call    map_bp_to_mpr34
         jsr     .convert_enemy_mask
-        lda     enemy_skate_x
-        sta     enemy_col_enemy_x
-        lda     enemy_skate_y
-        sta     enemy_col_enemy_y
         jsr     .opaque_overlap
-        bcc     .restore_maps
+        bcc     .next_slot
+
         lda     #1
         sta     enemy_col_hit
+        jmp     .restore_maps
+
+.next_slot:
+        inc     enemy_col_slot
+        lda     enemy_col_state
+        clc
+        adc     #8
+        sta     enemy_col_state
+        lda     enemy_col_slot
+        cmp     #4
+        beq     .restore_maps
+        jmp     .try_slot
 
 .restore_maps:
         pla
@@ -95,23 +105,59 @@ enemy_col_e2:           ds 1
         lda     enemy_col_hit
         beq     .done
 
-        ; Normal gameplay rooms have player_dead_flag=0 in the C64, therefore
-        ; enemy collision dispatches event 2 (Death.ByEnemyAlive).
         lda     #2
         sta     <monty_action_counter
 
-        ; C64 LifeLost triggers a complete room reload, which re-runs SetupRoom.
-        ; Force our room-scoped enemy sync to do the same after game_life_reload.
         lda     #$ff
         sta     enemy_smiley_last_room
 .done:
         leave
 
-; -----------------------------------------------------------------------------
-; Select the exact Monty PCE frame currently on-screen.  Existing pointer/bank
-; tables in monty_sprite.asm are reused, so collision cannot drift from render.
-; Returns _bp=frame pointer, Y=frame bank.
-; -----------------------------------------------------------------------------
+; Fast rectangle reject before doing banked frame conversion.
+.coarse_overlap:
+        lda     enemy_col_enemy_x
+        cmp     <monty_x
+        bcc     .coarse_enemy_left
+        sec
+        sbc     <monty_x
+        cmp     #12
+        bcc     .coarse_vertical
+        clc
+        rts
+.coarse_enemy_left:
+        lda     <monty_x
+        sec
+        sbc     enemy_col_enemy_x
+        cmp     #12
+        bcc     .coarse_vertical
+        clc
+        rts
+.coarse_vertical:
+        lda     <monty_y
+        clc
+        adc     #1
+        sta     enemy_col_tmp
+        lda     enemy_col_enemy_y
+        cmp     enemy_col_tmp
+        bcc     .coarse_enemy_above
+        sec
+        sbc     enemy_col_tmp
+        cmp     #21
+        bcc     .coarse_yes
+        clc
+        rts
+.coarse_enemy_above:
+        lda     enemy_col_tmp
+        sec
+        sbc     enemy_col_enemy_y
+        cmp     #21
+        bcc     .coarse_yes
+        clc
+        rts
+.coarse_yes:
+        sec
+        rts
+
 .select_monty_source:
         lda     <monty_sprite_last_mode
         cmp     #2
@@ -172,42 +218,92 @@ enemy_col_e2:           ds 1
         ldy     monty_sault_l_bank,x
         rts
 
-; Enemy files are four contiguous 512-byte frames.  map_bp_to_mpr34 maps the
-; base bank plus its successor, so high-byte +2/frame remains contiguous even
-; when the 2 KiB payload crosses an 8 KiB ROM-bank boundary.
-.select_smiley_source:
-        lda     #<enemy00_smiley_patterns
-        sta     <_bp
-        lda     enemy_smiley_anim
+; Exact C64 enemy frame: reverse uses 0..3, forward uses 4..7.
+.select_enemy_source:
+        ldx     enemy_col_state
+        lda     enemy_state_tbl+4,x
+        and     #$80
+        bne     .enemy_reverse_group
+        lda     #4
+        bra     .enemy_group_ready
+.enemy_reverse_group:
+        cla
+.enemy_group_ready:
+        sta     enemy_col_frame
+        ldy     enemy_col_slot
+        lda     enemy_anim_timer_tbl,y
         and     #$06
         lsr     a
-        asl     a                       ; frame * $0200 -> high-byte delta 0,2,4,6
         clc
-        adc     #>enemy00_smiley_patterns
-        sta     <_bp+1
-        ldy     #BANK(enemy00_smiley_patterns)
+        adc     enemy_col_frame
+        sta     enemy_col_frame
+
+        ldx     enemy_col_state
+        lda     enemy_state_tbl+3,x
+        cmp     #$09
+        bne     .enemy_not09
+        lda     #<enemy_type09_patterns
+        sta     <_bp
+        lda     #>enemy_type09_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type09_patterns)
+        rts
+.enemy_not09:
+        cmp     #$0e
+        bne     .enemy_not0e
+        lda     #<enemy_type0e_patterns
+        sta     <_bp
+        lda     #>enemy_type0e_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type0e_patterns)
+        rts
+.enemy_not0e:
+        cmp     #$0f
+        bne     .enemy_not0f
+        lda     #<enemy_type0f_patterns
+        sta     <_bp
+        lda     #>enemy_type0f_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type0f_patterns)
+        rts
+.enemy_not0f:
+        cmp     #$14
+        bne     .enemy_not14
+        lda     #<enemy_type14_patterns
+        sta     <_bp
+        lda     #>enemy_type14_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type14_patterns)
+        rts
+.enemy_not14:
+        cmp     #$18
+        bne     .enemy_type19
+        lda     #<enemy_type18_patterns
+        sta     <_bp
+        lda     #>enemy_type18_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type18_patterns)
+        rts
+.enemy_type19:
+        lda     #<enemy_type19_patterns
+        sta     <_bp
+        lda     #>enemy_type19_patterns
+        jsr     .add_frame_high
+        ldy     #BANK(enemy_type19_patterns)
         rts
 
-.select_skate_source:
-        lda     #<enemy00_skate_patterns
-        sta     <_bp
-        lda     enemy_skate_anim
-        and     #$06
-        lsr     a
+.add_frame_high:
+        sta     enemy_col_tmp
+        lda     enemy_col_frame
         asl     a
         clc
-        adc     #>enemy00_skate_patterns
+        adc     enemy_col_tmp
         sta     <_bp+1
-        ldy     #BANK(enemy00_skate_patterns)
         rts
 
-; -----------------------------------------------------------------------------
 ; PCE frame -> compact C64-style 24x21 occupancy mask.
-; Frame layout is TL,TR,BL,BR 16x16 tiles; plane 0 contains all opaque pixels.
-; Each output row is 3 bytes, MSB first, exactly matching C64 24-pixel rows.
-; -----------------------------------------------------------------------------
+; Frame layout is TL,TR,BL,BR; plane 0 contains all opaque pixels.
 .convert_monty_mask:
-        ; _di = top-right tile = _bp + $0080
         lda     <_bp
         clc
         adc     #$80
@@ -221,23 +317,22 @@ enemy_col_e2:           ds 1
         lda     #16
         sta     enemy_col_rows
 .cm_top:
-        lda     [_bp],y                 ; left tile plane0 low byte
+        lda     [_bp],y
         sta     enemy_col_tmp
         iny
-        lda     [_bp],y                 ; left tile plane0 high byte = pixels 0..7
+        lda     [_bp],y
         sta     enemy_col_monty_mask,x
         inx
-        lda     enemy_col_tmp           ; low byte = pixels 8..15
+        lda     enemy_col_tmp
         sta     enemy_col_monty_mask,x
         inx
-        lda     [_di],y                 ; right high byte = pixels 16..23
+        lda     [_di],y
         sta     enemy_col_monty_mask,x
         inx
         iny
         dec     enemy_col_rows
         bne     .cm_top
 
-        ; bottom-left/right tiles are +$0100 from their top counterparts
         inc     <_bp+1
         inc     <_di+1
         cly
@@ -314,27 +409,21 @@ enemy_col_e2:           ds 1
         bne     .ce_bottom
         rts
 
-; -----------------------------------------------------------------------------
 ; Exact opaque-pixel overlap for two unexpanded 24x21 sprites.
-; Internal X values are half VIC X for both Monty and enemies, so a difference
-; of N internal units equals 2N visible pixels. Monty VIC Y is monty_y+1;
-; enemy Y is already the VIC value written by Enemies.ProcessSlot.
-; Returns C=1 collision, C=0 clear.
-; -----------------------------------------------------------------------------
+; Both internal X values are half VIC X; Monty VIC Y is monty_y+1.
 .opaque_overlap:
-        ; horizontal separation / which row mask must shift right
         lda     enemy_col_enemy_x
         cmp     <monty_x
         bcc     .enemy_left
         sec
         sbc     <monty_x
-        cmp     #12                     ; 12 half-pixels = full 24px width
+        cmp     #12
         bcc     .x_right_ok
         jmp     .no_overlap
 .x_right_ok:
         asl     a
         sta     enemy_col_shift
-        stz     enemy_col_shift_side    ; enemy starts to the right
+        stz     enemy_col_shift_side
         bra     .vertical
 .enemy_left:
         lda     <monty_x
@@ -347,19 +436,19 @@ enemy_col_e2:           ds 1
         asl     a
         sta     enemy_col_shift
         lda     #1
-        sta     enemy_col_shift_side    ; Monty starts to the right
+        sta     enemy_col_shift_side
 
 .vertical:
         lda     <monty_y
         clc
-        adc     #1                      ; ProcessSprites writes Monty VIC Y = y+1
+        adc     #1
         sta     enemy_col_tmp
         lda     enemy_col_enemy_y
         cmp     enemy_col_tmp
         bcc     .enemy_above
 
         sec
-        sbc     enemy_col_tmp           ; enemy below Monty
+        sbc     enemy_col_tmp
         cmp     #21
         bcc     .y_below_ok
         jmp     .no_overlap
@@ -388,7 +477,6 @@ enemy_col_e2:           ds 1
         sta     enemy_col_rows
 
 .make_ptrs:
-        ; _bp = monty_mask + 3*monty_start_row
         lda     enemy_col_mrow
         sta     enemy_col_delta
         asl     a
@@ -401,7 +489,6 @@ enemy_col_e2:           ds 1
         adc     #0
         sta     <_bp+1
 
-        ; _di = enemy_mask + 3*enemy_start_row
         lda     enemy_col_erow
         sta     enemy_col_delta
         asl     a
@@ -467,7 +554,6 @@ enemy_col_e2:           ds 1
         and     enemy_col_e2
         bne     .collision
 
-        ; advance both 63-byte RAM-mask pointers by one 3-byte row
         clc
         lda     <_bp
         adc     #3
