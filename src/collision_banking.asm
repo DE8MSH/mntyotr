@@ -1,10 +1,11 @@
-; Phase 45: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
-; $02/$03/$04/$0A/$0B/$0D/$0E use the same 648-byte RAM collision/property
-; cache, refilled on room entry. Physics itself still addresses the established
-; room02_* RAM labels.
+; Phase 49 collision banking.
+; Room $00 keeps its proven ROM mapping path. Room $01 now owns a mutable RAM
+; collision map so the original rising-cloud code-8 strip can move at runtime.
+; Tail rooms $02+ continue to share the 648-byte Room02 RAM collision/property
+; cache, refilled on room entry.
 ;
 ; For every tail room above $02, collision_bank_enter temporarily shadows
-; monty_room as $02 while monty_update_input/monty_jump_step run.
+; monty_room as $02 while movement and the swept jump collision path run.
 ; collision_actual_room preserves the real room id for edge guards and is
 ; restored before world navigation.
 
@@ -43,9 +44,9 @@ collision_bank_enter:
 .select_room:
         lda     <monty_room
         cmp     #2
-        beq     .tail_room_ram
+        beq     .ram_ready
         cmp     #1
-        beq     .room01
+        beq     .ram_ready
 
 .room00:
         lda     #<room00_collision_map
@@ -53,18 +54,8 @@ collision_bank_enter:
         lda     #>room00_collision_map
         sta     <_bp+1
         ldy     #BANK(room00_collision_map)
-        bra     .map
-
-.room01:
-        lda     #<room01_collision_map
-        sta     <_bp
-        lda     #>room01_collision_map
-        sta     <_bp+1
-        ldy     #BANK(room01_collision_map)
-
-.map:
         call    map_bp_to_mpr34
-.tail_room_ram:
+.ram_ready:
         rts
 
 collision_bank_exit:
