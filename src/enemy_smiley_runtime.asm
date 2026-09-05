@@ -1,17 +1,21 @@
-; First authentic moving enemy stage: Room $00 Smiley only.
-; Original spawn record: 05 b8 8f 04 19 02 25
-; SetupRoom -> X=$78, Y=$6a, vertical speed 2, range $25, initial dir forward.
+; Authentic Room $00 moving enemies: Smiley + Skate.
+; Original records:
+;   Smiley 05 b8 8f 04 19 02 25 -> X=$78,Y=$6a, flags=$01,count=0, speed2, range$25
+;   Skate  03 78 37 03 09 03 13 -> X=$58,Y=$c2, flags=$81,count=$13,speed3, range$13
 ;
-; Runtime uses PCEAS --newproc relocation.  Newproc thunks live at the end of
-; MPR7, save MPR6, map the target proc bank into $C000-$DFFF, then JMP to it.
-; Therefore every exit from a relocated .proc MUST use PCEAS "leave" so the
-; generated leave_proc helper restores MPR6 before RTS.  Raw RTS is invalid.
-; Large sprite art remains independent and uses the proven MPR3/MPR4 upload
-; path used by lift/cloud, with both mappings saved/restored around the upload.
+; PCEAS --newproc thunks live at the end of MPR7, save MPR6, map the target
+; proc bank into $C000-$DFFF, then JMP to it. Every .proc exit MUST use leave.
+; Large sprite art uses the proven MPR3/MPR4 far-data upload path.
+;
+; C64 Enemies.Tick is gated by frame_toggle=1, so enemy movement/animation runs
+; at half the PAL game-frame rate. game_tick_counter bit0 reproduces that gate.
 
 ENEMY_SMILEY_VRAM  = $3800
+ENEMY_SKATE_VRAM   = $3c00
 ENEMY_SMILEY_SAT_L = SAT_ADDR+32      ; SAT entry 8
 ENEMY_SMILEY_SAT_R = SAT_ADDR+36      ; SAT entry 9
+ENEMY_SKATE_SAT_L  = SAT_ADDR+40      ; SAT entry 10
+ENEMY_SKATE_SAT_R  = SAT_ADDR+44      ; SAT entry 11
 
 .bss
 enemy_smiley_last_room: ds 1
@@ -21,14 +25,46 @@ enemy_smiley_flags:     ds 1
 enemy_smiley_count:     ds 1
 enemy_smiley_anim:      ds 1
 enemy_smiley_frame:     ds 1
+enemy_skate_active:     ds 1
+enemy_skate_y:          ds 1
+enemy_skate_flags:      ds 1
+enemy_skate_count:      ds 1
+enemy_skate_anim:       ds 1
+enemy_skate_frame:      ds 1
 
 .code
 
-; Cold-start state plus one bank-safe 2 KiB graphics upload.
+; Cold-start palettes plus both authentic 2 KiB sprite payloads.
 .proc enemy_smiley_init
         lda     #$ff
         sta     enemy_smiley_last_room
         stz     enemy_smiley_active
+        stz     enemy_skate_active
+
+        ; Sprite palette 19: Smiley, C64 cyan $03.
+        lda     #19
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy00_smiley_palette
+        sta     <_bp
+        lda     #>enemy00_smiley_palette
+        sta     <_bp+1
+        ldy     #BANK(enemy00_smiley_palette)
+        call    load_palettes
+
+        ; Sprite palette 20: Skate, C64 purple $04.
+        lda     #20
+        sta     <_al
+        lda     #1
+        sta     <_ah
+        lda     #<enemy00_skate_palette
+        sta     <_bp
+        lda     #>enemy00_skate_palette
+        sta     <_bp+1
+        ldy     #BANK(enemy00_skate_palette)
+        call    load_palettes
+        call    xfer_palettes
 
         php
         sei
@@ -37,31 +73,57 @@ enemy_smiley_frame:     ds 1
         tma4
         pha
 
+        ; Smiley: four 512-byte frames.
         lda     #<enemy00_smiley_patterns
         sta     <_bp
         lda     #>enemy00_smiley_patterns
         sta     <_bp+1
         ldy     #BANK(enemy00_smiley_patterns)
         call    map_bp_to_mpr34
-
         lda     #<ENEMY_SMILEY_VRAM
         sta     <_di
         lda     #>ENEMY_SMILEY_VRAM
         sta     <_di+1
         call    vdc_di_to_mawr
-        ldx     #8                      ; 2048 bytes
+        ldx     #8
         cly
-.upload_page:
+.smiley_page:
         lda     [_bp],y
         sta     VDC_DL
         iny
         lda     [_bp],y
         sta     VDC_DH
         iny
-        bne     .upload_page
+        bne     .smiley_page
         inc     <_bp+1
         dex
-        bne     .upload_page
+        bne     .smiley_page
+
+        ; Skate: four 512-byte frames.
+        lda     #<enemy00_skate_patterns
+        sta     <_bp
+        lda     #>enemy00_skate_patterns
+        sta     <_bp+1
+        ldy     #BANK(enemy00_skate_patterns)
+        call    map_bp_to_mpr34
+        lda     #<ENEMY_SKATE_VRAM
+        sta     <_di
+        lda     #>ENEMY_SKATE_VRAM
+        sta     <_di+1
+        call    vdc_di_to_mawr
+        ldx     #8
+        cly
+.skate_page:
+        lda     [_bp],y
+        sta     VDC_DL
+        iny
+        lda     [_bp],y
+        sta     VDC_DH
+        iny
+        bne     .skate_page
+        inc     <_bp+1
+        dex
+        bne     .skate_page
 
         pla
         tam4
@@ -69,12 +131,11 @@ enemy_smiley_frame:     ds 1
         tam3
         plp
 
-        ; Nested proc CALL is safe: its thunk saves the current MPR6 mapping.
         call    enemy_smiley_room_sync
         leave
 .endp
 
-; Re-seed the original Room-$00 enemy record on room entry.
+; Re-seed both exact C64 Room-$00 state records on room entry.
 .proc enemy_smiley_room_sync
         lda     <monty_room
         cmp     enemy_smiley_last_room
@@ -85,62 +146,113 @@ enemy_smiley_frame:     ds 1
         cmp     #$00
         beq     .room00
         stz     enemy_smiley_active
+        stz     enemy_skate_active
         leave
 .room00:
         lda     #1
         sta     enemy_smiley_active
+        sta     enemy_skate_active
+
         lda     #$6a
         sta     enemy_smiley_y
-        lda     #$01                    ; dir_idx4 -> vertical, forward/down
+        lda     #$01                    ; dir_idx4 -> vertical/down
         sta     enemy_smiley_flags
         stz     enemy_smiley_count
         stz     enemy_smiley_anim
+
+        lda     #$c2
+        sta     enemy_skate_y
+        lda     #$81                    ; dir_idx3 -> vertical/up
+        sta     enemy_skate_flags
+        lda     #$13                    ; negative flags preserve range as count
+        sta     enemy_skate_count
+        stz     enemy_skate_anim
         leave
 .endp
 
-; Exact C64 MoveVertical state for record 05 b8 8f 04 19 02 25.
+; Exact C64 MoveVertical for both Room-$00 records. Enemies.Tick itself is
+; called only on odd frame_toggle; game_tick_counter bit0 reproduces that.
 .proc enemy_smiley_update
-        lda     enemy_smiley_active
-        bne     .active
+        lda     <game_tick_counter
+        and     #$01
+        bne     .tick
         leave
-.active:
-        lda     enemy_smiley_flags
-        bmi     .up
+.tick:
+        lda     enemy_smiley_active
+        beq     .skate
 
+        lda     enemy_smiley_flags
+        bmi     .smiley_up
         inc     enemy_smiley_count
         lda     enemy_smiley_count
         cmp     #$25
-        bne     .down_move
+        bne     .smiley_down_move
         lda     enemy_smiley_flags
         eor     #$80
         sta     enemy_smiley_flags
-        bra     .anim
-.down_move:
+        bra     .smiley_anim
+.smiley_down_move:
         lda     enemy_smiley_y
         clc
         adc     #2
         sta     enemy_smiley_y
-        bra     .anim
-
-.up:
+        bra     .smiley_anim
+.smiley_up:
         dec     enemy_smiley_count
-        bne     .up_move
+        bne     .smiley_up_move
         lda     enemy_smiley_flags
         eor     #$80
         sta     enemy_smiley_flags
-        bra     .anim
-.up_move:
+        bra     .smiley_anim
+.smiley_up_move:
         lda     enemy_smiley_y
         sec
         sbc     #2
         sta     enemy_smiley_y
-.anim:
+.smiley_anim:
         inc     enemy_smiley_anim
+
+.skate:
+        lda     enemy_skate_active
+        bne     .skate_active
+        leave
+.skate_active:
+        lda     enemy_skate_flags
+        bmi     .skate_up
+        inc     enemy_skate_count
+        lda     enemy_skate_count
+        cmp     #$13
+        bne     .skate_down_move
+        lda     enemy_skate_flags
+        eor     #$80
+        sta     enemy_skate_flags
+        bra     .skate_anim
+.skate_down_move:
+        lda     enemy_skate_y
+        clc
+        adc     #3
+        sta     enemy_skate_y
+        bra     .skate_anim
+.skate_up:
+        dec     enemy_skate_count
+        bne     .skate_up_move
+        lda     enemy_skate_flags
+        eor     #$80
+        sta     enemy_skate_flags
+        bra     .skate_anim
+.skate_up_move:
+        lda     enemy_skate_y
+        sec
+        sbc     #3
+        sta     enemy_skate_y
+.skate_anim:
+        inc     enemy_skate_anim
         leave
 .endp
 
-; Writes SAT entries 8/9 only.  The cloud routine remains the final SAT-DMA
-; writer in main_loop, so this proc never changes the already-proven DMA order.
+; SAT bridge: C64 VIC sprite coordinates are relative to a 24px/50px display
+; origin. PCE SAT visible origin is +32/+64, therefore SAT X=VIC X+8,
+; SAT Y=VIC Y+14. C64 sprites are 24x21, carried as two 16x32 PCE halves.
 .proc enemy_smiley_update_satb
         lda     enemy_smiley_active
         bne     .show
@@ -150,7 +262,7 @@ enemy_smiley_frame:     ds 1
         lda     #>ENEMY_SMILEY_SAT_L
         sta     <_di+1
         call    vdc_di_to_mawr
-        ldx     #2
+        ldx     #4
 .hide_loop:
         cla
         sta     VDC_DL
@@ -168,6 +280,7 @@ enemy_smiley_frame:     ds 1
         leave
 
 .show:
+        ; Smiley frame: C64 (timer & 6)>>1, four unique frames reused both dirs.
         lda     enemy_smiley_anim
         and     #$06
         lsr     a
@@ -179,13 +292,12 @@ enemy_smiley_frame:     ds 1
         sta     <_di+1
         call    vdc_di_to_mawr
 
-        ; Left 16x32 half. Original hardware X=$78 -> PCE SAT X=$80.
         lda     enemy_smiley_y
         clc
         adc     #14
         sta     VDC_DL
         stz     VDC_DH
-        lda     #$80
+        lda     #$80                    ; C64 X=$78 + 8
         sta     VDC_DL
         stz     VDC_DH
         lda     enemy_smiley_frame
@@ -198,12 +310,11 @@ enemy_smiley_frame:     ds 1
         lda     #>(ENEMY_SMILEY_VRAM>>5)
         adc     #0
         sta     VDC_DH
-        lda     #$83                    ; sprite palette slot19 -> index3
+        lda     #$83                    ; sprite palette slot19
         sta     VDC_DL
         lda     #$10                    ; 16x32
         sta     VDC_DH
 
-        ; Right 16x32 half.
         lda     enemy_smiley_y
         clc
         adc     #14
@@ -223,6 +334,58 @@ enemy_smiley_frame:     ds 1
         adc     #0
         sta     VDC_DH
         lda     #$83
+        sta     VDC_DL
+        lda     #$10
+        sta     VDC_DH
+
+        ; Skate frame and SAT entries 10/11 immediately follow Smiley 8/9.
+        lda     enemy_skate_anim
+        and     #$06
+        lsr     a
+        sta     enemy_skate_frame
+
+        lda     enemy_skate_y
+        clc
+        adc     #14
+        sta     VDC_DL
+        stz     VDC_DH
+        lda     #$60                    ; C64 X=$58 + 8
+        sta     VDC_DL
+        stz     VDC_DH
+        lda     enemy_skate_frame
+        asl     a
+        asl     a
+        asl     a
+        clc
+        adc     #<(ENEMY_SKATE_VRAM>>5)
+        sta     VDC_DL
+        lda     #>(ENEMY_SKATE_VRAM>>5)
+        adc     #0
+        sta     VDC_DH
+        lda     #$84                    ; sprite palette slot20
+        sta     VDC_DL
+        lda     #$10
+        sta     VDC_DH
+
+        lda     enemy_skate_y
+        clc
+        adc     #14
+        sta     VDC_DL
+        stz     VDC_DH
+        lda     #$70
+        sta     VDC_DL
+        stz     VDC_DH
+        lda     enemy_skate_frame
+        asl     a
+        asl     a
+        asl     a
+        clc
+        adc     #<((ENEMY_SKATE_VRAM+$40)>>5)
+        sta     VDC_DL
+        lda     #>((ENEMY_SKATE_VRAM+$40)>>5)
+        adc     #0
+        sta     VDC_DH
+        lda     #$84
         sta     VDC_DL
         lda     #$10
         sta     VDC_DH
