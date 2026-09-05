@@ -15,6 +15,7 @@ def main():
         '03': (ROOT / 'src/room03_assets_tail.asm').read_text(),
         '04': (ROOT / 'src/room04_assets_tail.asm').read_text(),
         '05': (ROOT / 'src/room05_assets_tail.asm').read_text(),
+        '09': (ROOT / 'src/room09_assets_tail.asm').read_text(),
         '0a': (ROOT / 'src/room0a_assets_tail.asm').read_text(),
         '0b': (ROOT / 'src/room0b_assets_tail.asm').read_text(),
         '0c': (ROOT / 'src/room0c_assets_tail.asm').read_text(),
@@ -42,7 +43,7 @@ def main():
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
         assert f'room{room}_collision_map_rom:' in tails[room]
-    for room in ('05','0c'):
+    for room in ('05','09','0c'):
         assert f'call    room{room}_cache_collision' in ext
         assert f'BANK(room{room}_collision_map_rom)' in ext
         assert f'room{room}_collision_map_rom:' in tails[room]
@@ -58,10 +59,10 @@ def main():
     assert '#<room01_collision_map' in physics
     assert '#<room02_collision_map' in physics
     assert 'room02_tile_properties,x' in physics
-    for room in ('05','0a','0b','0c','0d','0e'):
+    for room in ('05','09','0a','0b','0c','0d','0e'):
         assert f'room{room}_collision_map' not in physics
 
-    print('OK: Room00/01 ROM banking + shared tail-room RAM collision cache through 05/0A-0E')
+    print('OK: Room00/01 ROM banking + shared tail-room RAM collision cache through 05/09/0A-0E')
 
 
 if __name__ == '__main__':
