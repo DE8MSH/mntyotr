@@ -1,6 +1,6 @@
-; Phase 44: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
-; $02/$03/$04/$0D/$0E use the same 648-byte RAM collision/property cache,
-; refilled on room entry. Physics itself still addresses the established
+; Phase 45: rooms $00/$01 keep their proven ROM mapping path. Tail rooms
+; $02/$03/$04/$0A/$0B/$0D/$0E use the same 648-byte RAM collision/property
+; cache, refilled on room entry. Physics itself still addresses the established
 ; room02_* RAM labels.
 ;
 ; For every tail room above $02, collision_bank_enter temporarily shadows
