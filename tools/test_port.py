@@ -115,11 +115,15 @@ def main():
  assert len(JUMP_DOWN)==17 and sum(JUMP_DOWN)==14
  assert pal_ticks(6)==5 and pal_ticks(60)==50 and pal_ticks(600)==500
 
+ world_text=(ROOT/'src/world.asm').read_text()
  world=parse_world_grid()
  assert len(world)==6, f'world grid rows: expected 6, got {len(world)}'
  assert all(len(row)==23 for row in world), f'world row lengths: {[len(row) for row in world]}'
  assert world[2][0x15]==0 and world[2][0x14]==1 and world[2][0x16]==0xff
  assert world[2][0x04]==0x33 and all(0x30 not in row for row in world)
+ # PCEAS BRA uses an 8-bit signed displacement. This dispatch target is already
+ # outside that range as the resolver grows, so keep the long jump explicit.
+ assert 'cmp     #4\n        beq     .down\n        jmp     .blocked' in world_text
 
  bat=words(make_bat(cells))
  assert len(bat)==640
