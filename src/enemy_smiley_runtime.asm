@@ -158,7 +158,9 @@ enemy_tmp_xhi:            ds 1
 .decode_next:
         lda     [_bp],y
         cmp     #$ff
-        beq     .decode_done
+        bne     .decode_record
+        jmp     .decode_done
+.decode_record:
         sty     enemy_tmp_record_y
         tax
         lda     .colour_tbl,x
@@ -245,7 +247,8 @@ enemy_tmp_xhi:            ds 1
         sta     enemy_tmp_state
         lda     enemy_tmp_slot
         cmp     #4
-        bne     .decode_next
+        beq     .decode_done
+        jmp     .decode_next
 .decode_done:
         rts
 
