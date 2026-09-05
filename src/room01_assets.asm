@@ -20,5 +20,6 @@ room01_extra_palettes:
 
 room01_tile_properties:
         ; source tiles $02,$63,$01,$0a,$40,$05,$55,$64 classified by
-        ; Monty.SetTileProperty: 1,0,1,1,2,1,4,0.
-        db $01,$00,$01,$01,$02,$01,$04,$00
+        ; Monty.SetTileProperty: 1,3,1,1,2,1,4,3.
+        ; $63/$64 are in the C64 $56-$76 property-3 range.
+        db $01,$03,$01,$01,$02,$01,$04,$03
