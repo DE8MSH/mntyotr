@@ -2,17 +2,20 @@
 ;
 ; The C64 jump table stores per-frame deltas of 0..3 pixels, but UpdateMovement
 ; consumes jump_up_steps/jump_dn_steps in a loop and calls CheckTileAbove/Below
-; before EVERY single pixel.  Applying a whole delta at once lets the PCE port
+; before EVERY single pixel. Applying a whole delta at once lets the PCE port
 ; skip an 8-pixel platform boundary and tunnel through floors/ceilings.
 ;
 ; Keep the existing authentic arc tables and collision routines; only replace
-; the multi-pixel application with this swept version.
+; the multi-pixel application with this swept version. Branches deliberately
+; target only nearby labels so future growth cannot recreate PCEAS ±127 issues.
 
 .code
 
 monty_jump_step_swept:
         lda     <monty_jump_phase
-        beq     .done
+        bne     .active
+        rts
+.active:
         cmp     #1
         bne     .descent
 
@@ -27,7 +30,9 @@ monty_jump_step_swept:
 
 .up_pixel:
         lda     <jump_delta
-        beq     .done
+        bne     .up_have_pixel
+        rts
+.up_have_pixel:
         call    monty_check_tile_above
         bcs     .switch_down
         dec     <monty_y
@@ -36,8 +41,8 @@ monty_jump_step_swept:
         dec     <jump_delta
         call    monty_check_room_edges
         lda     <monty_room_exit
-        bne     .done
-        bra     .up_pixel
+        beq     .up_pixel
+        rts
 
 .switch_down:
         lda     #2
@@ -55,7 +60,9 @@ monty_jump_step_swept:
 
 .down_pixel:
         lda     <jump_delta
-        beq     .done
+        bne     .down_have_pixel
+        rts
+.down_have_pixel:
         call    monty_check_tile_below
         bcs     .land
         inc     <monty_y
@@ -68,8 +75,8 @@ monty_jump_step_swept:
         ; past $DA before world navigation sees the transition.
         call    monty_check_down_room_edge
         lda     <monty_room_exit
-        bne     .done
-        bra     .down_pixel
+        beq     .down_pixel
+        rts
 
 .land:
         stz     <monty_jump_phase
@@ -87,5 +94,4 @@ monty_jump_step_swept:
         stz     <monty_jump_index
         stz     <monty_saved_left
         stz     <monty_saved_right
-.done:
         rts
