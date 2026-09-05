@@ -18,6 +18,9 @@ def main():
         '03': (ROOT / 'src/room03_assets_tail.asm').read_text(),
         '04': (ROOT / 'src/room04_assets_tail.asm').read_text(),
         '05': (ROOT / 'src/room05_assets_tail.asm').read_text(),
+        '06': (ROOT / 'src/room06_assets_tail.asm').read_text(),
+        '07': (ROOT / 'src/room07_assets_tail.asm').read_text(),
+        '08': (ROOT / 'src/room08_assets_tail.asm').read_text(),
         '09': (ROOT / 'src/room09_assets_tail.asm').read_text(),
         '0a': (ROOT / 'src/room0a_assets_tail.asm').read_text(),
         '0b': (ROOT / 'src/room0b_assets_tail.asm').read_text(),
@@ -54,12 +57,21 @@ def main():
     assert 'lda     #2' in bank and 'sta     <monty_room' in bank
     assert 'BANK(room02_collision_map)' not in bank
 
+    # Core-loader rooms still use their small room-specific cache wrappers.
     for room in ('02','03','04','0a','0b','0d','0e'):
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
         assert f'room{room}_collision_map_rom:' in tails[room]
-    for room in ('05','09','0c'):
-        assert f'call    room{room}_cache_collision' in ext
+
+    # Tail rooms $05-$09/$0C now share one bank-safe cache call selected through
+    # far-pointer tables. Verify every restored upper-house room is represented.
+    assert 'call    room_tail_cache_collision' in ext
+    assert 'room_ext_collision_lo:' in ext
+    assert 'room_ext_collision_hi:' in ext
+    assert 'room_ext_collision_bank:' in ext
+    for room in ('05','06','07','08','09','0c'):
+        assert f'<room{room}_collision_map_rom' in ext
+        assert f'>room{room}_collision_map_rom' in ext
         assert f'BANK(room{room}_collision_map_rom)' in ext
         assert f'room{room}_collision_map_rom:' in tails[room]
 
@@ -72,7 +84,9 @@ def main():
     assert '#<room01_collision_map' in physics
     assert '#<room02_collision_map' in physics
     assert 'room02_tile_properties,x' in physics
-    for room in ('05','09','0a','0b','0c','0d','0e'):
+    # Tail collision buffers are deliberately shared; room-specific ROM symbols
+    # must never leak into the movement hot path.
+    for room in ('05','06','07','08','09','0a','0b','0c','0d','0e'):
         assert f'room{room}_collision_map' not in physics
 
     print('OK: Room01 mutable cloud collision + shared tail RAM banking + pixelwise jump sweep')
