@@ -114,12 +114,15 @@ game_life_reload:
         call    room_load_pending_extended
         call    gem_draw_room
         ; C64 room reload reruns every room-scoped setup routine, including the
-        ; complete four-slot enemy SetupRoom pass.
+        ; complete four-slot enemy SetupRoom pass. Room $0B additionally seeds
+        ; its enemies/decor from special_item_room_sync, so invalidate that
+        ; cache too before the ordinary post-reload sync sequence runs.
         lda     #$ff
         sta     <rising_cloud_last_room
         sta     <rising_bollard_last_room
         sta     <moving_lift_last_room
         sta     enemy_smiley_last_room
+        sta     special_item_last_room
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
