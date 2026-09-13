@@ -38,6 +38,7 @@
         include "debug_room.asm"
         include "debug_room_warp.asm"
         include "debug_footer_visible.asm"
+        include "init_game_palettes.asm"
         ; Large banked room/decor/sprite data is appended after gameplay/runtime.
         include "moving_lift_assets_tail.asm"
         include "rising_cloud_sprite_assets_tail.asm"
@@ -66,79 +67,8 @@ main_y_before_step:        ds 1
 bare_main:
         call    init_352x224
         call    init_c64_video
-
         call    upload_room00_patterns
-
-        stz     <_al
-        lda     #13
-        sta     <_ah
-        lda     #<room00_bg_palettes
-        sta     <_bp + 0
-        lda     #>room00_bg_palettes
-        sta     <_bp + 1
-        ldy     #^room00_bg_palettes
-        call    load_palettes
-
-        ; Active house rooms use C64 purple and blue in slots 13/14.
-        lda     #13
-        sta     <_al
-        lda     #2
-        sta     <_ah
-        lda     #<room01_extra_palettes
-        sta     <_bp + 0
-        lda     #>room01_extra_palettes
-        sta     <_bp + 1
-        ldy     #^room01_extra_palettes
-        call    load_palettes
-
-        ; Room $03 additionally uses C64 light blue $0e in BG palette slot 15.
-        lda     #15
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<room03_extra_palette
-        sta     <_bp + 0
-        lda     #>room03_extra_palette
-        sta     <_bp + 1
-        ldy     #^room03_extra_palette
-        call    load_palettes
-
-        ; Sprite palette 16: Monty.
-        lda     #16
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<monty_sprite_palette
-        sta     <_bp + 0
-        lda     #>monty_sprite_palette
-        sta     <_bp + 1
-        ldy     #^monty_sprite_palette
-        call    load_palettes
-
-        ; Sprite palette 17: authentic multicolour lift pair.
-        lda     #17
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<moving_lift_palette
-        sta     <_bp + 0
-        lda     #>moving_lift_palette
-        sta     <_bp + 1
-        ldy     #^moving_lift_palette
-        call    load_palettes
-
-        ; Sprite palette 18: authentic white rising cloud.
-        lda     #18
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<rising_cloud_sprite_palette
-        sta     <_bp + 0
-        lda     #>rising_cloud_sprite_palette
-        sta     <_bp + 1
-        ldy     #^rising_cloud_sprite_palette
-        call    load_palettes
-        call    xfer_palettes
+        call    init_game_palettes
 
         call    draw_room00_native
         call    game_clock_init
@@ -172,9 +102,6 @@ main_loop:
         call    wait_vsync
         call    read_joypads
 
-        ; QA shortcut: one SELECT press loads the next supported room immediately.
-        ; Skip the gameplay tick on the warp frame so the fresh spawn cannot be
-        ; consumed by a stale collision/action before room-scoped state is synced.
         call    debug_room_warp_poll
         bcc     .after_debug_room_warp
         call    rising_cloud_room_sync
@@ -196,16 +123,12 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
-        ; Preserve Y so the external bottom-edge helper only runs after actual
-        ; downward motion, matching the C64 UpdateMovement_down semantics.
         lda     <monty_y
         sta     <main_y_before_step
 
         call    collision_bank_enter
         call    monty_update_input
 
-        ; Only the confirmed outer edge at Room $00 right is special-cased
-        ; before world navigation. Supported room exits otherwise remain live.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -222,7 +145,6 @@ main_loop:
         sta     <main_exit_before_jump
         lda     <monty_x
         sta     <main_jump_x_before_step
-        ; C64 jump deltas are consumed one pixel at a time with collision checks.
         call    monty_jump_step_swept
 
         lda     <main_exit_before_jump
@@ -246,8 +168,6 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
-        ; Non-jump downward movement (fall/climb) still uses the shared helper.
-        ; The swept jump routine already checks $DA after every descent pixel.
         lda     <monty_y
         cmp     <main_y_before_step
         bcc     .after_down_room_edge
@@ -256,7 +176,6 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
-        ; Dynamic mechanisms/enemy motion run with the real room id restored.
         call    rising_cloud_contact_update
         call    rising_cloud_update
         call    rising_bollard_update
@@ -264,8 +183,6 @@ main_loop:
         call    enemy_smiley_update
         call    special_item_update
 
-        ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
-        ; death reloads the same room at its saved entry point and skips topology.
         call    game_life_check
         bcc     .no_death
         call    game_life_reload
@@ -275,7 +192,6 @@ main_loop:
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
-        ; Room-entry sync restores mutable/dynamic mechanism state after loading.
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
@@ -285,7 +201,6 @@ main_loop:
         call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; SAT order: lift, enemies, special item, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
         call    special_item_update_satb
