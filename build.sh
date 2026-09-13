@@ -95,6 +95,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room08.py" --map "$BUILD/room08-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room09.py" --map "$BUILD/room09-map.dat" --screen-bat "$BUILD/room09-screen-bat.dat" --patterns "$BUILD/room09-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0a.py" --map "$BUILD/room0a-map.dat" --screen-bat "$BUILD/room0a-screen-bat.dat" --patterns "$BUILD/room0a-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b.py" --map "$BUILD/room0b-map.dat" --screen-bat "$BUILD/room0b-screen-bat.dat" --patterns "$BUILD/room0b-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b_decor.py" --screen-bat "$BUILD/room0b-screen-bat.dat" --patterns "$BUILD/room0b-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0c.py" --map "$BUILD/room0c-map.dat" --screen-bat "$BUILD/room0c-screen-bat.dat" --patterns "$BUILD/room0c-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
