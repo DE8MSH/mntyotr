@@ -10,6 +10,7 @@ import argparse
 import struct
 from pathlib import Path
 from room_rle import ROOM_CELLS, SCREEN_W, CHR_GAME, decode_room
+from room0a_decor import build_patterns as build_decor_patterns, overlay_screen_bat
 
 ROOM0A_RLE = bytes.fromhex(
     "b1 10 02 00 f1 91 30 02 00 f1 d0 02 10 02 10 02 "
@@ -81,9 +82,16 @@ def main() -> None:
     cells = decode_room(ROOM0A_RLE)
     assert len(cells) == ROOM_CELLS
     args.map.write_bytes(bytes(cells))
-    args.screen_bat.write_bytes(make_screen_bat(cells))
-    args.patterns.write_bytes(build_patterns())
-    print(f'room 0a: {len(ROOM0A_RLE)} compressed bytes -> {len(cells)} cells; 9 patterns')
+
+    base_bat = make_screen_bat(cells)
+    args.screen_bat.write_bytes(overlay_screen_bat(base_bat))
+
+    decor_patterns, _ = build_decor_patterns()
+    args.patterns.write_bytes(build_patterns() + decor_patterns)
+    print(
+        f'room 0a: {len(ROOM0A_RLE)} compressed bytes -> {len(cells)} cells; '
+        f'9 base + {len(decor_patterns)//32} decor patterns'
+    )
 
 
 if __name__ == '__main__':
