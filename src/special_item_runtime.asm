@@ -37,19 +37,33 @@ special_item_player_x: ds 1
         sta special_item_last_room
         stz special_item_active
         cmp #$02
-        beq .room02
+        bne .not02
+        jmp .room02
+.not02:
         cmp #$04
-        beq .room04
+        bne .not04
+        jmp .room04
+.not04:
         cmp #$08
-        beq .room08
+        bne .not08
+        jmp .room08
+.not08:
         cmp #$09
-        beq .room09
+        bne .not09
+        jmp .room09
+.not09:
         cmp #$0a
-        beq .room0a
+        bne .not0a
+        jmp .room0a
+.not0a:
         cmp #$0b
-        beq .room0b
+        bne .not0b
+        jmp .room0b
+.not0b:
         cmp #$0d
-        beq .room0d
+        bne .none
+        jmp .room0d
+.none:
         leave
 .room02:
         lda #11
@@ -59,7 +73,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$a2
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room04:
         lda #12
         sta special_item_index
@@ -69,7 +83,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$c2
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room08:
         lda #13
         sta special_item_index
@@ -79,7 +93,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$5a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room09:
         lda #14
         sta special_item_index
@@ -89,7 +103,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$62
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room0a:
         lda #15
         sta special_item_index
@@ -99,7 +113,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$ca
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room0b:
         lda #16
         sta special_item_index
@@ -109,7 +123,7 @@ special_item_player_x: ds 1
         sta special_item_x
         lda #$7a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .room0d:
         stz special_item_index
         lda #3
@@ -187,40 +201,48 @@ special_item_player_x: ds 1
         tma4
         pha
         lda special_item_asset
-        beq .first
+        bne .not_first
+        jmp .first
+.not_first:
         cmp #1
-        beq .milk
+        bne .not_milk
+        jmp .milk
+.not_milk:
         cmp #2
-        beq .teddy
+        bne .not_teddy
+        jmp .teddy
+.not_teddy:
         cmp #3
-        beq .cupcake
+        bne .smoke
+        jmp .cupcake
+.smoke:
         lda #<special_item_smoke_plane0
         sta <_bp
         lda #>special_item_smoke_plane0
         sta <_bp+1
         ldy #BANK(special_item_smoke_plane0)
-        bra .mapped
+        jmp .mapped
 .first:
         lda #<special_item_first_aid_plane0
         sta <_bp
         lda #>special_item_first_aid_plane0
         sta <_bp+1
         ldy #BANK(special_item_first_aid_plane0)
-        bra .mapped
+        jmp .mapped
 .milk:
         lda #<special_item_milk_plane0
         sta <_bp
         lda #>special_item_milk_plane0
         sta <_bp+1
         ldy #BANK(special_item_milk_plane0)
-        bra .mapped
+        jmp .mapped
 .teddy:
         lda #<special_item_teddy_plane0
         sta <_bp
         lda #>special_item_teddy_plane0
         sta <_bp+1
         ldy #BANK(special_item_teddy_plane0)
-        bra .mapped
+        jmp .mapped
 .cupcake:
         lda #<special_item_cupcake_plane0
         sta <_bp
