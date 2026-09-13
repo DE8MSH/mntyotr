@@ -185,66 +185,42 @@ monty_sault_r_bank:
  db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
  db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
 
-; Animation state follows C64 UpdateState more closely:
-; - walk: four frames, timer 4, only advances while moving
-; - climb: four frames, timer 4 while vertical movement is active
-; - explicit jump: 12 somersault frames, timer 4, clamped at frame 11
 monty_sprite_animate:
  lda <monty_jump_phase
  beq .not_jump
- lda <monty_sprite_last_mode
- cmp #2
- beq .jump_tick
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
- lda #1
- sta <monty_sprite_dirty
- bra .maybe_upload_jump
-.jump_tick:
+ lda <monty_anim_timer
+ beq .jump_advance
  dec <monty_anim_timer
- bne .maybe_upload_jump
- lda #4
+ bra .maybe_jump_upload
+.jump_advance:
+ lda #2
  sta <monty_anim_timer
- lda <monty_anim_frame
- cmp #11
- bcs .maybe_upload_jump
  inc <monty_anim_frame
+ lda <monty_anim_frame
+ cmp #12
+ bcc .jump_index_ok
+ stz <monty_anim_frame
+.jump_index_ok:
  lda #1
  sta <monty_sprite_dirty
-.maybe_upload_jump:
+.maybe_jump_upload:
  lda <monty_sprite_dirty
  beq .done
  call monty_upload_jump_frame
  bra .done
-
 .not_jump:
- lda <monty_climbing
- beq .walk_mode
  lda <monty_sprite_last_mode
- cmp #1
- beq .animate_four
+ cmp #2
+ bne .check_facing
  stz <monty_anim_frame
  lda #4
  sta <monty_anim_timer
  lda #1
  sta <monty_sprite_dirty
- bra .maybe_upload_four
-.walk_mode:
- lda <monty_sprite_last_mode
- beq .check_dir
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
- lda #1
- sta <monty_sprite_dirty
-.check_dir:
+.check_facing:
  lda <monty_facing
  cmp <monty_sprite_last_facing
  beq .check_motion
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
  lda #1
  sta <monty_sprite_dirty
 .check_motion:
@@ -343,7 +319,8 @@ monty_sprite_update_satb:
 
 .data
 monty_sprite_palette:
- dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+ ; Original C64 Monty sprite colour is $0f (light grey), not $01 white.
+ dw $000,$16d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
 monty_walk_l_1: incbin "monty-walk-l.dat",512,512
 monty_walk_l_2: incbin "monty-walk-l.dat",1024,512
