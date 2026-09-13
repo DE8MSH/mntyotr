@@ -9,9 +9,13 @@
 ;   BAT      = (row+3)*64 + (col+4)
 
 GEM_RECORD_COUNT = 20
-GEM_CHR          = CHR_GAME + 63
+; Current room/decor graphics use CHR_GAME+0..+65. Dynamic piledriver graphics
+; start at CHR_GAME+96, so +80 is a stable dedicated slot for collectibles.
+GEM_CHR          = CHR_GAME + 80
 GEM_BAT_LO       = <GEM_CHR
-GEM_BAT_HI       = $f0 | >GEM_CHR    ; BG palette 15
+; Use unified C64 white palette slot 7. Palette 15 is room-$03 light blue and
+; must not be used as a global collectible palette.
+GEM_BAT_HI       = $70 | >GEM_CHR
 
 .bss
 gem_collected:       ds GEM_RECORD_COUNT
@@ -34,7 +38,7 @@ gem_target_y:        ds 1
         leave
 .endp
 
-; Upload one 1bpp-shaped diamond into a dedicated PCE 4bpp BG tile.
+; Upload the original C64 char $34 converted to one PCE 4bpp BG tile.
 .proc gem_upload_pattern
         php
         sei
