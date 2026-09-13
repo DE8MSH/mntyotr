@@ -2,6 +2,8 @@
 ; Normal play: R02 first aid, R04 milk, R08 teddy, R09/R0A/R0D cupcake,
 ; R0B smoke stack. R01 cake remains cheat-mode-only and is not spawned.
 
+        include "room0b_decor_loader.asm"
+
 SPECIAL_ITEM_VRAM = $5800
 
 .bss
@@ -115,6 +117,9 @@ special_item_player_x: ds 1
         sta special_item_y
         jmp .activate
 .room0b:
+        ; The base Room $0B loader draws the decorated BAT generated at build
+        ; time. Upload its 25 exact decor chars before the room becomes visible.
+        call room0b_upload_decor
         lda #16
         sta special_item_index
         lda #4
