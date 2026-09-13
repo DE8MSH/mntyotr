@@ -220,7 +220,7 @@ gem_target_y:        ds 1
         adc     #5
         sta     gem_record_offset
         inc     gem_scan_index
-        bra     .scan
+        jmp     .scan
 .done:
         pla
         tam4
