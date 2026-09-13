@@ -2,7 +2,7 @@
 CHR_ROOM0B_DECOR = CHR_GAME + 9
 
 .code
-room0b_upload_decor:
+.proc room0b_upload_decor
         php
         sei
         tma3
@@ -56,4 +56,5 @@ room0b_upload_decor:
         pla
         tam3
         plp
-        rts
+        leave
+.endp
