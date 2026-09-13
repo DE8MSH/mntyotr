@@ -12,17 +12,20 @@ def main():
     assert any(data[:512]) and any(data[512:])
 
     main = (ROOT/'src/main.asm').read_text()
+    palettes = (ROOT/'src/init_game_palettes.asm').read_text()
     lift = (ROOT/'src/moving_lift.asm').read_text()
     assets = (ROOT/'src/moving_lift_assets_tail.asm').read_text()
     build_sh = (ROOT/'build.sh').read_text()
 
     assert 'include "moving_lift.asm"' in main
     assert 'include "moving_lift_assets_tail.asm"' in main
+    assert 'include "init_game_palettes.asm"' in main
+    assert 'call    init_game_palettes' in main
     assert 'call    moving_lift_init' in main
     assert 'call    moving_lift_room_sync' in main
     assert 'call    moving_lift_update' in main
     assert 'call    moving_lift_update_satb' in main
-    assert 'moving_lift_palette' in main
+    assert 'moving_lift_palette' in palettes
 
     # Exact C64 lift configs currently relevant to the port.
     assert 'lda     #$48' in lift and 'lda     #$5b' in lift
@@ -51,7 +54,7 @@ def main():
     assert 'jmp     main_loop' in main
     assert 'bra     main_loop' not in main
 
-    print('OK: authentic Room05/0D moving lifts + lift art + long-branch-safe runtime')
+    print('OK: authentic Room05/0D moving lifts + lift art + banked palette init + long-branch-safe runtime')
 
 
 if __name__ == '__main__':
