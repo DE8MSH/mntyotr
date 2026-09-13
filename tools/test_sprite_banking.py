@@ -23,4 +23,9 @@ assert text.count('BANK(monty_climb_') == 4
 assert '(MONTY_SPR_VRAM+64)>>5' in text
 assert '(MONTY_SPR_VRAM+256)>>5' not in text
 
-print('OK: bank-safe walk/climb + 24-frame somersault upload; 16x32 SAT pattern layout')
+# Original C64 Monty sprite colour is $0F light grey. The shared C64->PCE
+# quantization maps that colour to raw PCE CRAM word $16D, not white $1FF.
+assert 'dw $000,$16d,$000' in text.lower()
+assert 'dw $000,$1ff,$000' not in text.lower()
+
+print('OK: bank-safe Monty sprites + authentic light-grey palette; 16x32 SAT pattern layout')
