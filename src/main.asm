@@ -29,6 +29,7 @@
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
         include "room02_decor_loader.asm"
+        include "room0a_decor_loader.asm"
         include "room_loader.asm"
         include "room050c_loader.asm"
         include "game_life.asm"
@@ -102,6 +103,9 @@ main_loop:
         call    wait_vsync
         call    read_joypads
 
+        ; QA shortcut: one SELECT press loads the next supported room immediately.
+        ; Skip the gameplay tick on the warp frame so the fresh spawn cannot be
+        ; consumed by a stale collision/action before room-scoped state is synced.
         call    debug_room_warp_poll
         bcc     .after_debug_room_warp
         call    rising_cloud_room_sync
@@ -123,12 +127,16 @@ main_loop:
         bcc     main_loop
         inc     game_tick_counter
 
+        ; Preserve Y so the external bottom-edge helper only runs after actual
+        ; downward motion, matching the C64 UpdateMovement_down semantics.
         lda     <monty_y
         sta     <main_y_before_step
 
         call    collision_bank_enter
         call    monty_update_input
 
+        ; Only the confirmed outer edge at Room $00 right is special-cased
+        ; before world navigation. Supported room exits otherwise remain live.
         lda     <monty_jump_phase
         beq     .after_unsupported_jump_edge
         lda     <collision_actual_room
@@ -145,6 +153,7 @@ main_loop:
         sta     <main_exit_before_jump
         lda     <monty_x
         sta     <main_jump_x_before_step
+        ; C64 jump deltas are consumed one pixel at a time with collision checks.
         call    monty_jump_step_swept
 
         lda     <main_exit_before_jump
@@ -168,6 +177,8 @@ main_loop:
         stz     <monty_room_exit
 .after_jump_exit_guard:
 
+        ; Non-jump downward movement (fall/climb) still uses the shared helper.
+        ; The swept jump routine already checks $DA after every descent pixel.
         lda     <monty_y
         cmp     <main_y_before_step
         bcc     .after_down_room_edge
@@ -176,6 +187,7 @@ main_loop:
 .after_down_room_edge:
         call    collision_bank_exit
 
+        ; Dynamic mechanisms/enemy motion run with the real room id restored.
         call    rising_cloud_contact_update
         call    rising_cloud_update
         call    rising_bollard_update
@@ -183,6 +195,8 @@ main_loop:
         call    enemy_smiley_update
         call    special_item_update
 
+        ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
+        ; death reloads the same room at its saved entry point and skips topology.
         call    game_life_check
         bcc     .no_death
         call    game_life_reload
@@ -192,6 +206,7 @@ main_loop:
         bcc     .no_room_change
         call    room_load_pending_extended
 .no_room_change:
+        ; Room-entry sync restores mutable/dynamic mechanism state after loading.
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
@@ -201,6 +216,7 @@ main_loop:
         call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
+        ; SAT order: lift, enemies, special item, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
         call    special_item_update_satb
