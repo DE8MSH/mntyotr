@@ -11,3 +11,8 @@ moving_lift_patterns:
 ; Values use the same GGGRRRBBB C64 quantization as the room palettes.
 moving_lift_palette:
         dw $000,$062,$16d,$0eb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+
+; Collectibles are included from the ROM tail so their tables and tile art do
+; not consume the already-tight gameplay bank.
+        include "gem_runtime.asm"
+        include "gem_assets_tail.asm"
