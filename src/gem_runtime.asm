@@ -23,17 +23,19 @@ gem_target_y:        ds 1
 
 .code
 
-gem_init:
+.proc gem_init
         stz     gem_total
         ldx     #GEM_RECORD_COUNT-1
 .clear:
         stz     gem_collected,x
         dex
         bpl     .clear
-        jmp     gem_upload_pattern
+        call    gem_upload_pattern
+        leave
+.endp
 
 ; Upload one 1bpp-shaped diamond into a dedicated PCE 4bpp BG tile.
-gem_upload_pattern:
+.proc gem_upload_pattern
         php
         sei
         tma3
@@ -69,7 +71,8 @@ gem_upload_pattern:
         pla
         tam3
         plp
-        rts
+        leave
+.endp
 
 ; Redraw all uncollected gems belonging to monty_room.  Call after every room
 ; load, including same-room death reloads, because the room BAT was rebuilt.
