@@ -32,6 +32,8 @@
         include "room_loader.asm"
         include "room050c_loader.asm"
         include "game_life.asm"
+        include "special_item_runtime.asm"
+        include "special_item_sprite.asm"
         include "monty_sprite.asm"
         include "debug_room.asm"
         include "debug_room_warp.asm"
@@ -40,6 +42,7 @@
         include "moving_lift_assets_tail.asm"
         include "rising_cloud_sprite_assets_tail.asm"
         include "enemy_room00_assets_tail.asm"
+        include "special_item_assets_tail.asm"
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
@@ -153,6 +156,7 @@ bare_main:
         call    enemy_smiley_init
         call    enemy_room0f_palette_init
         call    game_life_init
+        call    special_item_init
         call    debug_room_init
         call    debug_room_warp_init
         call    debug_footer_visible_draw
@@ -160,6 +164,7 @@ bare_main:
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
         call    set_dspon
 
@@ -176,11 +181,13 @@ main_loop:
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
         call    enemy_smiley_room_sync
+        call    special_item_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
         jmp     main_loop
 .after_debug_room_warp:
@@ -255,6 +262,7 @@ main_loop:
         call    rising_bollard_update
         call    moving_lift_update
         call    enemy_smiley_update
+        call    special_item_update
 
         ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
         ; death reloads the same room at its saved entry point and skips topology.
@@ -272,13 +280,15 @@ main_loop:
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
         call    enemy_smiley_room_sync
+        call    special_item_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; SAT order: lift, enemies, cloud. Cloud remains final DMA writer.
+        ; SAT order: lift, enemies, special item, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
         jmp     main_loop
 
