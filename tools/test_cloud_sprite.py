@@ -13,15 +13,18 @@ def main():
     assert data[512:1024] != data[1024:]
 
     main = (ROOT/'src/main.asm').read_text()
+    palettes = (ROOT/'src/init_game_palettes.asm').read_text()
     spr = (ROOT/'src/rising_cloud_sprite.asm').read_text()
     assets = (ROOT/'src/rising_cloud_sprite_assets_tail.asm').read_text()
     build_sh = (ROOT/'build.sh').read_text()
 
+    assert 'include "init_game_palettes.asm"' in main
     assert 'include "rising_cloud_sprite.asm"' in main
     assert 'include "rising_cloud_sprite_assets_tail.asm"' in main
+    assert 'call    init_game_palettes' in main
     assert 'call    rising_cloud_sprite_init' in main
     assert main.count('call    rising_cloud_sprite_update_satb') >= 2
-    assert 'rising_cloud_sprite_palette' in main
+    assert 'rising_cloud_sprite_palette' in palettes
     assert 'CLOUD_SAT_LEFT = SAT_ADDR+24' in spr
     assert 'CLOUD_SAT_RIGHT= SAT_ADDR+28' in spr
     assert 'CLOUD_SAT_X    = 128' in spr
@@ -40,7 +43,7 @@ def main():
     assert 'jmp     rising_cloud_sprite_hide' in spr
     assert 'jmp     rising_cloud_sprite_sat_dma' in spr
 
-    print('OK: authentic 3-frame Room01 cloud sprite visibly follows 1px rising-cloud motion')
+    print('OK: authentic 3-frame Room01 cloud sprite + banked palette init + 1px rising-cloud motion')
 
 
 if __name__ == '__main__':
