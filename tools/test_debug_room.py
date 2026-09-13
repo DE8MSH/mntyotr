@@ -38,14 +38,16 @@ def main():
     assert 'db $0a,$10,$11,$12,$0e,$10,$13,$14,$0a,$10,$15,$0c,$0e,$10,$16,$17,$13,$11' in debug
 
     # Footer row23, commit row24 immediately below it. Both data sources are
-    # banked and must be remapped before reading.
+    # banked and must be remapped before reading. These routines are --newproc
+    # relocated now, so assert the proc declaration rather than the old label.
     assert 'DEBUG_FOOTER_VISIBLE_BAT = 23*BAT_LINE' in visible
-    assert 'debug_commit_bank_safe_draw:' in visible
+    assert '.proc debug_footer_visible_draw' in visible
+    assert '.proc debug_commit_bank_safe_draw' in visible
     assert 'ldy     #BANK(build_commit_nibbles)' in visible
     assert 'call    map_bp_to_mpr34' in visible
     assert 'lda     [_bp],y' in visible
     assert 'cpy     #7' in visible
-    assert 'jmp     debug_commit_bank_safe_draw' in visible
+    assert 'call    debug_commit_bank_safe_draw' in visible
     assert 'DEBUG_FOOTER_LEGACY_BAT' not in visible
 
     # build.sh converts the current short Git SHA to seven 0..15 nibble bytes.
