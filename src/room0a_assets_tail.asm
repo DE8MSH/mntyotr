@@ -3,10 +3,10 @@
 
 .data
 room0a_patterns:
-        incbin "room0a-patterns.dat"
+        incbin "room0a-patterns.dat",0,288
 
 room0a_decor_patterns:
-        incbin "room0a-decor-patterns.dat"
+        incbin "room0a-patterns.dat",288,768
 
 room0a_collision_map_rom:
         incbin "room0a-map.dat"
