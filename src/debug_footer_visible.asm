@@ -11,7 +11,7 @@ DEBUG_FOOTER_VISIBLE_BAT = 23*BAT_LINE
 
 .code
 
-debug_footer_visible_draw:
+.proc debug_footer_visible_draw
         php
         sei
         tma3
@@ -50,9 +50,11 @@ debug_footer_visible_draw:
         tam3
         plp
 
-        jmp     debug_commit_bank_safe_draw
+        call    debug_commit_bank_safe_draw
+        leave
+.endp
 
-debug_commit_bank_safe_draw:
+.proc debug_commit_bank_safe_draw
         php
         sei
         tma3
@@ -90,4 +92,5 @@ debug_commit_bank_safe_draw:
         pla
         tam3
         plp
-        rts
+        leave
+.endp
