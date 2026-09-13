@@ -26,6 +26,7 @@ game_life_init:
         lda     #$ff
         sta     <game_life_last_room
         stz     <game_respawn_pending
+        call    gem_init
         jmp     game_life_room_sync
 
 ; Call after a successful room load / at cold start. The transition code has
@@ -48,12 +49,16 @@ game_life_room_sync:
         sta     <game_checkpoint_x
         lda     <monty_y
         sta     <game_checkpoint_y
-        rts
+        jmp     gem_draw_room
 
 ; C=1 if a death was consumed and the caller must skip normal world resolution.
 ; This routine is --newproc-relocated so Bank 0 keeps enough thunk space for
 ; subsequent rooms/systems.
 .proc game_life_check
+        ; The original collectible collision pass runs every gameplay tick.
+        ; Collection is persistent across same-room death reloads.
+        call    gem_update
+
         lda     <monty_action_counter
         cmp     #2
         beq     .death
@@ -107,6 +112,7 @@ game_life_room_sync:
 ; Reload graphics/collision/mechanisms after game_life_check returns C=1.
 game_life_reload:
         call    room_load_pending_extended
+        call    gem_draw_room
         ; C64 room reload reruns every room-scoped setup routine, including the
         ; complete four-slot enemy SetupRoom pass.
         lda     #$ff
