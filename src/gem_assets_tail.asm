@@ -25,10 +25,11 @@ gem_records:
         db $0f,$1d,$6c,$c6,$01
         db $0f,$69,$6c,$d9,$01
 
-; PCE 4bpp tile, using colour index 1 only.  The silhouette is intentionally a
-; compact diamond/gem so it remains readable at the C64 8x8 character scale.
+; Original C64 font character $34 used by RoomEntitiesInit for room collectibles:
+;   3c 42 df c7 fb fb 46 3c
+; Converted with the same one-bit -> PCE plane-0 layout as all room characters.
 gem_tile_pattern:
-        db $18,$00,$3c,$00,$7e,$00,$ff,$00
-        db $ff,$00,$7e,$00,$3c,$00,$18,$00
+        db $3c,$00,$42,$00,$df,$00,$c7,$00
+        db $fb,$00,$fb,$00,$46,$00,$3c,$00
         db $00,$00,$00,$00,$00,$00,$00,$00
         db $00,$00,$00,$00,$00,$00,$00,$00
