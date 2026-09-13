@@ -30,8 +30,7 @@ gem_init:
         stz     gem_collected,x
         dex
         bpl     .clear
-        call    gem_upload_pattern
-        jmp     gem_draw_room
+        jmp     gem_upload_pattern
 
 ; Upload one 1bpp-shaped diamond into a dedicated PCE 4bpp BG tile.
 gem_upload_pattern:
