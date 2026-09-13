@@ -3,6 +3,7 @@
 ; R0B smoke stack. R01 cake remains cheat-mode-only and is not spawned.
 
         include "room0b_decor_loader.asm"
+        include "enemy_room0b_runtime.asm"
 
 SPECIAL_ITEM_VRAM = $5800
 
@@ -117,9 +118,10 @@ special_item_player_x: ds 1
         sta special_item_y
         jmp .activate
 .room0b:
-        ; The base Room $0B loader draws the decorated BAT generated at build
-        ; time. Upload its 25 exact decor chars before the room becomes visible.
+        ; Complete the original Room $0B setup omitted by the base-room pass:
+        ; five decor objects plus the two exact enemy records.
         call room0b_upload_decor
+        call enemy_room0b_seed
         lda #16
         sta special_item_index
         lda #4
