@@ -14,29 +14,53 @@ special_item_late_last_room: ds 1
 .changed:
         sta special_item_late_last_room
         cmp #$10
-        beq .r10
+        bne .not_r10
+        jmp .r10
+.not_r10:
         cmp #$13
-        beq .r13
+        bne .not_r13
+        jmp .r13
+.not_r13:
         cmp #$14
-        beq .r14
+        bne .not_r14
+        jmp .r14
+.not_r14:
         cmp #$16
-        beq .r16
+        bne .not_r16
+        jmp .r16
+.not_r16:
         cmp #$17
-        beq .r17
+        bne .not_r17
+        jmp .r17
+.not_r17:
         cmp #$1a
-        beq .r1a
+        bne .not_r1a
+        jmp .r1a
+.not_r1a:
         cmp #$1b
-        beq .r1b
+        bne .not_r1b
+        jmp .r1b
+.not_r1b:
         cmp #$1f
-        beq .r1f
+        bne .not_r1f
+        jmp .r1f
+.not_r1f:
         cmp #$23
-        beq .r23
+        bne .not_r23
+        jmp .r23
+.not_r23:
         cmp #$29
-        beq .r29
+        bne .not_r29
+        jmp .r29
+.not_r29:
         cmp #$2b
-        beq .r2b
+        bne .not_r2b
+        jmp .r2b
+.not_r2b:
         cmp #$2d
-        beq .r2d
+        bne .done_dispatch
+        jmp .r2d
+.done_dispatch:
         leave
 
 .r10:
@@ -48,7 +72,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$ca
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r13:
         lda #1
         sta special_item_index
@@ -58,7 +82,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$7a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r14:
         lda #2
         sta special_item_index
@@ -68,7 +92,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$82
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r16:
         lda #4
         sta special_item_index
@@ -78,7 +102,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$aa
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r17:
         lda #3
         sta special_item_index
@@ -88,7 +112,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$72
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r1a:
         lda #6
         sta special_item_index
@@ -98,7 +122,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$6a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r1b:
         lda #5
         sta special_item_index
@@ -108,7 +132,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$62
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r1f:
         lda #7
         sta special_item_index
@@ -118,7 +142,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$62
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r23:
         lda #8
         sta special_item_index
@@ -128,7 +152,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$b2
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r29:
         lda #9
         sta special_item_index
@@ -138,7 +162,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$9a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r2b:
         lda #10
         sta special_item_index
@@ -148,7 +172,7 @@ special_item_late_last_room: ds 1
         sta special_item_x
         lda #$5a
         sta special_item_y
-        bra .activate
+        jmp .activate
 .r2d:
         lda #18
         sta special_item_index
