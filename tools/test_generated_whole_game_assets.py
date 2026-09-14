@@ -4,6 +4,11 @@
 This is deliberately separate from the source-parity auditor: source parity asks
 whether the port matches the original tables, while this checks that build.sh
 actually emitted every binary payload that the assembler will incbin.
+
+After all exactness checks pass, the extended-room 36x20 BAT payloads are packed
+in-place with the same small word-RLE stream consumed by the HuC6280 room loader.
+That keeps source verification on the uncompressed truth while avoiding 1440
+ROM bytes per room at assembly time.
 """
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ import re
 import struct
 from pathlib import Path
 
+from bat_word_rle import encode as encode_bat_rle, decode as decode_bat_rle
 from rooms20_33_decor import (
     PAL_BY_C64 as LATE_PAL_BY_C64,
     ROOM_RECORDS as LATE_DECOR_RECORDS,
@@ -27,6 +33,13 @@ BAT_W = 36
 BAT_H = 20
 BAT_SIZE = BAT_W * BAT_H * 2
 BASE_PATTERN_SIZE = 9 * 32
+
+# Rooms handled by room_load_pending_extended. Their final 36x20 BAT is verified
+# in raw form first, then replaced by a compact RLE stream for the assembler.
+RLE_BAT_ROOMS = (
+    0x05, 0x06, 0x07, 0x08, 0x09, 0x0C, 0x0F,
+    *range(0x10, 0x34),
+)
 
 # R0A stores its 24 exact decor characters after the 9 base room chars in the
 # same file; room0a_assets_tail.asm incbins 288 + 768 bytes from this payload.
@@ -86,6 +99,23 @@ def verify_late_decor_payload(build: Path, room: int) -> None:
         )
 
 
+def pack_extended_bats(build: Path) -> tuple[int, int]:
+    """Replace verified raw BATs with exact round-trippable RLE streams."""
+    raw_total = 0
+    packed_total = 0
+    for room in RLE_BAT_ROOMS:
+        path = build / f"room{room:02x}-screen-bat.dat"
+        raw = path.read_bytes()
+        assert len(raw) == BAT_SIZE
+        packed = encode_bat_rle(raw)
+        assert decode_bat_rle(packed, BAT_W * BAT_H) == raw, f"R{room:02X} BAT RLE round-trip"
+        path.write_bytes(packed)
+        raw_total += len(raw)
+        packed_total += len(packed)
+    assert packed_total < raw_total, (packed_total, raw_total)
+    return raw_total, packed_total
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("build_dir", type=Path)
@@ -128,9 +158,12 @@ def main() -> None:
     for needle in ("$20,$21,$22,$23", "$2b,$2d,$2e,$30,$31,$32,$33", "room33_decor_patterns"):
         assert needle in late_loader, needle
 
+    raw_bat, packed_bat = pack_extended_bats(build)
+    saved = raw_bat - packed_bat
     print(
         f"OK: generated payloads for 52 rooms, {len(enemy_files)} enemy banks, "
-        f"{len(DECOR_CHARS)} decor rooms; late Decor bytes/BAT placement/palettes exact"
+        f"{len(DECOR_CHARS)} decor rooms; late Decor bytes/BAT placement/palettes exact; "
+        f"room BAT RLE {raw_bat} -> {packed_bat} bytes (saved {saved})"
     )
 
 
