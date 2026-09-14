@@ -60,8 +60,6 @@ def main():
     assert ROOM0A_TILE_BITMAPS[1] == bytes.fromhex('6c 44 d4 aa fe 00 6c 6c')
     assert ROOM0A_TILE_BITMAPS[2] == bytes.fromhex('ff aa ee 44 ee bb 00 00')
 
-    # Exact four original Room $0A decor records: fireplace, books,
-    # green bottle and blue bottle. They add 24 room-local characters.
     assert ROOM0A_RECORDS == [
         (0x08,0x12,0x07),
         (0x04,0x05,0x08),
@@ -104,7 +102,7 @@ def main():
 
     compact_world = ''.join(world_asm.lower().split())
     assert 'world_room_supported:' in world_asm
-    assert 'cmp#$10' in compact_world
+    assert 'cmp#$34' in compact_world
 
     assert loader.count('jmp     room_tail_cache_collision') >= 6
     assert loader.count('jmp     room_upload_9_patterns') >= 7
