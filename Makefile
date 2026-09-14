@@ -10,13 +10,24 @@ export PCE_INCLUDE
 
 PCEAS_FLAGS := --raw --newproc --strip -gA -m -l 2 -S
 
-.PHONY: all release debug smoke run check-tools clean
+.PHONY: all release debug smoke run audit audit-strict check-tools clean
 all: release
 release: $(ROM)
 
 check-tools:
 	@command -v $(PCEAS) >/dev/null || { echo "pceas not found; run ./install.sh"; exit 1; }
 	@test -f "$(HUC_HOME)/examples/asm/elmer/include/bare-startup.asm" || { echo "HuC CORE library not found under $(HUC_HOME)"; exit 1; }
+
+# Fast, emulator-free whole-game parity scan. It reports every room as
+# OK/MISSING/FAIL for geometry, topology, gems, enemies, specials and mechanisms.
+audit:
+	@mkdir -p build
+	python3 tools/playthrough_audit.py --json build/playthrough-audit.json --text build/playthrough-audit.txt
+
+# Completion gate: fail not only on wrong data but also on known missing content.
+audit-strict:
+	@mkdir -p build
+	python3 tools/playthrough_audit.py --strict --json build/playthrough-audit.json --text build/playthrough-audit.txt
 
 $(ROM): $(SRC) src/platform.inc | check-tools
 	@mkdir -p build
