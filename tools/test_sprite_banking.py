@@ -10,7 +10,7 @@ text = (ROOT / 'src' / 'monty_sprite.asm').read_text()
 assert 'tia monty_sault_' not in text
 assert 'tia monty_walk_' not in text
 assert 'tia monty_climb_' not in text
-assert 'monty_upload_far_512:' in text
+assert '.proc monty_upload_far_512' in text
 assert 'call map_bp_to_mpr34' in text
 assert 'lda [_bp],y' in text
 assert text.count('BANK(monty_sault_l_') == 12
@@ -18,6 +18,20 @@ assert text.count('BANK(monty_sault_r_') == 12
 assert text.count('BANK(monty_walk_l_') == 4
 assert text.count('BANK(monty_walk_r_') == 4
 assert text.count('BANK(monty_climb_') == 4
+
+# The whole sprite runtime must stay relocatable. The complete game already
+# fills fixed HOME heavily; --newproc should place these bodies in ordinary
+# ROM banks and leave only far-call thunks in Bank 0.
+for proc in (
+    'monty_sprite_init',
+    'monty_upload_walk_frame',
+    'monty_upload_climb_frame',
+    'monty_upload_jump_frame',
+    'monty_upload_far_512',
+    'monty_sprite_animate',
+    'monty_sprite_update_satb',
+):
+    assert f'.proc {proc}' in text
 
 # Phase 28c PCE 16x32 addressing must stay intact.
 assert '(MONTY_SPR_VRAM+64)>>5' in text
@@ -28,4 +42,4 @@ assert '(MONTY_SPR_VRAM+256)>>5' not in text
 assert 'dw $000,$16d,$000' in text.lower()
 assert 'dw $000,$1ff,$000' not in text.lower()
 
-print('OK: bank-safe Monty sprites + authentic light-grey palette; 16x32 SAT pattern layout')
+print('OK: banked Monty sprite runtime + bank-safe assets + authentic light-grey palette')
