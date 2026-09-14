@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 from pathlib import Path
 from room_rle import ROOM_CELLS, decode_room
 from room0f import (
@@ -26,15 +27,22 @@ assert len(make_screen_bat(cells)) == 36 * 20 * 2
 assert 'incbin "room0f-map.dat"' in assets
 assert 'db $01,$01,$01,$03,$02,$03,$02,$01' in assets
 
+# Room0F remains one descriptor in the now whole-game extended loader.  Do not
+# pin this regression to the old seven-room milestone table.
 for needle in (
     ".proc room_load_pending_extended",
-    "ROOM_EXT_COUNT = 7",
-    "db $05,$06,$07,$08,$09,$0c,$0f",
+    "ROOM_EXT_COUNT = 43",
+    "$05,$06,$07,$08,$09,$0c,$0f,$10",
+    "$31,$32,$33",
     "room0f_patterns", "room0f_screen_bat", "room0f_collision_map_rom",
 ):
     assert needle in loader, needle
 
-assert "cmp     #$10" in world
+m = re.search(r'world_room_supported:\s*\n\s*cmp\s+#\$([0-9a-fA-F]+)', world)
+assert m and int(m.group(1), 16) == 0x34
+
+# SELECT warp is a development helper and currently still cycles the original
+# R00-R0F QA set. Its scope is independent from normal world/loader support.
 assert "cmp     #$10" in warp
 assert "db $02,$02,$02,$02,$02,$02,$01,$01,$01,$01,$03,$03,$03,$03,$03,$03" in warp
 assert "db $15,$14,$13,$12,$11,$10,$11,$12,$13,$14,$14,$13,$10,$11,$12,$0f" in warp
@@ -52,4 +60,4 @@ for needle in (
 assert "call    enemy_room0f_palette_init" in main
 assert 'include "room0f_assets_tail.asm"' in main
 
-print("OK: exact Room0F ESCAPE TUNNEL geometry, collision, enemies, loader + SELECT reachability")
+print("OK: exact Room0F geometry/collision/enemies; whole-game loader support retained")
