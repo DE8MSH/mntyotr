@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import struct
 from pathlib import Path
 from room_rle import decode_room, ROOM_CELLS, SCREEN_W, CHR_GAME
@@ -52,12 +53,18 @@ def main():
 
     assert 'call    monty_check_down_room_edge' in main_asm
     assert 'cmp     #$da' in edge and 'lda     #4' in edge
+
+    # Whole-game support now ends at $33 inclusive.  Match semantics instead of
+    # a whitespace-sensitive literal so this regression does not break when the
+    # assembler formatting changes.
+    m = re.search(r'world_room_supported:\s*\n\s*cmp\s+#\$([0-9a-fA-F]+)', world)
+    assert m, 'world_room_supported upper-bound compare missing'
+    assert int(m.group(1), 16) == 0x34
+
     compact = ''.join(world.lower().split())
-    assert 'world_room_supported:' in world
-    assert 'cmp#$10' in compact
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
 
-    print('OK: exact Room 03 active with downward route into Room 0E')
+    print('OK: exact Room 03 active with downward route into Room 0E; world support through R33')
 
 
 if __name__ == '__main__':

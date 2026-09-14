@@ -5,7 +5,7 @@
 .code
 .proc enemy_room0f_palette_init
         ; Room $0F introduces C64 colour $0A (light red). Sprite palette 26 maps
-        ; to SAT palette index 10 and uses the same unified C64->PCE quantization.
+        ; to SAT palette index 10 and uses the shared later-room palette data.
         lda     #26
         sta     <_al
         lda     #1
@@ -265,6 +265,5 @@
         db $06,$03,$0a,$09
 .endp
 
-.data
-enemy_palette_light_red:             ; C64 $0A -> $0eb
-        dw $000,$0eb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+; enemy_palette_light_red is defined once in enemy_room10_1f_runtime.asm and
+; shared by Room $0F and the later room-table runtime.

@@ -10,7 +10,12 @@ monty_sprite_last_facing: ds 1
 monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
 .code
 
-monty_sprite_init:
+; Keep the sprite runtime out of fixed Bank 0. With --newproc each public
+; routine is placed in a normal code bank and Bank 0 only keeps a tiny thunk.
+; This is important now that the complete $00-$33 game fills the ROM with
+; room/enemy/decor assets: fixed HOME must remain reserved for reset/vectors
+; and generated far-call thunks rather than carrying the whole sprite engine.
+.proc monty_sprite_init
  stz <monty_anim_frame
  lda #4
  sta <monty_anim_timer
@@ -24,12 +29,13 @@ monty_sprite_init:
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
- rts
+ leave
+.endp
 
 ; All frame uploads use the same bank-safe 512-byte path. Room/decor growth can
 ; move any of these labels across an 8 KiB HuCard bank boundary, so direct TIA
 ; from a sprite label is intentionally forbidden for walk, climb and jump.
-monty_upload_walk_frame:
+.proc monty_upload_walk_frame
  lda <monty_anim_frame
  and #3
  tax
@@ -53,9 +59,10 @@ monty_upload_walk_frame:
  lda <monty_facing
  sta <monty_sprite_last_facing
  stz <monty_sprite_last_mode
- rts
+ leave
+.endp
 
-monty_upload_climb_frame:
+.proc monty_upload_climb_frame
  lda <monty_anim_frame
  and #3
  tax
@@ -68,9 +75,10 @@ monty_upload_climb_frame:
  stz <monty_sprite_dirty
  lda #1
  sta <monty_sprite_last_mode
- rts
+ leave
+.endp
 
-monty_upload_jump_frame:
+.proc monty_upload_jump_frame
  lda <monty_anim_frame
  cmp #12
  bcc .index_ok
@@ -98,12 +106,13 @@ monty_upload_jump_frame:
  sta <monty_sprite_last_facing
  lda #2
  sta <monty_sprite_last_mode
- rts
+ leave
+.endp
 
 ; Copy one 512-byte PCE sprite frame from arbitrary banked ROM to VRAM.
 ; map_bp_to_mpr34 maps the selected bank into MPR3 and the following bank into
 ; MPR4, so a frame may also straddle a bank boundary safely.
-monty_upload_far_512:
+.proc monty_upload_far_512
  php
  sei
  tma3
@@ -137,114 +146,45 @@ monty_upload_far_512:
  pla
  tam3
  plp
- rts
+ leave
+.endp
 
-; Compile-time far-pointer tables. Keeping them in code space means frame
-; selection itself never depends on whichever ROM bank currently contains data.
-monty_walk_l_lo:
- db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
-monty_walk_l_hi:
- db >monty_walk_l_0,>monty_walk_l_1,>monty_walk_l_2,>monty_walk_l_3
-monty_walk_l_bank:
- db BANK(monty_walk_l_0),BANK(monty_walk_l_1),BANK(monty_walk_l_2),BANK(monty_walk_l_3)
-monty_walk_r_lo:
- db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
-monty_walk_r_hi:
- db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
-monty_walk_r_bank:
- db BANK(monty_walk_r_0),BANK(monty_walk_r_1),BANK(monty_walk_r_2),BANK(monty_walk_r_3)
-monty_climb_lo:
- db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
-monty_climb_hi:
- db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
-monty_climb_bank:
- db BANK(monty_climb_0),BANK(monty_climb_1),BANK(monty_climb_2),BANK(monty_climb_3)
-
-monty_sault_l_lo:
- db <monty_sault_l_0,<monty_sault_l_1,<monty_sault_l_2,<monty_sault_l_3
- db <monty_sault_l_4,<monty_sault_l_5,<monty_sault_l_6,<monty_sault_l_7
- db <monty_sault_l_8,<monty_sault_l_9,<monty_sault_l_10,<monty_sault_l_11
-monty_sault_l_hi:
- db >monty_sault_l_0,>monty_sault_l_1,>monty_sault_l_2,>monty_sault_l_3
- db >monty_sault_l_4,>monty_sault_l_5,>monty_sault_l_6,>monty_sault_l_7
- db >monty_sault_l_8,>monty_sault_l_9,>monty_sault_l_10,>monty_sault_l_11
-monty_sault_l_bank:
- db BANK(monty_sault_l_0),BANK(monty_sault_l_1),BANK(monty_sault_l_2),BANK(monty_sault_l_3)
- db BANK(monty_sault_l_4),BANK(monty_sault_l_5),BANK(monty_sault_l_6),BANK(monty_sault_l_7)
- db BANK(monty_sault_l_8),BANK(monty_sault_l_9),BANK(monty_sault_l_10),BANK(monty_sault_l_11)
-monty_sault_r_lo:
- db <monty_sault_r_0,<monty_sault_r_1,<monty_sault_r_2,<monty_sault_r_3
- db <monty_sault_r_4,<monty_sault_r_5,<monty_sault_r_6,<monty_sault_r_7
- db <monty_sault_r_8,<monty_sault_r_9,<monty_sault_r_10,<monty_sault_r_11
-monty_sault_r_hi:
- db >monty_sault_r_0,>monty_sault_r_1,>monty_sault_r_2,>monty_sault_r_3
- db >monty_sault_r_4,>monty_sault_r_5,>monty_sault_r_6,>monty_sault_r_7
- db >monty_sault_r_8,>monty_sault_r_9,>monty_sault_r_10,>monty_sault_r_11
-monty_sault_r_bank:
- db BANK(monty_sault_r_0),BANK(monty_sault_r_1),BANK(monty_sault_r_2),BANK(monty_sault_r_3)
- db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
- db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
-
-; Animation state follows C64 UpdateState more closely:
-; - walk: four frames, timer 4, only advances while moving
-; - climb: four frames, timer 4 while vertical movement is active
-; - explicit jump: 12 somersault frames, timer 4, clamped at frame 11
-monty_sprite_animate:
+.proc monty_sprite_animate
  lda <monty_jump_phase
  beq .not_jump
- lda <monty_sprite_last_mode
- cmp #2
- beq .jump_tick
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
- lda #1
- sta <monty_sprite_dirty
- bra .maybe_upload_jump
-.jump_tick:
+ lda <monty_anim_timer
+ beq .jump_advance
  dec <monty_anim_timer
- bne .maybe_upload_jump
- lda #4
+ bra .maybe_jump_upload
+.jump_advance:
+ lda #2
  sta <monty_anim_timer
- lda <monty_anim_frame
- cmp #11
- bcs .maybe_upload_jump
  inc <monty_anim_frame
+ lda <monty_anim_frame
+ cmp #12
+ bcc .jump_index_ok
+ stz <monty_anim_frame
+.jump_index_ok:
  lda #1
  sta <monty_sprite_dirty
-.maybe_upload_jump:
+.maybe_jump_upload:
  lda <monty_sprite_dirty
  beq .done
  call monty_upload_jump_frame
  bra .done
-
 .not_jump:
- lda <monty_climbing
- beq .walk_mode
  lda <monty_sprite_last_mode
- cmp #1
- beq .animate_four
+ cmp #2
+ bne .check_facing
  stz <monty_anim_frame
  lda #4
  sta <monty_anim_timer
  lda #1
  sta <monty_sprite_dirty
- bra .maybe_upload_four
-.walk_mode:
- lda <monty_sprite_last_mode
- beq .check_dir
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
- lda #1
- sta <monty_sprite_dirty
-.check_dir:
+.check_facing:
  lda <monty_facing
  cmp <monty_sprite_last_facing
  beq .check_motion
- stz <monty_anim_frame
- lda #4
- sta <monty_anim_timer
  lda #1
  sta <monty_sprite_dirty
 .check_motion:
@@ -272,12 +212,13 @@ monty_sprite_animate:
 .upload_walk:
  call monty_upload_walk_frame
 .done:
- rts
+ leave
+.endp
 
 ; Coordinate bridge from the C64 internal Monty values to PCE SAT space.
 ; C64 visible X = 2*(monty_x-$0c), visible Y = (monty_y+1)-$32.
 ; PCE SAT origin is +32 X / +64 Y, therefore SAT X=2*x+8, SAT Y=y+15.
-monty_sprite_update_satb:
+.proc monty_sprite_update_satb
  lda #<MONTY_SAT_LEFT
  sta <_di
  lda #>MONTY_SAT_LEFT
@@ -339,11 +280,61 @@ monty_sprite_update_satb:
  st0 #$13
  st1 #<SAT_ADDR
  st2 #>SAT_ADDR
- rts
+ leave
+.endp
+
+; These compact far-pointer tables intentionally remain in fixed HOME code.
+; Both the banked Monty upload procs and the separately banked exact enemy
+; collision proc need to read them without first remapping MPR3/MPR4. Keeping
+; only 108 bytes of selectors fixed is cheap; the large sprite runtime remains
+; relocatable across the normal PCE ROM banks.
+monty_walk_l_lo:
+ db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
+monty_walk_l_hi:
+ db >monty_walk_l_0,>monty_walk_l_1,>monty_walk_l_2,>monty_walk_l_3
+monty_walk_l_bank:
+ db BANK(monty_walk_l_0),BANK(monty_walk_l_1),BANK(monty_walk_l_2),BANK(monty_walk_l_3)
+monty_walk_r_lo:
+ db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
+monty_walk_r_hi:
+ db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
+monty_walk_r_bank:
+ db BANK(monty_walk_r_0),BANK(monty_walk_r_1),BANK(monty_walk_r_2),BANK(monty_walk_r_3)
+monty_climb_lo:
+ db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
+monty_climb_hi:
+ db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
+monty_climb_bank:
+ db BANK(monty_climb_0),BANK(monty_climb_1),BANK(monty_climb_2),BANK(monty_climb_3)
+monty_sault_l_lo:
+ db <monty_sault_l_0,<monty_sault_l_1,<monty_sault_l_2,<monty_sault_l_3
+ db <monty_sault_l_4,<monty_sault_l_5,<monty_sault_l_6,<monty_sault_l_7
+ db <monty_sault_l_8,<monty_sault_l_9,<monty_sault_l_10,<monty_sault_l_11
+monty_sault_l_hi:
+ db >monty_sault_l_0,>monty_sault_l_1,>monty_sault_l_2,>monty_sault_l_3
+ db >monty_sault_l_4,>monty_sault_l_5,>monty_sault_l_6,>monty_sault_l_7
+ db >monty_sault_l_8,>monty_sault_l_9,>monty_sault_l_10,>monty_sault_l_11
+monty_sault_l_bank:
+ db BANK(monty_sault_l_0),BANK(monty_sault_l_1),BANK(monty_sault_l_2),BANK(monty_sault_l_3)
+ db BANK(monty_sault_l_4),BANK(monty_sault_l_5),BANK(monty_sault_l_6),BANK(monty_sault_l_7)
+ db BANK(monty_sault_l_8),BANK(monty_sault_l_9),BANK(monty_sault_l_10),BANK(monty_sault_l_11)
+monty_sault_r_lo:
+ db <monty_sault_r_0,<monty_sault_r_1,<monty_sault_r_2,<monty_sault_r_3
+ db <monty_sault_r_4,<monty_sault_r_5,<monty_sault_r_6,<monty_sault_r_7
+ db <monty_sault_r_8,<monty_sault_r_9,<monty_sault_r_10,<monty_sault_r_11
+monty_sault_r_hi:
+ db >monty_sault_r_0,>monty_sault_r_1,>monty_sault_r_2,>monty_sault_r_3
+ db >monty_sault_r_4,>monty_sault_r_5,>monty_sault_r_6,>monty_sault_r_7
+ db >monty_sault_r_8,>monty_sault_r_9,>monty_sault_r_10,>monty_sault_r_11
+monty_sault_r_bank:
+ db BANK(monty_sault_r_0),BANK(monty_sault_r_1),BANK(monty_sault_r_2),BANK(monty_sault_r_3)
+ db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
+ db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
 
 .data
 monty_sprite_palette:
- dw $000,$1ff,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
+ ; Original C64 Monty sprite colour is $0f (light grey), not $01 white.
+ dw $000,$16d,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000
 monty_walk_l_0: incbin "monty-walk-l.dat",0,512
 monty_walk_l_1: incbin "monty-walk-l.dat",512,512
 monty_walk_l_2: incbin "monty-walk-l.dat",1024,512

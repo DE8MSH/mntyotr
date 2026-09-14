@@ -139,7 +139,6 @@ piledriver_static_room_sync:
 
 ; Exact source state sequence, with game_tick_counter supplying the original
 ; random $14..$53 delay range and the choice between two Room-$01 drivers.
-; Collision is deliberately not enabled yet; this stage proves animation only.
 piledriver_static_update:
         lda     <pile_static_count
         bne     .active_room
@@ -240,7 +239,8 @@ piledriver_static_upload_set1:
 ; Generate 18 chars = left[6], middle[6], right[6]. Original MoveDown leaves
 ; byte0 untouched while shifting everything else down. Thus for global offsets
 ; <= shift the rendered byte is seed[0]; offsets shift+1..shift+7 use the rest
-; of the seed. This is the missing visible body from the previous PCE pass.
+; of the seed. When cheat_mode bit 7 is set, SeedGlyphs selects the original
+; alternate +$18 Easter-egg frame for every standard piledriver instance.
 piledriver_static_upload_common:
         call    vdc_di_to_mawr
         stz     <pile_static_tile
@@ -288,6 +288,21 @@ piledriver_static_upload_common:
 .body_row:
         cly                             ; seed row 0 is replicated by MoveDown
 .seed_row:
+        lda     <cheat_mode
+        bpl     .normal_seed
+        lda     <pile_static_seed_sel
+        beq     .get_cheat_left
+        cmp     #1
+        beq     .get_cheat_mid
+        lda     piledriver_static_cheat_right,y
+        bra     .put_row
+.get_cheat_left:
+        lda     piledriver_static_cheat_left,y
+        bra     .put_row
+.get_cheat_mid:
+        lda     piledriver_static_cheat_mid,y
+        bra     .put_row
+.normal_seed:
         lda     <pile_static_seed_sel
         beq     .get_left
         cmp     #1
@@ -320,7 +335,9 @@ piledriver_static_upload_common:
         inc     <pile_static_tile
         lda     <pile_static_tile
         cmp     #18
-        bne     .tile_loop
+        beq     .upload_done
+        jmp     .tile_loop
+.upload_done:
         rts
 
 piledriver_static_draw:
@@ -375,6 +392,14 @@ piledriver_static_seed_mid:
         db $ff,$ff,$00,$ff,$ff,$ff,$ff,$00
 piledriver_static_seed_right:
         db $f0,$f0,$00,$ff,$ff,$ff,$fe,$00
+
+; Mechanisms.Data.piledriver_frame_data +$18: original alternate Easter-egg glyph.
+piledriver_static_cheat_left:
+        db $00,$00,$1f,$20,$fb,$71,$20,$00
+piledriver_static_cheat_mid:
+        db $3c,$c3,$ff,$99,$e7,$c3,$81,$00
+piledriver_static_cheat_right:
+        db $00,$00,$f8,$04,$df,$8e,$04,$00
 
 piledriver_static_bat_lo:
         db $00,$40,$80,$c0,$00,$40,$80,$c0,$00,$40,$80,$c0,$00,$40,$80,$c0

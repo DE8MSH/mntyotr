@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import struct
 from pathlib import Path
 
@@ -105,13 +106,19 @@ def main():
     assert 'room_ext_bat_lo:' in ext
     assert 'room_ext_collision_lo:' in ext
     assert '$0f' in ext and 'room0f_patterns' in ext
-    assert 'cmp     #$10' in world_asm
+
+    # The loader has grown from the original $00-$0F milestone to the complete
+    # source room range $00-$33. Keep this test tied to the semantic upper bound
+    # instead of an obsolete literal from the early port.
+    m = re.search(r'world_room_supported:\s*\n\s*cmp\s+#\$([0-9a-fA-F]+)', world_asm)
+    assert m, 'world_room_supported upper-bound compare missing'
+    assert int(m.group(1), 16) == 0x34
 
     guard = main_asm.split('call    monty_update_input', 1)[1]
     guard = guard.split('.after_unsupported_jump_edge:', 1)[0]
     assert 'cmp     #4' not in guard
 
-    print('OK: exact Rooms 05-08/0C assets + Room0F descriptor + compact tail loader')
+    print('OK: exact Rooms 05-08/0C assets + Room0F descriptor + compact tail loader; world support through R33')
 
 
 if __name__ == '__main__':

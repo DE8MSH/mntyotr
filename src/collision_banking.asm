@@ -22,7 +22,11 @@ room02_tile_properties: ds 8
 
 .code
 
-collision_bank_enter:
+; These are substantial per-tick helpers, not HOME glue. Keep the bodies in
+; ordinary ROM code banks and pay only two --newproc thunks in Bank $00.
+; Unlike the earlier tiny-clock move this actually frees materially more HOME
+; bytes than it adds in thunk overhead.
+.proc collision_bank_enter
         sei
         tma3
         sta     <collision_saved_mpr3
@@ -56,9 +60,10 @@ collision_bank_enter:
         ldy     #BANK(room00_collision_map)
         call    map_bp_to_mpr34
 .ram_ready:
-        rts
+        leave
+.endp
 
-collision_bank_exit:
+.proc collision_bank_exit
         lda     <collision_actual_room
         sta     <monty_room
         lda     <collision_saved_mpr4
@@ -70,4 +75,5 @@ collision_bank_exit:
         lda     <collision_saved_bp_hi
         sta     <_bp+1
         cli
-        rts
+        leave
+.endp

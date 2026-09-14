@@ -101,6 +101,7 @@ room_load_pending:
 
 .room0a:
         call    room0a_upload_patterns
+        call    room0a_upload_decor
         call    room0a_draw_native
         call    room0a_cache_collision
         lda     #$0a

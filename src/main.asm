@@ -29,17 +29,24 @@
         include "vertical_world_edges.asm"
         include "room01_decor_loader.asm"
         include "room02_decor_loader.asm"
+        include "room0a_decor_loader.asm"
         include "room_loader.asm"
         include "room050c_loader.asm"
-        include "game_life.asm"
+        ; Keep the non-proc Monty sprite bridge before the large table-driven
+        ; late-game runtimes so it cannot straddle the MPR7->MPR0 code wrap.
         include "monty_sprite.asm"
+        include "game_life.asm"
+        include "special_item_runtime.asm"
+        include "special_item_sprite.asm"
         include "debug_room.asm"
         include "debug_room_warp.asm"
         include "debug_footer_visible.asm"
+        include "init_game_palettes.asm"
         ; Large banked room/decor/sprite data is appended after gameplay/runtime.
         include "moving_lift_assets_tail.asm"
         include "rising_cloud_sprite_assets_tail.asm"
         include "enemy_room00_assets_tail.asm"
+        include "special_item_assets_tail.asm"
         include "room01_decor_assets.asm"
         include "room02_assets_tail.asm"
         include "room03_assets_tail.asm"
@@ -60,82 +67,20 @@ main_y_before_step:        ds 1
 
         .code
 
+; bare-startup jumps here in the fixed HOME window. Keep this bridge tiny; the
+; substantial init and per-frame code are .proc blocks so --newproc can place
+; them in available banks instead of wrapping MPR7 back into MPR0.
 bare_main:
+        call    main_game_init
+main_loop:
+        call    main_game_tick
+        jmp     main_loop
+
+.proc main_game_init
         call    init_352x224
         call    init_c64_video
-
         call    upload_room00_patterns
-
-        stz     <_al
-        lda     #13
-        sta     <_ah
-        lda     #<room00_bg_palettes
-        sta     <_bp + 0
-        lda     #>room00_bg_palettes
-        sta     <_bp + 1
-        ldy     #^room00_bg_palettes
-        call    load_palettes
-
-        ; Active house rooms use C64 purple and blue in slots 13/14.
-        lda     #13
-        sta     <_al
-        lda     #2
-        sta     <_ah
-        lda     #<room01_extra_palettes
-        sta     <_bp + 0
-        lda     #>room01_extra_palettes
-        sta     <_bp + 1
-        ldy     #^room01_extra_palettes
-        call    load_palettes
-
-        ; Room $03 additionally uses C64 light blue $0e in BG palette slot 15.
-        lda     #15
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<room03_extra_palette
-        sta     <_bp + 0
-        lda     #>room03_extra_palette
-        sta     <_bp + 1
-        ldy     #^room03_extra_palette
-        call    load_palettes
-
-        ; Sprite palette 16: Monty.
-        lda     #16
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<monty_sprite_palette
-        sta     <_bp + 0
-        lda     #>monty_sprite_palette
-        sta     <_bp + 1
-        ldy     #^monty_sprite_palette
-        call    load_palettes
-
-        ; Sprite palette 17: authentic multicolour lift pair.
-        lda     #17
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<moving_lift_palette
-        sta     <_bp + 0
-        lda     #>moving_lift_palette
-        sta     <_bp + 1
-        ldy     #^moving_lift_palette
-        call    load_palettes
-
-        ; Sprite palette 18: authentic white rising cloud.
-        lda     #18
-        sta     <_al
-        lda     #1
-        sta     <_ah
-        lda     #<rising_cloud_sprite_palette
-        sta     <_bp + 0
-        lda     #>rising_cloud_sprite_palette
-        sta     <_bp + 1
-        ldy     #^rising_cloud_sprite_palette
-        call    load_palettes
-        call    xfer_palettes
+        call    init_game_palettes
 
         call    draw_room00_native
         call    game_clock_init
@@ -153,6 +98,7 @@ bare_main:
         call    enemy_smiley_init
         call    enemy_room0f_palette_init
         call    game_life_init
+        call    special_item_init
         call    debug_room_init
         call    debug_room_warp_init
         call    debug_footer_visible_draw
@@ -160,10 +106,13 @@ bare_main:
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
         call    set_dspon
+        leave
+.endp
 
-main_loop:
+.proc main_game_tick
         call    wait_vsync
         call    read_joypads
 
@@ -176,17 +125,21 @@ main_loop:
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
         call    enemy_smiley_room_sync
+        call    special_item_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    monty_sprite_update_satb
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
-        jmp     main_loop
+        leave
 .after_debug_room_warp:
 
         call    game_clock_step
-        bcc     main_loop
+        bcs     .clock_tick
+        leave
+.clock_tick:
         inc     game_tick_counter
 
         ; Preserve Y so the external bottom-edge helper only runs after actual
@@ -253,8 +206,12 @@ main_loop:
         call    rising_cloud_contact_update
         call    rising_cloud_update
         call    rising_bollard_update
+        call    piledriver_late_collision_update
         call    moving_lift_update
         call    enemy_smiley_update
+        call    special_item_update
+        call    teleporter_update
+        call    scripted_transition_update
 
         ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
         ; death reloads the same room at its saved entry point and skips topology.
@@ -263,6 +220,15 @@ main_loop:
         call    game_life_reload
         bra     .no_room_change
 .no_death:
+        ; Teleporters and completion/C5 paths are scripted, not normal edge exits.
+        lda     teleporter_transition_pending
+        ora     scripted_transition_pending
+        beq     .normal_world_exit
+        stz     teleporter_transition_pending
+        stz     scripted_transition_pending
+        call    room_load_pending_extended
+        bra     .no_room_change
+.normal_world_exit:
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending_extended
@@ -272,21 +238,26 @@ main_loop:
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
         call    enemy_smiley_room_sync
+        call    special_item_room_sync
         call    game_life_room_sync
         call    debug_room_draw
         call    monty_sprite_animate
         call    monty_sprite_update_satb
-        ; SAT order: lift, enemies, cloud. Cloud remains final DMA writer.
+        ; SAT order: lift, enemies, special item, cloud. Cloud remains final DMA writer.
         call    moving_lift_update_satb
         call    enemy_smiley_update_satb
+        call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
-        jmp     main_loop
+.done:
+        leave
+.endp
 
-init_c64_video:
+.proc init_c64_video
         st0     #$0a
         st1     #<VDC_HSR_320
         st2     #>VDC_HSR_320
         st0     #$0b
         st1     #<VDC_HDR_320
         st2     #>VDC_HDR_320
-        rts
+        leave
+.endp

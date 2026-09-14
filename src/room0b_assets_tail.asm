@@ -5,6 +5,9 @@
 room0b_patterns:
         incbin "room0b-patterns.dat"
 
+room0b_decor_patterns:
+        incbin "room0b-decor-patterns.dat"
+
 room0b_collision_map_rom:
         incbin "room0b-map.dat"
 room0b_tile_properties_rom:

@@ -48,6 +48,10 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room050c.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0a0b.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0f.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_rooms10_1f.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_rooms20_33.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_decor_records_20_33.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_gem_records.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
@@ -80,6 +84,7 @@ out.write_bytes(data)
 print(f'ROM commit overlay: {text}')
 PY
 
+echo "Generating room assets..."
 python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" --screen-bat "$BUILD/room00-screen-bat.dat" --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01.py" --map "$BUILD/room01-map.dat" --screen-bat "$BUILD/room01-screen-bat.dat" --patterns "$BUILD/room01-patterns.dat" >/dev/null
@@ -95,10 +100,17 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room08.py" --map "$BUILD/room08-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room09.py" --map "$BUILD/room09-map.dat" --screen-bat "$BUILD/room09-screen-bat.dat" --patterns "$BUILD/room09-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0a.py" --map "$BUILD/room0a-map.dat" --screen-bat "$BUILD/room0a-screen-bat.dat" --patterns "$BUILD/room0a-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b.py" --map "$BUILD/room0b-map.dat" --screen-bat "$BUILD/room0b-screen-bat.dat" --patterns "$BUILD/room0b-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0b_decor.py" --screen-bat "$BUILD/room0b-screen-bat.dat" --patterns "$BUILD/room0b-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0c.py" --map "$BUILD/room0c-map.dat" --screen-bat "$BUILD/room0c-screen-bat.dat" --patterns "$BUILD/room0c-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-map.dat" --screen-bat "$BUILD/room0f-screen-bat.dat" --patterns "$BUILD/room0f-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f_decor.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33_decor.py" --out-dir "$BUILD" >/dev/null
+
+echo "Generating player/enemy assets..."
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
@@ -119,6 +131,18 @@ python3 "$ROOT/tools/enemy_room00.py" \
   --hand "$BUILD/enemy-type1b-hand.dat" \
   --tank "$BUILD/enemy-type1c-tank.dat" \
   --jelly-fish "$BUILD/enemy-type1d-jelly-fish.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room10_1f.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room20_33.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_medusa.py" --write "$BUILD/enemy-type1e-medusa.dat" >/dev/null
+
+# Keep source-truth parity and generated-file integrity separate. The source
+# auditor knows the original game; the generated gate knows build payload sizes
+# including rooms such as R0A whose decor is appended to the base pattern file.
+echo "Running generated-asset parity gate..."
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_generated_whole_game_assets.py" "$BUILD"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_complete.py" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
+
+echo "Assembling ROM..."
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi

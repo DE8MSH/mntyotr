@@ -11,7 +11,9 @@ world_lookup_index:     ds 1
 
 .code
 
-world_init:
+; Startup-only world state does not need to occupy fixed HOME. Keep it banked
+; with --newproc so Bank 0 remains available for reset/vectors and call thunks.
+.proc world_init
         lda     #$02
         sta     <world_map_row
         lda     #$15
@@ -19,32 +21,14 @@ world_init:
         stz     <monty_room            ; room $00 at row 2, col $15
         stz     <world_pending_room
         stz     <world_transition_ready
-        rts
-
-; X=world column 0..22, Y=world row 0..5.
-; Returns A=room id or $ff for a wall/outside cell.
-world_get_room_xy:
-        cpx     #23
-        bcs     .wall
-        cpy     #6
-        bcs     .wall
-        stx     <world_lookup_index
-        tya
-        tax
-        lda     world_row_offsets,x
-        clc
-        adc     <world_lookup_index
-        tax
-        lda     world_room_grid,x
-        rts
-.wall:
-        lda     #$ff
-        rts
+        leave
+.endp
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Rooms $00-$0F are now a contiguous supported block; $0F begins ESCAPE TUNNEL.
+; Rooms $00-$33 are now a contiguous supported block; $30 remains off-grid and
+; is reached by the original completion path rather than normal edge traversal.
 world_room_supported:
-        cmp     #$10
+        cmp     #$34
         bcc     .yes
         clc
         rts
@@ -52,7 +36,12 @@ world_room_supported:
         sec
         rts
 
-world_resolve_exit:
+; Relocate the large edge dispatcher into a normal code bank. Keep the world
+; lookup table in THIS SAME mapped PROC bank: putting it in generic .data and
+; reading it directly from HOME is not bank-safe and can return bytes from the
+; currently mapped room/asset bank (observed as R00-left incorrectly loading
+; R11). The local lookup below always runs while this PROC bank is mapped.
+.proc world_resolve_exit
         stz     <world_transition_ready
         lda     <monty_room_exit
         bne     .have_exit
@@ -67,66 +56,115 @@ world_resolve_exit:
         cmp     #4
         beq     .down
         jmp     .blocked
+
 .left:
         lda     <world_exit_col
-        beq     .blocked_left
+        bne     .left_in_range
+        jmp     .blocked_left
+.left_in_range:
         sec
         sbc     #1
         tax
         ldy     <world_map_row
-        jsr     world_get_room_xy
+        jsr     .get_room_xy
         cmp     #$ff
-        beq     .blocked_left
-        jsr     world_room_supported
-        bcc     .blocked_left
+        bne     .left_has_room
+        jmp     .blocked_left
+.left_has_room:
+        cmp     #$34
+        bcc     .left_supported
+        jmp     .blocked_left
+.left_supported:
         dec     <world_exit_col
-        bra     .valid
+        jmp     .valid
+
 .right:
         lda     <world_exit_col
         clc
         adc     #1
         tax
         ldy     <world_map_row
-        jsr     world_get_room_xy
+        jsr     .get_room_xy
         cmp     #$ff
-        beq     .blocked_right
-        jsr     world_room_supported
-        bcc     .blocked_right
+        bne     .right_has_room
+        jmp     .blocked_right
+.right_has_room:
+        cmp     #$34
+        bcc     .right_supported
+        jmp     .blocked_right
+.right_supported:
         inc     <world_exit_col
-        bra     .valid
+        jmp     .valid
+
 .up:
         lda     <world_map_row
-        beq     .blocked_up
+        bne     .up_in_range
+        jmp     .blocked_up
+.up_in_range:
         sec
         sbc     #1
         tay
         ldx     <world_exit_col
-        jsr     world_get_room_xy
+        jsr     .get_room_xy
         cmp     #$ff
-        beq     .blocked_up
-        jsr     world_room_supported
-        bcc     .blocked_up
+        bne     .up_has_room
+        jmp     .blocked_up
+.up_has_room:
+        cmp     #$34
+        bcc     .up_supported
+        jmp     .blocked_up
+.up_supported:
         dec     <world_map_row
-        bra     .valid
+        jmp     .valid
+
 .down:
         lda     <world_map_row
         clc
         adc     #1
         tay
         ldx     <world_exit_col
-        jsr     world_get_room_xy
+        jsr     .get_room_xy
         cmp     #$ff
-        beq     .blocked_down
-        jsr     world_room_supported
-        bcc     .blocked_down
+        bne     .down_has_room
+        jmp     .blocked_down
+.down_has_room:
+        cmp     #$34
+        bcc     .down_supported
+        jmp     .blocked_down
+.down_supported:
         inc     <world_map_row
+
 .valid:
+        ; A still holds the destination room returned by .get_room_xy.
         sta     <world_pending_room
+        lda     <monty_room_exit
+        cmp     #1
+        bne     .entry_not_left
+        lda     #$9b
+        sta     <monty_x
+        bra     .entry_done
+.entry_not_left:
+        cmp     #2
+        bne     .entry_not_right
+        lda     #$15
+        sta     <monty_x
+        bra     .entry_done
+.entry_not_right:
+        cmp     #3
+        bne     .entry_down
+        lda     #$da
+        sta     <monty_y
+        bra     .entry_done
+.entry_down:
+        lda     #$4c
+        sta     <monty_y
+.entry_done:
+        stz     <monty_is_moving
         lda     #1
         sta     <world_transition_ready
         stz     <monty_room_exit
         sec
-        rts
+        leave
 
 .blocked_left:
         lda     #$15
@@ -147,9 +185,31 @@ world_resolve_exit:
         stz     <monty_room_exit
 .none:
         clc
+        leave
+
+; X=world column 0..22, Y=world row 0..5.
+; Returns A=room id or $ff for a wall/outside cell. This helper and its tables
+; deliberately live inside world_resolve_exit's mapped bank.
+.get_room_xy:
+        cpx     #23
+        bcs     .lookup_wall
+        cpy     #6
+        bcs     .lookup_wall
+        stx     <world_lookup_index
+        tya
+        tax
+        lda     world_row_offsets,x
+        clc
+        adc     <world_lookup_index
+        tax
+        lda     world_room_grid,x
+        rts
+.lookup_wall:
+        lda     #$ff
         rts
 
-.data
+; Keep the canonical symbol names because the source-truth audit parses these
+; exact tables. They still reside physically inside this PROC bank.
 world_row_offsets:
         db $00,$17,$2e,$45,$5c,$73
 
@@ -160,3 +220,4 @@ world_room_grid:
         db $2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff
         db $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$1e,$ff,$1a,$19,$18,$ff,$10,$11,$ff,$ff,$ff,$ff,$ff,$ff
         db $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$1d,$1c,$17,$16,$15,$14,$12,$13,$ff,$ff,$ff,$ff,$ff,$ff
+.endp

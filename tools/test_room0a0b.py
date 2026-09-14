@@ -7,6 +7,9 @@ from room0a import (
     ROOM0A_RLE, ROOM0A_TILE_IDS, ROOM0A_COLOURS, ROOM0A_PROPERTIES,
     ROOM0A_TILE_BITMAPS, build_patterns as build0a, make_screen_bat as bat0a,
 )
+from room0a_decor import (
+    ROOM0A_RECORDS, build_patterns as build0a_decor, overlay_screen_bat as overlay0a,
+)
 from room0b import (
     ROOM0B_RLE, ROOM0B_TILE_IDS, ROOM0B_COLOURS, ROOM0B_PROPERTIES,
     ROOM0B_TILE_BITMAPS, build_patterns as build0b, make_screen_bat as bat0b,
@@ -45,8 +48,8 @@ def parse_world_grid():
 
 
 def main():
-    check_room(ROOM0A_RLE, ROOM0A_TILE_IDS, ROOM0A_COLOURS, ROOM0A_PROPERTIES,
-               ROOM0A_TILE_BITMAPS, build0a, bat0a)
+    cells0a = check_room(ROOM0A_RLE, ROOM0A_TILE_IDS, ROOM0A_COLOURS, ROOM0A_PROPERTIES,
+                         ROOM0A_TILE_BITMAPS, build0a, bat0a)
     check_room(ROOM0B_RLE, ROOM0B_TILE_IDS, ROOM0B_COLOURS, ROOM0B_PROPERTIES,
                ROOM0B_TILE_BITMAPS, build0b, bat0b)
 
@@ -56,6 +59,17 @@ def main():
     assert ROOM0A_PROPERTIES == (1,3,2,2,1,1,1,1)
     assert ROOM0A_TILE_BITMAPS[1] == bytes.fromhex('6c 44 d4 aa fe 00 6c 6c')
     assert ROOM0A_TILE_BITMAPS[2] == bytes.fromhex('ff aa ee 44 ee bb 00 00')
+
+    assert ROOM0A_RECORDS == [
+        (0x08,0x12,0x07),
+        (0x04,0x05,0x08),
+        (0x04,0x12,0x09),
+        (0x05,0x12,0x0b),
+    ]
+    decor0a, _ = build0a_decor()
+    assert len(decor0a) == 24*32
+    base0a = bat0a(cells0a)
+    assert overlay0a(base0a) != base0a
 
     assert len(ROOM0B_RLE) == 124
     assert ROOM0B_TILE_IDS == (0x05,0x47,0x65,0x3b,0x36,0x62,0x03,0x51)
@@ -83,15 +97,18 @@ def main():
         assert f'call    room{room}_cache_collision' in loader
         assert f'BANK(room{room}_collision_map_rom)' in loader
 
+    assert 'include "room0a_decor_loader.asm"' in main_asm
+    assert 'call    room0a_upload_decor' in loader
+
     compact_world = ''.join(world_asm.lower().split())
     assert 'world_room_supported:' in world_asm
-    assert 'cmp#$10' in compact_world
+    assert 'cmp#$34' in compact_world
 
     assert loader.count('jmp     room_tail_cache_collision') >= 6
     assert loader.count('jmp     room_upload_9_patterns') >= 7
     assert loader.count('jmp     room_draw_native_36x20') >= 7
 
-    print('OK: exact Room 0A/0B assets + lower-house route wiring')
+    print('OK: exact Room 0A/0B base assets + Room 0A decor + lower-house route wiring')
 
 
 if __name__ == '__main__':
