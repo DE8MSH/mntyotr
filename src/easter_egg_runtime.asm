@@ -1,3 +1,4 @@
+; Original name trigger: I WANT TO CHEAT
 .zp
 cheat_mode: ds 1
 
