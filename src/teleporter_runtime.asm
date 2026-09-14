@@ -133,16 +133,16 @@ teleporter_update:
         bcc .done
 
         ldx teleporter_index
-        lda .dest_room,x
+        lda teleporter_dest_room,x
         sta <world_pending_room
         sta <monty_room
-        lda .dest_x,x
+        lda teleporter_dest_x,x
         sta <monty_x
-        lda .dest_y,x
+        lda teleporter_dest_y,x
         sta <monty_y
-        lda .dest_col,x
+        lda teleporter_dest_col,x
         sta <world_exit_col
-        lda .dest_row,x
+        lda teleporter_dest_row,x
         sta <world_map_row
         stz <monty_room_exit
         stz <monty_jump_phase
@@ -156,13 +156,13 @@ teleporter_update:
         rts
 
 .data
-.dest_room:
+teleporter_dest_room:
         db $06,$13,$1b,$29
-.dest_x:
+teleporter_dest_x:
         db $34,$60,$28,$17
-.dest_y:
+teleporter_dest_y:
         db $72,$a2,$6a,$a2
-.dest_col:
+teleporter_dest_col:
         db $11,$10,$0c,$03
-.dest_row:
+teleporter_dest_row:
         db $01,$05,$03,$03
