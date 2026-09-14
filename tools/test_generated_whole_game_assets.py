@@ -99,6 +99,35 @@ def verify_late_decor_payload(build: Path, room: int) -> None:
         )
 
 
+def audit_gem_base_cells(build: Path, src_dir: Path) -> None:
+    """Report source gem positions that sit on a nonzero generated base-map code.
+
+    item_tbl coordinates are source truth, so this is intentionally diagnostic,
+    not a relocation pass. A nonzero code can be a ladder/platform rather than a
+    wall; the list tells us exactly which rooms need collision/property review
+    instead of guessing from screenshots.
+    """
+    text = (src_dir / "gem_assets_tail.asm").read_text(errors="replace")
+    block = text.split("gem_records:", 1)[1].split("gem_tile_pattern:", 1)[0]
+    occupied = []
+    for line in block.splitlines():
+        m = re.search(r"\bdb\s+((?:\$[0-9a-fA-F]{2}\s*,\s*){4}\$[0-9a-fA-F]{2})", line)
+        if not m:
+            continue
+        room, tx, ty, _blo, _bhi = (int(x.strip()[1:], 16) for x in m.group(1).split(','))
+        col = (tx - 0x15) // 4
+        row = (ty - 0x4C) // 8
+        assert 0 <= col < 32 and 0 <= row < 20, (room, col, row)
+        code = (build / f"room{room:02x}-map.dat").read_bytes()[row * 32 + col]
+        if code:
+            occupied.append((room, col, row, code))
+    if occupied:
+        detail = ", ".join(f"R{r:02X}({c:02X},{y:02X})=tile{code}" for r, c, y, code in occupied)
+        print(f"GEM-CELL-AUDIT: {len(occupied)} source gem cells use nonzero base-map tiles: {detail}")
+    else:
+        print("GEM-CELL-AUDIT: all 64 source gem cells are blank in generated base maps")
+
+
 def pack_extended_bats(build: Path) -> tuple[int, int]:
     """Replace verified raw BATs with exact round-trippable RLE streams."""
     raw_total = 0
@@ -157,6 +186,8 @@ def main() -> None:
     late_loader = (args.src_dir / "room20_33_decor_loader.asm").read_text(errors="replace")
     for needle in ("$20,$21,$22,$23", "$2b,$2d,$2e,$30,$31,$32,$33", "room33_decor_patterns"):
         assert needle in late_loader, needle
+
+    audit_gem_base_cells(build, args.src_dir)
 
     raw_bat, packed_bat = pack_extended_bats(build)
     saved = raw_bat - packed_bat
