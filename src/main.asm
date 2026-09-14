@@ -137,7 +137,9 @@ main_loop:
 .after_debug_room_warp:
 
         call    game_clock_step
-        bcc     .done
+        bcs     .clock_tick
+        leave
+.clock_tick:
         inc     game_tick_counter
 
         ; Preserve Y so the external bottom-edge helper only runs after actual

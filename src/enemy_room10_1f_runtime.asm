@@ -173,7 +173,8 @@ enemy_room10_1f_last_room: ds 1
         sta enemy_tmp_state
         lda enemy_tmp_slot
         cmp #4
-        bne .decode_next
+        beq .decode_done
+        jmp .decode_next
 .decode_done:
         rts
 

@@ -335,7 +335,9 @@ piledriver_static_upload_common:
         inc     <pile_static_tile
         lda     <pile_static_tile
         cmp     #18
-        bne     .tile_loop
+        beq     .upload_done
+        jmp     .tile_loop
+.upload_done:
         rts
 
 piledriver_static_draw:
