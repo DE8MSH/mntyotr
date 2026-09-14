@@ -198,20 +198,22 @@ world_room_supported:
         stx     <world_lookup_index
         tya
         tax
-        lda     .row_offsets,x
+        lda     world_row_offsets,x
         clc
         adc     <world_lookup_index
         tax
-        lda     .room_grid,x
+        lda     world_room_grid,x
         rts
 .lookup_wall:
         lda     #$ff
         rts
 
-.row_offsets:
+; Keep the canonical symbol names because the source-truth audit parses these
+; exact tables. They still reside physically inside this PROC bank.
+world_row_offsets:
         db $00,$17,$2e,$45,$5c,$73
 
-.room_grid:
+world_room_grid:
         db $ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$23,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff
         db $ff,$2f,$2e,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$22,$ff,$ff,$ff,$ff,$ff,$ff,$06,$07,$08,$09,$ff,$ff
         db $2d,$2c,$27,$26,$33,$32,$31,$25,$24,$20,$21,$ff,$ff,$ff,$ff,$ff,$05,$04,$03,$02,$01,$00,$ff
