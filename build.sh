@@ -107,6 +107,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f_decor.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33_decor.py" --out-dir "$BUILD" >/dev/null
 
 echo "Generating player/enemy assets..."
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
