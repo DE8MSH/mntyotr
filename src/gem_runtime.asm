@@ -264,14 +264,19 @@ gem_palette_hi:      ds 1
 .scan:
         ldx     gem_scan_index
         cpx     #GEM_RECORD_COUNT
-        beq     .done
+        bne     .scan_active
+        jmp     .done
+.scan_active:
         lda     gem_collected,x
-        bne     .next
-
+        beq     .scan_room
+        jmp     .next
+.scan_room:
         ldy     gem_record_offset
         lda     [_bp],y
         cmp     <monty_room
-        bne     .next
+        beq     .room_match
+        jmp     .next
+.room_match:
 
         ; Stored target_x = $15 + 4*source_col. Recover the item's absolute
         ; C64 screen column (source_col + 4).
@@ -297,7 +302,8 @@ gem_palette_hi:      ds 1
         clc
         adc     #1
         cmp     gem_target_x
-        bne     .next
+        beq     .x_hit
+        jmp     .next
 .x_hit:
         ; Stored target_y = $4c + 8*source_row. Recover absolute screen row
         ; (source_row + 3), then compare against Monty's top two char rows.
@@ -326,7 +332,8 @@ gem_palette_hi:      ds 1
         clc
         adc     #1
         cmp     gem_target_y
-        bne     .next
+        beq     .collect
+        jmp     .next
 
 .collect:
         ; Persist collection and award 50 points.
