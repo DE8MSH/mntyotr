@@ -9,9 +9,12 @@
 ;   BAT      = (row+3)*64 + (col+4)
 
 GEM_RECORD_COUNT = 64
-; Current room/decor graphics use CHR_GAME+0..+65. Dynamic piledriver graphics
-; start at CHR_GAME+96, so +80 is a stable dedicated slot for collectibles.
-GEM_CHR          = CHR_GAME + 80
+; Room/decor graphics currently occupy CHR_GAME+0..+65. The two standard
+; piledriver sets occupy +64..+99 and the static piledriver sets occupy
+; +96..+131, so the old +80 gem slot was being overwritten during gameplay
+; (visible as number-like garbage instead of the original char $34). Keep the
+; collectible in the first BG slot above all of those dynamic allocations.
+GEM_CHR          = CHR_GAME + 132
 GEM_BAT_LO       = <GEM_CHR
 ; Initial colour is C64 red, palette slot 2. Runtime cycles the BAT palette nibble
 ; through the original 11-step CharacterAnimation sequence.
