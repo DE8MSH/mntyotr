@@ -57,7 +57,12 @@ for needle in (
     "enemy_palette_light_red",
 ):
     assert needle in enemies, needle
-assert "C64 $0A -> $0eb" in shared_enemy_palettes
+
+# The shared light-red palette was deliberately moved into the common R10-R1F
+# palette block. Guard the symbol and exact PCE colour value rather than an old
+# source comment that no longer belongs to the defining file.
+assert "enemy_palette_light_red:" in shared_enemy_palettes
+assert "dw $000,$0eb,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000,$000" in shared_enemy_palettes
 assert "call    enemy_room0f_palette_init" in main
 assert 'include "room0f_assets_tail.asm"' in main
 
