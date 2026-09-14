@@ -32,10 +32,12 @@
         include "room0a_decor_loader.asm"
         include "room_loader.asm"
         include "room050c_loader.asm"
+        ; Keep the non-proc Monty sprite bridge before the large table-driven
+        ; late-game runtimes so it cannot straddle the MPR7->MPR0 code wrap.
+        include "monty_sprite.asm"
         include "game_life.asm"
         include "special_item_runtime.asm"
         include "special_item_sprite.asm"
-        include "monty_sprite.asm"
         include "debug_room.asm"
         include "debug_room_warp.asm"
         include "debug_footer_visible.asm"
