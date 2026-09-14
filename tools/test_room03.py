@@ -54,7 +54,7 @@ def main():
     assert 'cmp     #$da' in edge and 'lda     #4' in edge
     compact = ''.join(world.lower().split())
     assert 'world_room_supported:' in world
-    assert 'cmp#$10' in compact
+    assert 'cmp#$34' in compact
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
 
     print('OK: exact Room 03 active with downward route into Room 0E')
