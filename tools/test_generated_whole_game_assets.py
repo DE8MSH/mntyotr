@@ -9,11 +9,23 @@ from __future__ import annotations
 
 import argparse
 import re
+import struct
 from pathlib import Path
+
+from rooms20_33_decor import (
+    PAL_BY_C64 as LATE_PAL_BY_C64,
+    ROOM_RECORDS as LATE_DECOR_RECORDS,
+    TYPE_DATA as LATE_TYPE_DATA,
+    ROOM_Y0 as LATE_ROOM_Y0,
+    SCREEN_X0 as LATE_SCREEN_X0,
+    build_room_patterns as build_late_decor_patterns,
+)
 
 ROOMS = range(0x34)
 MAP_SIZE = 32 * 20
-BAT_SIZE = 36 * 20 * 2
+BAT_W = 36
+BAT_H = 20
+BAT_SIZE = BAT_W * BAT_H * 2
 BASE_PATTERN_SIZE = 9 * 32
 
 # R0A stores its 24 exact decor characters after the 9 base room chars in the
@@ -21,7 +33,7 @@ BASE_PATTERN_SIZE = 9 * 32
 ROOM_PATTERN_SIZES = {0x0A: (9 + 24) * 32}
 
 # Exact unique Decor character counts for every generated source-derived decor
-# payload.  Multiple placements of one type share the same uploaded glyphs.
+# payload. Multiple placements of one type share the same uploaded glyphs.
 DECOR_CHARS = {
     0x10:23, 0x11:48, 0x12:33, 0x13:6, 0x1D:51, 0x1E:26, 0x1F:56,
     0x20:34, 0x21:4, 0x22:4, 0x23:50, 0x24:22, 0x25:36, 0x26:44,
@@ -36,6 +48,42 @@ def require_size(path: Path, expected: int) -> None:
     got = path.stat().st_size
     if got != expected:
         raise AssertionError(f"{path.name}: {got} bytes, expected {expected}")
+
+
+def verify_late_decor_payload(build: Path, room: int) -> None:
+    """Prove that generated pattern bytes and final BAT cells match the guarded truth."""
+    prefix = f"room{room:02x}"
+    expected_patterns, first_char = build_late_decor_patterns(room)
+    actual_patterns = (build / f"{prefix}-decor-patterns.dat").read_bytes()
+    assert actual_patterns == expected_patterns, f"R{room:02X} decor pattern bytes differ"
+
+    bat = (build / f"{prefix}-screen-bat.dat").read_bytes()
+    words = struct.unpack("<" + "H" * (len(bat) // 2), bat)
+
+    # Build the exact final cells. Later room_list records overwrite earlier
+    # cells just as the original decoration pass does (important in R26).
+    expected_cells: dict[tuple[int, int], int] = {}
+    for c64_x, c64_y, typ in LATE_DECOR_RECORDS[room]:
+        w, h, _bmp_hex, cols_hex = LATE_TYPE_DATA[typ]
+        cols = bytes.fromhex(cols_hex)
+        char = first_char[typ]
+        ci = 0
+        x0 = c64_x - LATE_SCREEN_X0
+        y0 = c64_y - LATE_ROOM_Y0
+        for dy in range(h):
+            for dx in range(w):
+                x, y = x0 + dx, y0 + dy
+                assert 0 <= x < BAT_W and 0 <= y < BAT_H, (room, typ, x, y)
+                expected_cells[(x, y)] = (LATE_PAL_BY_C64[cols[ci]] << 12) | char
+                char += 1
+                ci += 1
+
+    for (x, y), expected in expected_cells.items():
+        actual = words[y * BAT_W + x]
+        assert actual == expected, (
+            f"R{room:02X} Decor BAT mismatch at ({x},{y}): "
+            f"${actual:04X} != ${expected:04X}"
+        )
 
 
 def main() -> None:
@@ -63,6 +111,12 @@ def main() -> None:
     for room, chars in DECOR_CHARS.items():
         require_size(build / f"room{room:02x}-decor-patterns.dat", chars * 32)
 
+    # For $20-$33, do not stop at file size: compare every emitted decor pattern
+    # byte and every final decorated BAT cell (tile index + PCE palette) against
+    # the source-guarded room/x/y/type/colour tables.
+    for room in sorted(LATE_DECOR_RECORDS):
+        verify_late_decor_payload(build, room)
+
     # $2A/$2C/$2F really have no Decor.room_list entries. Their lack of a decor
     # payload is source truth, not an omitted build artifact.
     for room in (0x2A, 0x2C, 0x2F):
@@ -76,7 +130,7 @@ def main() -> None:
 
     print(
         f"OK: generated payloads for 52 rooms, {len(enemy_files)} enemy banks, "
-        f"and {len(DECOR_CHARS)} source-derived decor rooms"
+        f"{len(DECOR_CHARS)} decor rooms; late Decor bytes/BAT placement/palettes exact"
     )
 
 
