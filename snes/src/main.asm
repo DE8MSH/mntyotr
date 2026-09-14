@@ -1,4 +1,4 @@
-; Monty on the Run — isolated SNES parallel port bring-up.
+; Monty on the Run — isolated SNES parallel port.
 ; This source intentionally has no include/dependency on the PCE src/ tree.
 
 .setcpu "65816"
@@ -24,16 +24,17 @@ Reset:
         lda     #$0000
         tcd                     ; direct page = $0000
         phk
-        plb                     ; data bank = program bank ($00 here)
+        plb                     ; data bank = program bank ($00 in this LoROM bank)
 
         jsr     init_machine
         jsr     game_clock_init
 
         sep     #$20
 .a8
+        stz     frame_counter
         lda     RDNMI           ; clear any pending NMI status
         lda     #$80
-        sta     NMITIMEN         ; VBlank NMI, auto joy read still disabled
+        sta     NMITIMEN         ; VBlank NMI; joy auto-read comes with gameplay input
         lda     #$0F
         sta     INIDISP          ; display on, full brightness
         cli
@@ -47,31 +48,48 @@ Reset:
         jsr     game_clock_step
         bcc     @frame
 
-        ; S1+ gameplay update will live here. PCE behaviour is the reference,
-        ; but all implementation and generated data remain under snes/.
+        ; Gameplay/physics follows in later milestones. Room $00 rendering is
+        ; already live and remains independent from all PCE source/build files.
         bra     @frame
 
 init_machine:
         sep     #$20
 .a8
+.i16
         stz     NMITIMEN
         stz     MDMAEN
         stz     HDMAEN
         lda     #$80
-        sta     INIDISP          ; forced blank while PPU state is established
+        sta     INIDISP          ; forced blank during all PPU/VRAM setup
+
+        ; Deterministic Mode 1 state. BG1 map = VRAM $0000, BG1 CHR = $1000 words.
+        lda     #$01
+        sta     BGMODE
+        stz     MOSAIC
+        stz     BG1SC
+        lda     #$01
+        sta     BG12NBA
+
+        ; Clear BG1 scroll latches. The generated tilemap places the 32x20 room
+        ; at row 4, centering the 160-line playfield within 224 visible lines.
+        stz     BG1HOFS
+        stz     BG1HOFS
+        stz     BG1VOFS
+        stz     BG1VOFS
+
+        ; Disable unused screens/windows/colour math before enabling BG1.
+        stz     TM
+        stz     TS
+        stz     TMW
+        stz     TSW
+        stz     CGWSEL
+        stz     CGADSUB
+        stz     SETINI
+
+        jsr     room00_upload
 
         lda     #$01
-        sta     BGMODE           ; Mode 1 target for the real port
-        stz     BG1SC
-        stz     BG12NBA
-        stz     TM               ; backdrop only during S0 bring-up
-
-        ; Visible non-black backdrop proves reset/PPU/header/vector bring-up.
-        ; CGRAM is BGR555; colour 0 becomes a dark blue.
-        stz     CGADD
-        stz     CGDATA
-        lda     #$20
-        sta     CGDATA
+        sta     TM               ; main screen: BG1 only
         rts
 
 NmiHandler:
@@ -87,6 +105,7 @@ DefaultInterrupt:
         rti
 
 .include "game_clock.asm"
+.include "room00.asm"
 
 .segment "HEADER"
         .byte   "MONTY SNES PARALLEL  " ; 21-byte internal title
@@ -101,8 +120,8 @@ DefaultInterrupt:
 .endif
         .byte   $00                     ; licensee (bring-up)
         .byte   $00                     ; version
-        .word   $FFFF                   ; checksum complement placeholder
-        .word   $0000                   ; checksum placeholder
+        .word   $FFFF                   ; patched after link
+        .word   $0000                   ; patched after link
 
 .segment "VECTORS"
         .word   $0000, $0000            ; $FFE0-$FFE3 reserved
