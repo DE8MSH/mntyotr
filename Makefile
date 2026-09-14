@@ -22,12 +22,12 @@ check-tools:
 # OK/MISSING/FAIL for geometry, topology, gems, enemies, specials and mechanisms.
 audit:
 	@mkdir -p build
-	python3 tools/playthrough_audit.py --json build/playthrough-audit.json --text build/playthrough-audit.txt
+	python3 tools/playthrough_audit_runner.py --json build/playthrough-audit.json --text build/playthrough-audit.txt
 
 # Completion gate: fail not only on wrong data but also on known missing content.
 audit-strict:
 	@mkdir -p build
-	python3 tools/playthrough_audit.py --strict --json build/playthrough-audit.json --text build/playthrough-audit.txt
+	python3 tools/playthrough_audit_runner.py --strict --json build/playthrough-audit.json --text build/playthrough-audit.txt
 
 $(ROM): $(SRC) src/platform.inc | check-tools
 	@mkdir -p build
