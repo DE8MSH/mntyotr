@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Static/data guards for the exact C64 Room $10-$1F block."""
+import re
 from pathlib import Path
 from rooms10_1f import RLE_HEX, ROOM_DEFS, room_data
 
@@ -24,8 +25,11 @@ def main():
     world = (ROOT / 'src/world.asm').read_text().lower()
     loader = (ROOT / 'src/room050c_loader.asm').read_text().lower()
     tail = (ROOT / 'src/room0f_assets_tail.asm').read_text().lower()
-    assert 'cmp     #$20' in world
-    assert 'room_ext_count = 23' in loader
+
+    # R10-R1F are still exact, but no longer the end of the supported world.
+    m = re.search(r'world_room_supported:\s*\n\s*cmp\s+#\$([0-9a-f]+)', world)
+    assert m and int(m.group(1), 16) == 0x34
+    assert 'room_ext_count = 43' in loader
     assert 'include "room10_1f_assets_tail.asm"' in tail
     for room in range(0x10, 0x20):
         p = f'room{room:02x}'
@@ -33,7 +37,7 @@ def main():
         assert f'{p}_screen_bat' in loader
         assert f'{p}_collision_map_rom' in loader
 
-    print('OK: exact Room10-1F geometry, patterns, collision and banked loader wiring')
+    print('OK: exact Room10-1F geometry/patterns/collision retained inside whole-game loader')
 
 
 if __name__ == '__main__':
