@@ -1,6 +1,14 @@
-; Banked collectible data for rooms $00-$1F.
-; Records are (room, target_x, target_y, BAT_lo, BAT_hi) and come from the
-; original C64 FreedomKit.Data.item_tbl positions.
+; Banked collectible data for rooms $00-$33.
+; Records are (room, target_x, target_y, BAT_lo, BAT_hi) and come directly from
+; the original C64 FreedomKit.Data.item_tbl positions.
+;
+; Conversion used for every record:
+;   target_x = $15 + 4*col
+;   target_y = $4c + 8*row
+;   BAT      = (row+3)*64 + (col+4)
+;
+; The original table contains 64 normal room collectibles. Rooms without a
+; record intentionally have no normal gem.
 
 .data
 gem_records:
@@ -54,6 +62,20 @@ gem_records:
         db $1e,$49,$9c,$51,$03
         db $1f,$3d,$cc,$ce,$04
         db $1f,$51,$bc,$53,$04
+        db $20,$35,$cc,$cc,$04
+        db $21,$7d,$dc,$5e,$05
+        db $22,$3d,$8c,$ce,$02
+        db $22,$41,$c4,$8f,$04
+        db $26,$3d,$bc,$4e,$04
+        db $27,$21,$bc,$47,$04
+        db $28,$85,$ac,$e0,$03
+        db $29,$49,$5c,$51,$01
+        db $2a,$39,$8c,$cd,$02
+        db $2a,$55,$9c,$54,$03
+        db $2c,$25,$64,$88,$01
+        db $2c,$75,$9c,$5c,$03
+        db $2d,$8d,$a4,$a2,$03
+        db $2e,$35,$ac,$cc,$03
 
 ; Original C64 font character $34 used by RoomEntitiesInit for room collectibles:
 ;   3c 42 df c7 fb fb 46 3c
