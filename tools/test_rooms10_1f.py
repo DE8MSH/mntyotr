@@ -23,10 +23,10 @@ def main():
 
     world = (ROOT / 'src/world.asm').read_text().lower()
     loader = (ROOT / 'src/room050c_loader.asm').read_text().lower()
-    main_asm = (ROOT / 'src/main.asm').read_text().lower()
+    tail = (ROOT / 'src/room0f_assets_tail.asm').read_text().lower()
     assert 'cmp     #$20' in world
     assert 'room_ext_count = 23' in loader
-    assert 'include "room10_1f_assets_tail.asm"' in main_asm
+    assert 'include "room10_1f_assets_tail.asm"' in tail
     for room in range(0x10, 0x20):
         p = f'room{room:02x}'
         assert f'{p}_patterns' in loader
