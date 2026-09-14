@@ -141,6 +141,7 @@ game_respawn_pending:   ds 1
         stz     <monty_saved_left
         stz     <monty_saved_right
         stz     <monty_climbing
+        stz     <monty_is_moving
         stz     <moving_lift_contains
         stz     <rising_bollard_active
         lda     #1
@@ -153,6 +154,19 @@ game_respawn_pending:   ds 1
 .proc game_life_reload
         call    room_load_pending_extended
         call    gem_draw_room
+        ; Death can happen on any animation tick. Reset the sprite sequencer to
+        ; a known walking frame instead of inheriting a half-finished timer/mode
+        ; from the fatal frame; otherwise repeated deaths can leave the walk
+        ; animation apparently frozen for a long wrapped timer interval.
+        stz     <monty_anim_frame
+        lda     #4
+        sta     <monty_anim_timer
+        lda     #$ff
+        sta     <monty_sprite_last_facing
+        sta     <monty_sprite_last_mode
+        lda     #1
+        sta     <monty_sprite_dirty
+        call    monty_upload_walk_frame
         ; C64 room reload reruns every room-scoped setup routine, including the
         ; complete four-slot enemy SetupRoom pass. Invalidate all helper caches.
         lda     #$ff
