@@ -48,6 +48,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room050c.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0a0b.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0f.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_rooms10_1f.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
@@ -100,6 +101,7 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0c.py" --map "$BUILD/room0c-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-map.dat" --screen-bat "$BUILD/room0d-screen-bat.dat" --patterns "$BUILD/room0d-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-map.dat" --screen-bat "$BUILD/room0f-screen-bat.dat" --patterns "$BUILD/room0f-patterns.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f.py" --out-dir "$BUILD" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
@@ -120,6 +122,7 @@ python3 "$ROOT/tools/enemy_room00.py" \
   --hand "$BUILD/enemy-type1b-hand.dat" \
   --tank "$BUILD/enemy-type1c-tank.dat" \
   --jelly-fish "$BUILD/enemy-type1d-jelly-fish.dat" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room10_1f.py" --out-dir "$BUILD" >/dev/null
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
