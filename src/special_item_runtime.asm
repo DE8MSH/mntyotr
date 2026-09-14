@@ -1,6 +1,6 @@
 ; Authentic C64 special items for supported rooms $00-$0F.
 ; Normal play: R02 first aid, R04 milk, R08 teddy, R09/R0A/R0D cupcake,
-; R0B smoke stack. R01 cake remains cheat-mode-only and is not spawned.
+; R0B smoke stack. R01 secret cake #19 is gated by the original cheat state.
 
         include "room0b_decor_loader.asm"
         include "enemy_room0b_runtime.asm"
@@ -39,6 +39,10 @@ special_item_player_x: ds 1
 .changed:
         sta special_item_last_room
         stz special_item_active
+        cmp #$01
+        bne .not01
+        jmp .room01
+.not01:
         cmp #$02
         bne .not02
         jmp .room02
@@ -68,6 +72,20 @@ special_item_player_x: ds 1
         jmp .room0d
 .none:
         leave
+.room01:
+        ; SpecialItems.Data.si_spawn_tbl #19: room $01, X=$6A, Y=$D2,
+        ; frame base $31 (VIC pointer $BF). It exists only after the name trigger.
+        lda <cheat_mode
+        beq .none
+        lda #19
+        sta special_item_index
+        lda #10
+        sta special_item_asset
+        lda #$6a
+        sta special_item_x
+        lda #$d2
+        sta special_item_y
+        jmp .activate
 .room02:
         lda #11
         sta special_item_index
@@ -186,6 +204,21 @@ special_item_player_x: ds 1
         lda #$81
         sta special_item_collected,x
         stz special_item_active
+
+        ; Original secret cake: collecting SI #19 sets bit 7 in cheat_mode and
+        ; returns without the normal +200/item effects. Refresh both dynamic
+        ; piledriver charsets immediately so the Easter-egg glyph is visible.
+        lda special_item_index
+        cmp #19
+        bne .normal_collect
+        lda <cheat_mode
+        ora #$81
+        sta <cheat_mode
+        call piledriver_static_upload_set0
+        call piledriver_static_upload_set1
+        leave
+
+.normal_collect:
         ; Original SI score award: +200.
         lda #2
         ldy #2
@@ -220,8 +253,12 @@ special_item_player_x: ds 1
         jmp .teddy
 .not_teddy:
         cmp #3
-        bne .smoke
+        bne .not_cupcake
         jmp .cupcake
+.not_cupcake:
+        cmp #10
+        bne .smoke
+        jmp .cake
 .smoke:
         lda #<special_item_smoke_plane0
         sta <_bp
@@ -256,6 +293,13 @@ special_item_player_x: ds 1
         lda #>special_item_cupcake_plane0
         sta <_bp+1
         ldy #BANK(special_item_cupcake_plane0)
+        jmp .mapped
+.cake:
+        lda #<special_item_cake_plane0
+        sta <_bp
+        lda #>special_item_cake_plane0
+        sta <_bp+1
+        ldy #BANK(special_item_cake_plane0)
 .mapped:
         call map_bp_to_mpr34
         lda #<SPECIAL_ITEM_VRAM
@@ -293,3 +337,5 @@ special_item_player_x: ds 1
         plp
         leave
 .endp
+
+        include "easter_egg_assets_tail.asm"
