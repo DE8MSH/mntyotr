@@ -25,9 +25,9 @@ def main():
     assert 'db$2d,$2c,$27,$26,$33,$32,$31,$25,$24,$20,$21,$ff,$ff,$ff,$ff,$ff,$05,$04,$03,$02,$01,$00,$ff' in compact
     assert 'db$2b,$2a,$28,$29,$ff,$ff,$ff,$ff,$ff,$1f,$ff,$ff,$1b,$ff,$ff,$0f,$0c,$0d,$0e,$0b,$0a,$ff,$ff' in compact
     assert 'world_room_supported:' in world
-    assert 'cmp#$10' in compact
+    assert 'cmp#$34' in compact
 
-    print('OK: vertical exits require actual downward motion + contiguous exact $00-$0F routes')
+    print('OK: vertical exits require actual downward motion + full $00-$33 world support')
 
 
 if __name__ == '__main__':
