@@ -133,10 +133,12 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room10_1f.py" --out-dir "$BU
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room20_33.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_medusa.py" --write "$BUILD/enemy-type1e-medusa.dat" >/dev/null
 
-# Generated-asset parity gate before assembly: use the same complete detector as
-# CI/source audit, but add generated-file checks through --build-dir.
+# Keep source-truth parity and generated-file integrity separate. The source
+# auditor knows the original game; the generated gate knows build payload sizes
+# including rooms such as R0A whose decor is appended to the base pattern file.
 echo "Running generated-asset parity gate..."
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_complete.py" --build-dir "$BUILD" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_generated_whole_game_assets.py" "$BUILD"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_complete.py" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
 
 echo "Assembling ROM..."
 cd "$BUILD"
