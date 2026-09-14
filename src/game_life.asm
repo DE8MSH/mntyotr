@@ -5,10 +5,20 @@
 ; sequence are still pending, but hazards, lift squash and enemies now share the
 ; correct gameplay consequence instead of leaving Monty in a softlocked state.
 
-        ; Room-scoped seed shims reuse the shared enemy movement/SAT/collision engine.
+        ; Room-scoped seed shims/table runtimes reuse the shared enemy movement,
+        ; SAT and collision engine. Together these cover all original room IDs.
         include "enemy_room07_runtime.asm"
         include "enemy_room0608_runtime.asm"
+        include "enemy_room09_0e_runtime.asm"
         include "enemy_room10_1f_runtime.asm"
+        include "enemy_room20_33_runtime.asm"
+
+        ; Late-game content is kept in small source-derived helpers so the
+        ; proven early-room runtimes remain stable.
+        include "special_item_late_runtime.asm"
+        include "piledriver_late_runtime.asm"
+        include "teleporter_runtime.asm"
+        include "scripted_transition_runtime.asm"
 
 .zp
 game_lives:             ds 1
@@ -28,6 +38,9 @@ game_life_init:
         stz     <game_respawn_pending
         call    enemy_room10_1f_palette_init
         call    gem_init
+        call    piledriver_late_init
+        call    teleporter_init
+        call    scripted_transition_init
         jmp     game_life_room_sync
 
 ; Call after a successful room load / at cold start. The transition code has
@@ -35,11 +48,16 @@ game_life_init:
 ; position to which a life loss in that room should return.
 game_life_room_sync:
         ; enemy_smiley_room_sync runs immediately before this routine in the
-        ; main loop. It clears unsupported legacy slots first; the room-specific
-        ; seed passes then rebuild exact original C64 records in the shared slots.
+        ; main loop. It clears unsupported legacy slots first; room-specific
+        ; seed/table passes then rebuild the exact original C64 records.
         call    enemy_room0608_room_sync
         call    enemy_room07_room_sync
+        call    enemy_room09_0e_room_sync
         call    enemy_room10_1f_room_sync
+        call    enemy_room20_33_room_sync
+        call    special_item_late_room_sync
+        call    piledriver_late_room_sync
+        call    teleporter_room_sync
         lda     <monty_room
         cmp     <game_life_last_room
         bne     .new_room
@@ -116,16 +134,19 @@ game_life_reload:
         call    room_load_pending_extended
         call    gem_draw_room
         ; C64 room reload reruns every room-scoped setup routine, including the
-        ; complete four-slot enemy SetupRoom pass. Room $0B additionally seeds
-        ; its enemies/decor from special_item_room_sync, so invalidate that
-        ; cache too before the ordinary post-reload sync sequence runs.
+        ; complete four-slot enemy SetupRoom pass. Invalidate all helper caches.
         lda     #$ff
         sta     <rising_cloud_last_room
         sta     <rising_bollard_last_room
         sta     <moving_lift_last_room
         sta     enemy_smiley_last_room
+        sta     enemy_room09_0e_last_room
         sta     enemy_room10_1f_last_room
+        sta     enemy_room20_33_last_room
         sta     special_item_last_room
+        sta     special_item_late_last_room
+        sta     late_pile_last_room
+        sta     teleporter_last_room
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
