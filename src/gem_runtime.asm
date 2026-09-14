@@ -1,4 +1,4 @@
-; Authentic C64 room collectibles for the currently supported $00-$0F block.
+; Authentic C64 room collectibles for the currently supported $00-$1F block.
 ; The original RoomEntitiesInit draws char $34 for these records and CollectCoin
 ; permanently marks a touched record collected while awarding 50 points.
 ;
@@ -8,7 +8,7 @@
 ;   target_y = $4c + 8*row
 ;   BAT      = (row+3)*64 + (col+4)
 
-GEM_RECORD_COUNT = 20
+GEM_RECORD_COUNT = 50
 ; Current room/decor graphics use CHR_GAME+0..+65. Dynamic piledriver graphics
 ; start at CHR_GAME+96, so +80 is a stable dedicated slot for collectibles.
 GEM_CHR          = CHR_GAME + 80
