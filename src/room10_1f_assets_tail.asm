@@ -159,3 +159,6 @@ room1f_tile_properties_rom:
         incbin "room1f-properties.dat"
 room1f_screen_bat:
         incbin "room1f-screen-bat.dat"
+
+; Continue with the remaining original room block, including completion/C5 rooms.
+include "room20_33_assets_tail.asm"
