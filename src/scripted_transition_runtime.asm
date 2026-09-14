@@ -1,24 +1,28 @@
 ; Scripted non-grid room transitions from the original C64 game.
 ; - R2F treasure at ($40,$9A), enabled by Jerry Can item #8, enters R30.
 ; - R33 C5 return at exact Monty position ($14,$CA) returns to R26 at ($9C,$5C).
+;
+; Keep both entry points as procedures.  With --newproc pceas can relocate these
+; helpers instead of letting late-game code consume/wrap the fixed HOME window.
 
 .bss
 scripted_transition_pending: ds 1
 scripted_transition_tmp: ds 1
 
 .code
-scripted_transition_init:
+.proc scripted_transition_init
         stz scripted_transition_pending
-        rts
+        leave
+.endp
 
-scripted_transition_update:
+.proc scripted_transition_update
         stz scripted_transition_pending
         lda <monty_room
         cmp #$2f
         beq .room2f
         cmp #$33
         beq .room33
-        rts
+        leave
 
 .room2f:
         ; Original Enemies.PlaceTreasure only enables the treasure after Jerry
@@ -61,7 +65,7 @@ scripted_transition_update:
         stz <monty_jump_index
         lda #1
         sta scripted_transition_pending
-        rts
+        leave
 
 .room33:
         ; Exact C5CheckReturnTeleport trigger and destination.
@@ -89,4 +93,5 @@ scripted_transition_update:
         lda #1
         sta scripted_transition_pending
 .done:
-        rts
+        leave
+.endp
