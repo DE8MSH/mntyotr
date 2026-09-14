@@ -50,6 +50,8 @@ enemy_type1c_patterns:
         incbin "enemy-type1c-tank.dat"
 enemy_type1d_patterns:
         incbin "enemy-type1d-jelly-fish.dat"
+enemy_type1e_patterns:
+        incbin "enemy-type1e-medusa.dat"
 enemy_type1f_patterns:
         incbin "enemy-type1f-fish.dat"
 enemy_type20_patterns:
