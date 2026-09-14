@@ -109,3 +109,7 @@ room20_33_decor_index: ds 1
 .tail_words:
         db 32,64,64,32,96,64,64,80,96,48,96,64,48,16,96,16,48
 .endp
+
+; Extended rooms use compressed 36x20 BAT streams in ROM. Keep the depacker
+; next to the late-room loader so it is available before room050c_loader.asm.
+        include "room_bat_rle.asm"
