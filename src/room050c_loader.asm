@@ -2,6 +2,8 @@
 ; Bulk assets remain banked; this dispatch is --newproc-relocated so extending
 ; the descriptor tables no longer consumes precious Bank-0 gameplay code.
 
+        include "room10_1f_decor_loader.asm"
+
 .zp
 room_ext_index: ds 1
 
@@ -37,6 +39,10 @@ room_ext_index: ds 1
         sta     <_bp+1
         ldy     room_ext_patterns_bank,x
         call    room_upload_9_patterns
+
+        ; Rooms $10-$1F with original Decor.room_list entries upload their
+        ; generated character payload after the common nine base patterns.
+        call    room10_1f_upload_decor
 
         ; Draw its exact 36x20 C64 playfield window.
         ldx     <room_ext_index
