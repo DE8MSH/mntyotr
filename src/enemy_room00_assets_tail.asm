@@ -1,8 +1,11 @@
-; Authentic C64 enemy art used by Rooms $00-$08, converted by tools/enemy_room00.py.
-; Every payload is eight PCE frames (4096 bytes). C64 4-frame types are duplicated
-; into the opposite-direction frame group exactly like enemy_copy_flag does.
+; Authentic C64 enemy art used by Rooms $00-$1F, converted by tools/enemy_room00.py
+; and tools/enemy_room10_1f.py. Every payload is eight PCE frames (4096 bytes).
+; C64 4-frame types are duplicated into the opposite-direction frame group exactly
+; like enemy_copy_flag does.
 .data
 
+enemy_type08_patterns:
+        incbin "enemy-type08-boot.dat"
 enemy00_skate_patterns:
 enemy_type09_patterns:
         incbin "enemy-type09-skate.dat"
@@ -10,12 +13,18 @@ enemy_type0a_patterns:
         incbin "enemy-type0a-lamp.dat"
 enemy_type0b_patterns:
         incbin "enemy-type0b-knight.dat"
+enemy_type0c_patterns:
+        incbin "enemy-type0c-ufo.dat"
 enemy_type0e_patterns:
         incbin "enemy-type0e-clock.dat"
 enemy_type0f_patterns:
         incbin "enemy-type0f-big-nose.dat"
+enemy_type10_patterns:
+        incbin "enemy-type10-king.dat"
 enemy_type11_patterns:
         incbin "enemy-type11-rubik.dat"
+enemy_type12_patterns:
+        incbin "enemy-type12-sad-mug.dat"
 enemy_type13_patterns:
         incbin "enemy-type13-pi-pie.dat"
 enemy_type14_patterns:
@@ -24,11 +33,15 @@ enemy_type15_patterns:
         incbin "enemy-type15-bubble.dat"
 enemy_type16_patterns:
         incbin "enemy-type16-sad-ghost.dat"
+enemy_type17_patterns:
+        incbin "enemy-type17-alien.dat"
 enemy_type18_patterns:
         incbin "enemy-type18-kettle.dat"
 enemy00_smiley_patterns:
 enemy_type19_patterns:
         incbin "enemy-type19-smiley.dat"
+enemy_type1a_patterns:
+        incbin "enemy-type1a-cone.dat"
 enemy_type1b_patterns:
         incbin "enemy-type1b-hand.dat"
 enemy_type1c_patterns:
