@@ -1,14 +1,14 @@
-; Authentic C64 room collectibles for the currently supported $00-$1F block.
+; Authentic C64 room collectibles for the complete $00-$33 room set.
 ; The original RoomEntitiesInit draws char $34 for these records and CollectCoin
 ; permanently marks a touched record collected while awarding 50 points.
 ;
-; PCE rendering uses one dedicated 8x8 BG tile.  The coordinates below are
-; precomputed from FreedomKit.Data.item_tbl:
+; PCE rendering uses one dedicated 8x8 BG tile. Coordinates are precomputed
+; directly from FreedomKit.Data.item_tbl:
 ;   target_x = $15 + 4*col
 ;   target_y = $4c + 8*row
 ;   BAT      = (row+3)*64 + (col+4)
 
-GEM_RECORD_COUNT = 50
+GEM_RECORD_COUNT = 64
 ; Current room/decor graphics use CHR_GAME+0..+65. Dynamic piledriver graphics
 ; start at CHR_GAME+96, so +80 is a stable dedicated slot for collectibles.
 GEM_CHR          = CHR_GAME + 80
