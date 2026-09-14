@@ -20,6 +20,15 @@ BASE_PATTERN_SIZE = 9 * 32
 # same file; room0a_assets_tail.asm incbins 288 + 768 bytes from this payload.
 ROOM_PATTERN_SIZES = {0x0A: (9 + 24) * 32}
 
+# Exact unique Decor character counts for every generated source-derived decor
+# payload.  Multiple placements of one type share the same uploaded glyphs.
+DECOR_CHARS = {
+    0x10:23, 0x11:48, 0x12:33, 0x13:6, 0x1D:51, 0x1E:26, 0x1F:56,
+    0x20:34, 0x21:4, 0x22:4, 0x23:50, 0x24:22, 0x25:36, 0x26:44,
+    0x27:45, 0x28:22, 0x29:59, 0x2B:30, 0x2D:36, 0x2E:35, 0x30:9,
+    0x31:54, 0x32:49, 0x33:51,
+}
+
 
 def require_size(path: Path, expected: int) -> None:
     if not path.exists():
@@ -51,18 +60,23 @@ def main() -> None:
     for filename in enemy_files:
         require_size(build / filename, 4096)
 
-    # Exact R10-R1F decor payloads currently emitted by the source-derived decor
-    # generator. Sizes are characters * 32 bytes.
-    decor_sizes = {
-        0x10: 736, 0x11: 1536, 0x12: 1056, 0x13: 192,
-        0x1D: 1632, 0x1E: 832, 0x1F: 1792,
-    }
-    for room, expected in decor_sizes.items():
-        require_size(build / f"room{room:02x}-decor-patterns.dat", expected)
+    for room, chars in DECOR_CHARS.items():
+        require_size(build / f"room{room:02x}-decor-patterns.dat", chars * 32)
+
+    # $2A/$2C/$2F really have no Decor.room_list entries. Their lack of a decor
+    # payload is source truth, not an omitted build artifact.
+    for room in (0x2A, 0x2C, 0x2F):
+        path = build / f"room{room:02x}-decor-patterns.dat"
+        if path.exists():
+            raise AssertionError(f"unexpected decor payload for R{room:02X}")
+
+    late_loader = (args.src_dir / "room20_33_decor_loader.asm").read_text(errors="replace")
+    for needle in ("$20,$21,$22,$23", "$2b,$2d,$2e,$30,$31,$32,$33", "room33_decor_patterns"):
+        assert needle in late_loader, needle
 
     print(
         f"OK: generated payloads for 52 rooms, {len(enemy_files)} enemy banks, "
-        f"and {len(decor_sizes)} late decor rooms"
+        f"and {len(DECOR_CHARS)} source-derived decor rooms"
     )
 
 
