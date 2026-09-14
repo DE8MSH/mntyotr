@@ -27,7 +27,19 @@ def main():
     assert 'world_room_supported:' in world
     assert 'cmp#$34' in compact
 
-    print('OK: vertical exits require actual downward motion + full $00-$33 world support')
+    # A successful world transition must commit the destination first and then
+    # force the opposite-edge spawn. This keeps R00 -> R01 from inheriting a
+    # stale edge coordinate and immediately resolving back into R00.
+    valid = world.split('.valid:', 1)[1].split('.blocked_left:', 1)[0]
+    assert 'sta     <world_pending_room' in valid
+    assert 'lda     <monty_room_exit' in valid
+    assert 'lda     #$9b' in valid and 'sta     <monty_x' in valid
+    assert 'lda     #$15' in valid and 'sta     <monty_x' in valid
+    assert 'lda     #$da' in valid and 'sta     <monty_y' in valid
+    assert 'lda     #$4c' in valid and 'sta     <monty_y' in valid
+    assert 'stz     <monty_is_moving' in valid
+
+    print('OK: vertical exits + atomic opposite-edge room-entry spawn through $00-$33')
 
 
 if __name__ == '__main__':
