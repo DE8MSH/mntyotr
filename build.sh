@@ -83,6 +83,7 @@ out.write_bytes(data)
 print(f'ROM commit overlay: {text}')
 PY
 
+echo "Generating room assets..."
 python3 "$ROOT/tools/room_rle.py" --write "$BUILD/room00-map.dat" --bat "$BUILD/room00-bat.dat" --screen-bat "$BUILD/room00-screen-bat.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room00_decor.py" --screen-bat "$BUILD/room00-screen-bat.dat" --patterns "$BUILD/room00-decor-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room01.py" --map "$BUILD/room01-map.dat" --screen-bat "$BUILD/room01-screen-bat.dat" --patterns "$BUILD/room01-patterns.dat" >/dev/null
@@ -106,6 +107,8 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f_decor.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33.py" --out-dir "$BUILD" >/dev/null
+
+echo "Generating player/enemy assets..."
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
@@ -130,10 +133,12 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room10_1f.py" --out-dir "$BU
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room20_33.py" --out-dir "$BUILD" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_medusa.py" --write "$BUILD/enemy-type1e-medusa.dat" >/dev/null
 
-# Generated-asset parity gate before assembly: catches missing room/enemy payloads,
-# bad gem placement and source wiring without requiring an emulator playthrough.
-PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_runner.py" --build-dir "$BUILD" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
+# Generated-asset parity gate before assembly: use the same complete detector as
+# CI/source audit, but add generated-file checks through --build-dir.
+echo "Running generated-asset parity gate..."
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_complete.py" --build-dir "$BUILD" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
 
+echo "Assembling ROM..."
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
