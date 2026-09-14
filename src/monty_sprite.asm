@@ -41,18 +41,18 @@ monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
  tax
  lda <monty_facing
  bmi .left
- lda .walk_r_lo,x
+ lda monty_walk_r_lo,x
  sta <_bp
- lda .walk_r_hi,x
+ lda monty_walk_r_hi,x
  sta <_bp+1
- ldy .walk_r_bank,x
+ ldy monty_walk_r_bank,x
  bra .upload
 .left:
- lda .walk_l_lo,x
+ lda monty_walk_l_lo,x
  sta <_bp
- lda .walk_l_hi,x
+ lda monty_walk_l_hi,x
  sta <_bp+1
- ldy .walk_l_bank,x
+ ldy monty_walk_l_bank,x
 .upload:
  call monty_upload_far_512
  stz <monty_sprite_dirty
@@ -60,42 +60,22 @@ monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
  sta <monty_sprite_last_facing
  stz <monty_sprite_last_mode
  leave
-
-.walk_l_lo:
- db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
-.walk_l_hi:
- db >monty_walk_l_0,>monty_walk_l_1,>monty_walk_l_2,>monty_walk_l_3
-.walk_l_bank:
- db BANK(monty_walk_l_0),BANK(monty_walk_l_1),BANK(monty_walk_l_2),BANK(monty_walk_l_3)
-.walk_r_lo:
- db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
-.walk_r_hi:
- db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
-.walk_r_bank:
- db BANK(monty_walk_r_0),BANK(monty_walk_r_1),BANK(monty_walk_r_2),BANK(monty_walk_r_3)
 .endp
 
 .proc monty_upload_climb_frame
  lda <monty_anim_frame
  and #3
  tax
- lda .climb_lo,x
+ lda monty_climb_lo,x
  sta <_bp
- lda .climb_hi,x
+ lda monty_climb_hi,x
  sta <_bp+1
- ldy .climb_bank,x
+ ldy monty_climb_bank,x
  call monty_upload_far_512
  stz <monty_sprite_dirty
  lda #1
  sta <monty_sprite_last_mode
  leave
-
-.climb_lo:
- db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
-.climb_hi:
- db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
-.climb_bank:
- db BANK(monty_climb_0),BANK(monty_climb_1),BANK(monty_climb_2),BANK(monty_climb_3)
 .endp
 
 .proc monty_upload_jump_frame
@@ -107,18 +87,18 @@ monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
  tax
  lda <monty_facing
  bmi .left
- lda .sault_r_lo,x
+ lda monty_sault_r_lo,x
  sta <_bp
- lda .sault_r_hi,x
+ lda monty_sault_r_hi,x
  sta <_bp+1
- ldy .sault_r_bank,x
+ ldy monty_sault_r_bank,x
  bra .upload
 .left:
- lda .sault_l_lo,x
+ lda monty_sault_l_lo,x
  sta <_bp
- lda .sault_l_hi,x
+ lda monty_sault_l_hi,x
  sta <_bp+1
- ldy .sault_l_bank,x
+ ldy monty_sault_l_bank,x
 .upload:
  call monty_upload_far_512
  stz <monty_sprite_dirty
@@ -127,31 +107,6 @@ monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
  lda #2
  sta <monty_sprite_last_mode
  leave
-
-.sault_l_lo:
- db <monty_sault_l_0,<monty_sault_l_1,<monty_sault_l_2,<monty_sault_l_3
- db <monty_sault_l_4,<monty_sault_l_5,<monty_sault_l_6,<monty_sault_l_7
- db <monty_sault_l_8,<monty_sault_l_9,<monty_sault_l_10,<monty_sault_l_11
-.sault_l_hi:
- db >monty_sault_l_0,>monty_sault_l_1,>monty_sault_l_2,>monty_sault_l_3
- db >monty_sault_l_4,>monty_sault_l_5,>monty_sault_l_6,>monty_sault_l_7
- db >monty_sault_l_8,>monty_sault_l_9,>monty_sault_l_10,>monty_sault_l_11
-.sault_l_bank:
- db BANK(monty_sault_l_0),BANK(monty_sault_l_1),BANK(monty_sault_l_2),BANK(monty_sault_l_3)
- db BANK(monty_sault_l_4),BANK(monty_sault_l_5),BANK(monty_sault_l_6),BANK(monty_sault_l_7)
- db BANK(monty_sault_l_8),BANK(monty_sault_l_9),BANK(monty_sault_l_10),BANK(monty_sault_l_11)
-.sault_r_lo:
- db <monty_sault_r_0,<monty_sault_r_1,<monty_sault_r_2,<monty_sault_r_3
- db <monty_sault_r_4,<monty_sault_r_5,<monty_sault_r_6,<monty_sault_r_7
- db <monty_sault_r_8,<monty_sault_r_9,<monty_sault_r_10,<monty_sault_r_11
-.sault_r_hi:
- db >monty_sault_r_0,>monty_sault_r_1,>monty_sault_r_2,>monty_sault_r_3
- db >monty_sault_r_4,>monty_sault_r_5,>monty_sault_r_6,>monty_sault_r_7
- db >monty_sault_r_8,>monty_sault_r_9,>monty_sault_r_10,>monty_sault_r_11
-.sault_r_bank:
- db BANK(monty_sault_r_0),BANK(monty_sault_r_1),BANK(monty_sault_r_2),BANK(monty_sault_r_3)
- db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
- db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
 .endp
 
 ; Copy one 512-byte PCE sprite frame from arbitrary banked ROM to VRAM.
@@ -327,6 +282,54 @@ monty_sprite_last_mode: ds 1       ; 0=walk, 1=climb, 2=jump/somersault
  st2 #>SAT_ADDR
  leave
 .endp
+
+; These compact far-pointer tables intentionally remain in fixed HOME code.
+; Both the banked Monty upload procs and the separately banked exact enemy
+; collision proc need to read them without first remapping MPR3/MPR4. Keeping
+; only 108 bytes of selectors fixed is cheap; the large sprite runtime remains
+; relocatable across the normal PCE ROM banks.
+monty_walk_l_lo:
+ db <monty_walk_l_0,<monty_walk_l_1,<monty_walk_l_2,<monty_walk_l_3
+monty_walk_l_hi:
+ db >monty_walk_l_0,>monty_walk_l_1,>monty_walk_l_2,>monty_walk_l_3
+monty_walk_l_bank:
+ db BANK(monty_walk_l_0),BANK(monty_walk_l_1),BANK(monty_walk_l_2),BANK(monty_walk_l_3)
+monty_walk_r_lo:
+ db <monty_walk_r_0,<monty_walk_r_1,<monty_walk_r_2,<monty_walk_r_3
+monty_walk_r_hi:
+ db >monty_walk_r_0,>monty_walk_r_1,>monty_walk_r_2,>monty_walk_r_3
+monty_walk_r_bank:
+ db BANK(monty_walk_r_0),BANK(monty_walk_r_1),BANK(monty_walk_r_2),BANK(monty_walk_r_3)
+monty_climb_lo:
+ db <monty_climb_0,<monty_climb_1,<monty_climb_2,<monty_climb_3
+monty_climb_hi:
+ db >monty_climb_0,>monty_climb_1,>monty_climb_2,>monty_climb_3
+monty_climb_bank:
+ db BANK(monty_climb_0),BANK(monty_climb_1),BANK(monty_climb_2),BANK(monty_climb_3)
+monty_sault_l_lo:
+ db <monty_sault_l_0,<monty_sault_l_1,<monty_sault_l_2,<monty_sault_l_3
+ db <monty_sault_l_4,<monty_sault_l_5,<monty_sault_l_6,<monty_sault_l_7
+ db <monty_sault_l_8,<monty_sault_l_9,<monty_sault_l_10,<monty_sault_l_11
+monty_sault_l_hi:
+ db >monty_sault_l_0,>monty_sault_l_1,>monty_sault_l_2,>monty_sault_l_3
+ db >monty_sault_l_4,>monty_sault_l_5,>monty_sault_l_6,>monty_sault_l_7
+ db >monty_sault_l_8,>monty_sault_l_9,>monty_sault_l_10,>monty_sault_l_11
+monty_sault_l_bank:
+ db BANK(monty_sault_l_0),BANK(monty_sault_l_1),BANK(monty_sault_l_2),BANK(monty_sault_l_3)
+ db BANK(monty_sault_l_4),BANK(monty_sault_l_5),BANK(monty_sault_l_6),BANK(monty_sault_l_7)
+ db BANK(monty_sault_l_8),BANK(monty_sault_l_9),BANK(monty_sault_l_10),BANK(monty_sault_l_11)
+monty_sault_r_lo:
+ db <monty_sault_r_0,<monty_sault_r_1,<monty_sault_r_2,<monty_sault_r_3
+ db <monty_sault_r_4,<monty_sault_r_5,<monty_sault_r_6,<monty_sault_r_7
+ db <monty_sault_r_8,<monty_sault_r_9,<monty_sault_r_10,<monty_sault_r_11
+monty_sault_r_hi:
+ db >monty_sault_r_0,>monty_sault_r_1,>monty_sault_r_2,>monty_sault_r_3
+ db >monty_sault_r_4,>monty_sault_r_5,>monty_sault_r_6,>monty_sault_r_7
+ db >monty_sault_r_8,>monty_sault_r_9,>monty_sault_r_10,>monty_sault_r_11
+monty_sault_r_bank:
+ db BANK(monty_sault_r_0),BANK(monty_sault_r_1),BANK(monty_sault_r_2),BANK(monty_sault_r_3)
+ db BANK(monty_sault_r_4),BANK(monty_sault_r_5),BANK(monty_sault_r_6),BANK(monty_sault_r_7)
+ db BANK(monty_sault_r_8),BANK(monty_sault_r_9),BANK(monty_sault_r_10),BANK(monty_sault_r_11)
 
 .data
 monty_sprite_palette:
