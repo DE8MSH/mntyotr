@@ -1,7 +1,7 @@
-; Authentic C64 enemy art used by Rooms $00-$1F, converted by tools/enemy_room00.py
-; and tools/enemy_room10_1f.py. Every payload is eight PCE frames (4096 bytes).
-; C64 4-frame types are duplicated into the opposite-direction frame group exactly
-; like enemy_copy_flag does.
+; Authentic C64 enemy art used by Rooms $00-$33, converted by tools/enemy_room00.py,
+; tools/enemy_room10_1f.py and tools/enemy_room20_33.py. Every payload is eight
+; PCE frames (4096 bytes). C64 4-frame types are duplicated into the opposite-
+; direction frame group exactly like enemy_copy_flag does.
 .data
 
 enemy_type08_patterns:
@@ -15,6 +15,8 @@ enemy_type0b_patterns:
         incbin "enemy-type0b-knight.dat"
 enemy_type0c_patterns:
         incbin "enemy-type0c-ufo.dat"
+enemy_type0d_patterns:
+        incbin "enemy-type0d-queen-liz.dat"
 enemy_type0e_patterns:
         incbin "enemy-type0e-clock.dat"
 enemy_type0f_patterns:
@@ -48,6 +50,14 @@ enemy_type1c_patterns:
         incbin "enemy-type1c-tank.dat"
 enemy_type1d_patterns:
         incbin "enemy-type1d-jelly-fish.dat"
+enemy_type1f_patterns:
+        incbin "enemy-type1f-fish.dat"
+enemy_type20_patterns:
+        incbin "enemy-type20-flying-banner-1.dat"
+enemy_type21_patterns:
+        incbin "enemy-type21-flying-banner-2.dat"
+enemy_type22_patterns:
+        incbin "enemy-type22-flying-banner-3.dat"
 
 ; PCE sprite palettes 19..25 -> SAT palette indices 3..9.
 ; Values use the same unified C64 -> PCE GGGRRRBBB quantization as room art.
