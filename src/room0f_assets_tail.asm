@@ -10,3 +10,6 @@ room0f_tile_properties_rom:
 
 room0f_screen_bat:
         incbin "room0f-screen-bat.dat"
+
+; Continue the banked room tail with the next contiguous 16-room block.
+include "room10_1f_assets_tail.asm"
