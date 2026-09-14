@@ -24,14 +24,23 @@ for needle in (
     assert needle in src, needle
 
 assert 'include "score_runtime.asm"' in main
-assert "call    score_init" in main
 assert main.index('include "score_runtime.asm"') < main.index("bare_main:")
-assert main.index("call    score_init") < main.index("main_loop:")
+
+# Startup is now deliberately tiny in HOME: bare_main calls a relocatable init
+# procedure before entering main_loop. Guard the semantic ordering rather than
+# the old source-text ordering of score_init versus main_loop.
+assert "bare_main:\n        call    main_game_init\nmain_loop:" in main
+init_start = main.index(".proc main_game_init")
+init_end = main.index(".endp", init_start)
+init_body = main[init_start:init_end]
+assert "call    score_init" in init_body
 
 # Score integration must not delete the local video timing helper used by startup.
-assert "call    init_c64_video" in main
-assert "init_c64_video:" in main
-assert main.index("init_c64_video:") > main.index("main_loop:")
+assert "call    init_c64_video" in init_body
+assert ".proc init_c64_video" in main
+video_start = main.index(".proc init_c64_video")
+video_end = main.index(".endp", video_start)
+video_body = main[video_start:video_end]
 for needle in (
     "st0     #$0a",
     "st1     #<VDC_HSR_320",
@@ -40,7 +49,7 @@ for needle in (
     "st1     #<VDC_HDR_320",
     "st2     #>VDC_HDR_320",
 ):
-    assert needle in main, needle
+    assert needle in video_body, needle
 
 # Five display-ready ASCII digits, exactly as original $0294-$0298.
 digits = [0x30] * 5
@@ -67,4 +76,4 @@ assert bytes(digits) == b"00250"
 increase(8, 3)          # +80 -> 00330
 assert bytes(digits) == b"00330"
 
-print("OK: authentic five-ASCII-digit C64 score arithmetic + startup/video init")
+print("OK: authentic five-ASCII-digit C64 score arithmetic + relocated startup/video init")
