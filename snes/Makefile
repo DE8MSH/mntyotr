@@ -4,6 +4,8 @@ PYTHON ?= python3
 REGION ?= pal
 
 BUILD := build
+ASSET_DIR := $(BUILD)/assets
+ASSET_STAMP := $(ASSET_DIR)/.room00.stamp
 OBJ := $(BUILD)/main.o
 ROM := $(BUILD)/monty.sfc
 MAP := $(BUILD)/monty.map
@@ -17,13 +19,14 @@ else
 $(error REGION must be pal or ntsc)
 endif
 
-.PHONY: all clean guard guard-strict check-tools
+.PHONY: all assets clean guard guard-strict check-tools smoke
 
 all: guard check-tools $(ROM)
 
 check-tools:
-	@command -v $(CA65) >/dev/null || { echo "ca65 not found (install cc65)"; exit 1; }
-	@command -v $(LD65) >/dev/null || { echo "ld65 not found (install cc65)"; exit 1; }
+	@command -v $(CA65) >/dev/null || { echo "ca65 not found; run ./install.sh"; exit 1; }
+	@command -v $(LD65) >/dev/null || { echo "ld65 not found; run ./install.sh"; exit 1; }
+	@command -v $(PYTHON) >/dev/null || { echo "python3 not found; run ./install.sh"; exit 1; }
 
 guard:
 	@$(PYTHON) tools/check_isolation.py
@@ -34,13 +37,27 @@ guard-strict:
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(OBJ): src/main.asm src/hardware.inc src/game_clock.asm | $(BUILD)
-	$(CA65) --cpu 65816 -I src $(REGION_DEFS) -g -o $@ $<
+$(ASSET_DIR): | $(BUILD)
+	@mkdir -p $(ASSET_DIR)
 
-$(ROM): $(OBJ) lorom.cfg
+$(ASSET_STAMP): tools/room00_assets.py | $(ASSET_DIR)
+	$(PYTHON) tools/room00_assets.py --out-dir $(ASSET_DIR)
+	@touch $@
+
+assets: $(ASSET_STAMP)
+
+$(OBJ): src/main.asm src/hardware.inc src/game_clock.asm src/room00.asm $(ASSET_STAMP) | $(BUILD)
+	$(CA65) --cpu 65816 -I src -I $(ASSET_DIR) $(REGION_DEFS) -g -o $@ $<
+
+$(ROM): $(OBJ) lorom.cfg tools/fix_checksum.py tools/test_rom.py
 	$(LD65) -C lorom.cfg -m $(MAP) -Ln $(DBG) -o $@ $(OBJ)
 	@test "$$(stat -c%s "$@")" -eq 32768 || { echo "unexpected ROM size"; exit 1; }
+	$(PYTHON) tools/fix_checksum.py $@
+	$(PYTHON) tools/test_rom.py $@
 	@echo "Built $(ROM) ($(REGION))"
+
+smoke: $(ROM)
+	@$(PYTHON) tools/test_rom.py $(ROM)
 
 clean:
 	rm -rf $(BUILD)
