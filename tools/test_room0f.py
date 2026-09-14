@@ -13,6 +13,7 @@ loader = (ROOT / "src/room050c_loader.asm").read_text()
 warp = (ROOT / "src/debug_room_warp.asm").read_text()
 world = (ROOT / "src/world.asm").read_text()
 enemies = (ROOT / "src/enemy_room0608_runtime.asm").read_text()
+shared_enemy_palettes = (ROOT / "src/enemy_room10_1f_runtime.asm").read_text()
 main = (ROOT / "src/main.asm").read_text()
 
 cells = decode_room(ROOM0F_RLE)
@@ -54,9 +55,9 @@ for needle in (
     "db $20,$62,$0e,$0f,$02,$9c,$00,$01",
     "db $06,$03,$0a,$09",
     "enemy_palette_light_red",
-    "C64 $0A -> $0eb",
 ):
     assert needle in enemies, needle
+assert "C64 $0A -> $0eb" in shared_enemy_palettes
 assert "call    enemy_room0f_palette_init" in main
 assert 'include "room0f_assets_tail.asm"' in main
 
