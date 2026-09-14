@@ -30,15 +30,25 @@ piledriver_late_room_sync:
 .changed:
         sta late_pile_last_room
         cmp #$06
-        beq .r06
+        bne .not_r06
+        jmp .r06
+.not_r06:
         cmp #$13
-        beq .r13
+        bne .not_r13
+        jmp .r13
+.not_r13:
         cmp #$19
-        beq .r19
+        bne .not_r19
+        jmp .r19
+.not_r19:
         cmp #$1b
-        beq .r1b
+        bne .not_r1b
+        jmp .r1b
+.not_r1b:
         cmp #$28
-        beq .r28
+        bne .no_room
+        jmp .r28
+.no_room:
         rts
 
 .reset:
