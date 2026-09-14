@@ -5,10 +5,10 @@
 ; sequence are still pending, but hazards, lift squash and enemies now share the
 ; correct gameplay consequence instead of leaving Monty in a softlocked state.
 
-        ; Rooms06-08 use small exact seed shims while the shared enemy engine
-        ; continues to own movement, SAT rendering and pixel collision.
+        ; Room-scoped seed shims reuse the shared enemy movement/SAT/collision engine.
         include "enemy_room07_runtime.asm"
         include "enemy_room0608_runtime.asm"
+        include "enemy_room10_1f_runtime.asm"
 
 .zp
 game_lives:             ds 1
@@ -26,6 +26,7 @@ game_life_init:
         lda     #$ff
         sta     <game_life_last_room
         stz     <game_respawn_pending
+        call    enemy_room10_1f_palette_init
         call    gem_init
         jmp     game_life_room_sync
 
@@ -34,10 +35,11 @@ game_life_init:
 ; position to which a life loss in that room should return.
 game_life_room_sync:
         ; enemy_smiley_room_sync runs immediately before this routine in the
-        ; main loop. It clears unsupported legacy slots on Rooms06-08 entry;
-        ; seed the exact C64 records before checking the life checkpoint.
+        ; main loop. It clears unsupported legacy slots first; the room-specific
+        ; seed passes then rebuild exact original C64 records in the shared slots.
         call    enemy_room0608_room_sync
         call    enemy_room07_room_sync
+        call    enemy_room10_1f_room_sync
         lda     <monty_room
         cmp     <game_life_last_room
         bne     .new_room
@@ -122,6 +124,7 @@ game_life_reload:
         sta     <rising_bollard_last_room
         sta     <moving_lift_last_room
         sta     enemy_smiley_last_room
+        sta     enemy_room10_1f_last_room
         sta     special_item_last_room
         call    rising_cloud_room_sync
         call    rising_bollard_room_sync
