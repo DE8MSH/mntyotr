@@ -5,6 +5,10 @@
 ; sequence are still pending, but hazards, lift squash and enemies now share the
 ; correct gameplay consequence instead of leaving Monty in a softlocked state.
 
+        ; Original hi-score Easter-egg state is shared by specials, piledrivers,
+        ; C5 and the ordinary death dispatcher.
+        include "easter_egg_runtime.asm"
+
         ; Room-scoped seed shims/table runtimes reuse the shared enemy movement,
         ; SAT and collision engine. Together these cover all original room IDs.
         include "enemy_room07_runtime.asm"
@@ -19,6 +23,7 @@
         include "piledriver_late_runtime.asm"
         include "teleporter_runtime.asm"
         include "scripted_transition_runtime.asm"
+        include "c5_cheat_runtime.asm"
 
 .zp
 game_lives:             ds 1
@@ -93,10 +98,19 @@ game_life_room_sync:
         clc
         leave
 .death:
+        ; Original cake cheat: bit 7 suppresses ordinary deaths. Completion and
+        ; non-death action values never enter this dispatcher, matching C64 flow.
+        lda     <cheat_mode
+        bmi     .cheat_survives
         stz     <monty_action_counter
         lda     <game_lives
         beq     .reload
         dec     <game_lives
+        bra     .reload
+.cheat_survives:
+        stz     <monty_action_counter
+        clc
+        leave
 
 .reload:
         ; Full GAME OVER presentation is a later subsystem. Keep the current
