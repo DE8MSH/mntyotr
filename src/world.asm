@@ -128,7 +128,35 @@ world_room_supported:
         bcc     .blocked_down
         inc     <world_map_row
 .valid:
+        ; Commit the destination before touching A again. Then install the exact
+        ; opposite-edge entry coordinate from the exit direction. The movement
+        ; code also clamps at the edge, but doing it here makes the transition
+        ; atomic and prevents a freshly loaded room from inheriting a stale edge
+        ; coordinate and immediately bouncing back to the previous room.
         sta     <world_pending_room
+        lda     <monty_room_exit
+        cmp     #1
+        bne     .entry_not_left
+        lda     #$9b
+        sta     <monty_x
+        bra     .entry_done
+.entry_not_left:
+        cmp     #2
+        bne     .entry_not_right
+        lda     #$15
+        sta     <monty_x
+        bra     .entry_done
+.entry_not_right:
+        cmp     #3
+        bne     .entry_down
+        lda     #$da
+        sta     <monty_y
+        bra     .entry_done
+.entry_down:
+        lda     #$4c
+        sta     <monty_y
+.entry_done:
+        stz     <monty_is_moving
         lda     #1
         sta     <world_transition_ready
         stz     <monty_room_exit
