@@ -17,7 +17,13 @@ jobs:
       - name: Whole-game source parity audit
         run: make audit
 
-      - name: Upload audit report
+      - name: Install HuC toolchain
+        run: ./install.sh
+
+      - name: Generate assets and assemble ROM
+        run: ./build.sh
+
+      - name: Upload audit and ROM
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -25,4 +31,7 @@ jobs:
           path: |
             build/playthrough-audit.txt
             build/playthrough-audit.json
+            build/monty.pce
+            build/monty.sym
+            build/monty.lst
           if-no-files-found: warn
