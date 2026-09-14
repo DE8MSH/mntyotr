@@ -1,5 +1,5 @@
 ; Remaining authentic standard Piledriver configs from Mechanisms.Data.config_tbl.
-; Early runtime already owns R01/R02/R0B. This helper activates R13/R19/R1B/R28
+; Early runtime already owns R01/R02/R0B. This helper activates R06/R13/R19/R1B/R28
 ; using the same dynamic VRAM renderer/state machine and adds exact CheckTiles
 ; collision for those rooms.
 
@@ -29,6 +29,8 @@ piledriver_late_room_sync:
         rts
 .changed:
         sta late_pile_last_room
+        cmp #$06
+        beq .r06
         cmp #$13
         beq .r13
         cmp #$19
@@ -68,6 +70,14 @@ piledriver_late_room_sync:
         call piledriver_static_draw
         jmp .reset
 
+.r06:
+        lda #$0d
+        sta late_pile_col0
+        lda #$06
+        sta late_pile_row0
+        lda #4
+        sta late_pile_h0
+        jmp .single_draw
 .r13:
         lda #$18
         sta late_pile_col0
@@ -131,6 +141,8 @@ piledriver_late_room_sync:
 ; then pd_sprite_y + position must reach Monty's Y.
 piledriver_late_collision_update:
         lda <monty_room
+        cmp #$06
+        beq .late_room
         cmp #$13
         beq .late_room
         cmp #$19
