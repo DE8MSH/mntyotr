@@ -296,8 +296,7 @@ enemy_room09_0e_last_room: ds 1
         db BANK(enemy_type14_patterns),BANK(enemy_type15_patterns),BANK(enemy_type16_patterns),BANK(enemy_type17_patterns)
         db BANK(enemy_type18_patterns),BANK(enemy_type19_patterns),BANK(enemy_type1a_patterns),BANK(enemy_type1b_patterns)
         db BANK(enemy_type1c_patterns),BANK(enemy_type1d_patterns),BANK(enemy_type1e_patterns),BANK(enemy_type1f_patterns)
-        db BANK(enemy_type20_patterns),BANK(enemy_type21_patterns),BANK(enemy_type22_patterns
-        )
+        db BANK(enemy_type20_patterns),BANK(enemy_type21_patterns),BANK(enemy_type22_patterns)
 
 enemy_room09_records:
         db $07,$60,$97,$02,$12,$01,$78
