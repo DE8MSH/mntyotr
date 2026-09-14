@@ -1,12 +1,28 @@
-; Minimal SNES CPU/PPU register definitions used by the isolated bring-up.
+; SNES CPU/PPU register definitions used by the isolated parallel port.
 
 INIDISP  = $2100
+OBJSEL   = $2101
 BGMODE   = $2105
+MOSAIC   = $2106
 BG1SC    = $2107
 BG12NBA  = $210B
+BG1HOFS  = $210D
+BG1VOFS  = $210E
+VMAIN    = $2115
+VMADDL   = $2116
+VMADDH   = $2117
+VMDATAL  = $2118
+VMDATAH  = $2119
 CGADD    = $2121
 CGDATA   = $2122
 TM       = $212C
+TS       = $212D
+TMW      = $212E
+TSW      = $212F
+CGWSEL   = $2130
+CGADSUB  = $2131
+COLDATA  = $2132
+SETINI   = $2133
 
 NMITIMEN = $4200
 MDMAEN   = $420B
