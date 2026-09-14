@@ -67,7 +67,16 @@ main_y_before_step:        ds 1
 
         .code
 
+; bare-startup jumps here in the fixed HOME window. Keep this bridge tiny; the
+; substantial init and per-frame code are .proc blocks so --newproc can place
+; them in available banks instead of wrapping MPR7 back into MPR0.
 bare_main:
+        call    main_game_init
+main_loop:
+        call    main_game_tick
+        jmp     main_loop
+
+.proc main_game_init
         call    init_352x224
         call    init_c64_video
         call    upload_room00_patterns
@@ -100,8 +109,10 @@ bare_main:
         call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
         call    set_dspon
+        leave
+.endp
 
-main_loop:
+.proc main_game_tick
         call    wait_vsync
         call    read_joypads
 
@@ -122,11 +133,11 @@ main_loop:
         call    enemy_smiley_update_satb
         call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
-        jmp     main_loop
+        leave
 .after_debug_room_warp:
 
         call    game_clock_step
-        bcc     main_loop
+        bcc     .done
         inc     game_tick_counter
 
         ; Preserve Y so the external bottom-edge helper only runs after actual
@@ -235,13 +246,16 @@ main_loop:
         call    enemy_smiley_update_satb
         call    special_item_update_satb
         call    rising_cloud_sprite_update_satb
-        jmp     main_loop
+.done:
+        leave
+.endp
 
-init_c64_video:
+.proc init_c64_video
         st0     #$0a
         st1     #<VDC_HSR_320
         st2     #>VDC_HSR_320
         st0     #$0b
         st1     #<VDC_HDR_320
         st2     #>VDC_HDR_320
-        rts
+        leave
+.endp
