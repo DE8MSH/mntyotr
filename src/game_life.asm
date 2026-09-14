@@ -35,7 +35,9 @@ game_respawn_pending:   ds 1
 
 .code
 
-game_life_init:
+; Public game-life entry points are procedures so --newproc can relocate them
+; instead of consuming the fixed HOME/MPR7 window as late-game systems grow.
+.proc game_life_init
         lda     #5                  ; C64 STARTING_LIVES
         sta     <game_lives
         lda     #$ff
@@ -46,12 +48,14 @@ game_life_init:
         call    piledriver_late_init
         call    teleporter_init
         call    scripted_transition_init
-        jmp     game_life_room_sync
+        call    game_life_room_sync
+        leave
+.endp
 
 ; Call after a successful room load / at cold start. The transition code has
 ; already installed the C64 edge spawn ($15/$9B/$4C/$DA), so this is the exact
 ; position to which a life loss in that room should return.
-game_life_room_sync:
+.proc game_life_room_sync
         ; enemy_smiley_room_sync runs immediately before this routine in the
         ; main loop. It clears unsupported legacy slots first; room-specific
         ; seed/table passes then rebuild the exact original C64 records.
@@ -66,7 +70,7 @@ game_life_room_sync:
         lda     <monty_room
         cmp     <game_life_last_room
         bne     .new_room
-        rts
+        leave
 .new_room:
         sta     <game_life_last_room
         sta     <game_checkpoint_room
@@ -74,7 +78,9 @@ game_life_room_sync:
         sta     <game_checkpoint_x
         lda     <monty_y
         sta     <game_checkpoint_y
-        jmp     gem_draw_room
+        call    gem_draw_room
+        leave
+.endp
 
 ; C=1 if a death was consumed and the caller must skip normal world resolution.
 ; This routine is --newproc-relocated so Bank 0 keeps enough thunk space for
@@ -144,7 +150,7 @@ game_life_room_sync:
 .endp
 
 ; Reload graphics/collision/mechanisms after game_life_check returns C=1.
-game_life_reload:
+.proc game_life_reload
         call    room_load_pending_extended
         call    gem_draw_room
         ; C64 room reload reruns every room-scoped setup routine, including the
@@ -165,4 +171,5 @@ game_life_reload:
         call    rising_bollard_room_sync
         call    moving_lift_room_sync
         stz     <game_respawn_pending
-        rts
+        leave
+.endp
