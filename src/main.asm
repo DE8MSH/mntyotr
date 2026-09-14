@@ -191,9 +191,12 @@ main_loop:
         call    rising_cloud_contact_update
         call    rising_cloud_update
         call    rising_bollard_update
+        call    piledriver_late_collision_update
         call    moving_lift_update
         call    enemy_smiley_update
         call    special_item_update
+        call    teleporter_update
+        call    scripted_transition_update
 
         ; Hazards/mechanisms now share the C64-style life-loss path. A consumed
         ; death reloads the same room at its saved entry point and skips topology.
@@ -202,6 +205,15 @@ main_loop:
         call    game_life_reload
         bra     .no_room_change
 .no_death:
+        ; Teleporters and completion/C5 paths are scripted, not normal edge exits.
+        lda     teleporter_transition_pending
+        ora     scripted_transition_pending
+        beq     .normal_world_exit
+        stz     teleporter_transition_pending
+        stz     scripted_transition_pending
+        call    room_load_pending_extended
+        bra     .no_room_change
+.normal_world_exit:
         call    world_resolve_exit
         bcc     .no_room_change
         call    room_load_pending_extended
