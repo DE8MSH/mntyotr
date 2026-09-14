@@ -127,6 +127,13 @@ python3 "$ROOT/tools/enemy_room00.py" \
   --tank "$BUILD/enemy-type1c-tank.dat" \
   --jelly-fish "$BUILD/enemy-type1d-jelly-fish.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room10_1f.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_room20_33.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/enemy_medusa.py" --write "$BUILD/enemy-type1e-medusa.dat" >/dev/null
+
+# Generated-asset parity gate before assembly: catches missing room/enemy payloads,
+# bad gem placement and source wiring without requiring an emulator playthrough.
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/playthrough_audit_runner.py" --build-dir "$BUILD" --json "$BUILD/playthrough-audit.json" --text "$BUILD/playthrough-audit.txt" --quiet
+
 cd "$BUILD"
 "$PCEAS" --newproc --strip -m -l 2 -S -gA --raw main.asm
 if [ -s main.pce ]; then mv -f main.pce monty.pce; fi
