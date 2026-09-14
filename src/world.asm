@@ -11,7 +11,9 @@ world_lookup_index:     ds 1
 
 .code
 
-world_init:
+; Startup-only world state does not need to occupy fixed HOME. Keep it banked
+; with --newproc so Bank 0 remains available for reset/vectors and call thunks.
+.proc world_init
         lda     #$02
         sta     <world_map_row
         lda     #$15
@@ -19,7 +21,8 @@ world_init:
         stz     <monty_room            ; room $00 at row 2, col $15
         stz     <world_pending_room
         stz     <world_transition_ready
-        rts
+        leave
+.endp
 
 ; X=world column 0..22, Y=world row 0..5.
 ; Returns A=room id or $ff for a wall/outside cell.
@@ -53,7 +56,10 @@ world_room_supported:
         sec
         rts
 
-world_resolve_exit:
+; Relocate the large edge dispatcher into a normal code bank. The generated
+; HOME thunk is much smaller than this body and leaves fixed Bank 0 available
+; for reset/vectors and the other --newproc thunks.
+.proc world_resolve_exit
         stz     <world_transition_ready
         lda     <monty_room_exit
         bne     .have_exit
@@ -127,7 +133,7 @@ world_resolve_exit:
         sta     <world_transition_ready
         stz     <monty_room_exit
         sec
-        rts
+        leave
 
 .blocked_left:
         lda     #$15
@@ -148,7 +154,8 @@ world_resolve_exit:
         stz     <monty_room_exit
 .none:
         clc
-        rts
+        leave
+.endp
 
 .data
 world_row_offsets:
