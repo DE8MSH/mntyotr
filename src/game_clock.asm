@@ -6,6 +6,11 @@
 ; phase accumulator will use measured/verified refresh constants for ~50.12 Hz.
 ;
 ; game_clock_step returns C=1 when one C64 gameplay tick must execute.
+;
+; Keep both tiny clock routines relocatable. Bank 0 is the fixed HOME/thunk
+; bank and must retain headroom as the complete game grows; --newproc places
+; these bodies in the normal code banks and leaves only compact far-call thunks
+; in HOME. Carry is intentionally set immediately before LEAVE in step().
 
 .zp
 game_clock_phase:       ds 1
@@ -13,12 +18,13 @@ game_tick_counter:      ds 1
 
 .code
 
-game_clock_init:
+.proc game_clock_init
         stz     <game_clock_phase
         stz     <game_tick_counter
-        rts
+        leave
+.endp
 
-game_clock_step:
+.proc game_clock_step
         lda     <game_clock_phase
         clc
         adc     #5
@@ -27,8 +33,9 @@ game_clock_step:
         sbc     #6                      ; carry is set after CMP
         sta     <game_clock_phase
         sec
-        rts
+        leave
 .no_tick:
         sta     <game_clock_phase
         clc
-        rts
+        leave
+.endp
