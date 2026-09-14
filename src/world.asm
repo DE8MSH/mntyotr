@@ -42,9 +42,10 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Rooms $00-$1F are now a contiguous supported block.
+; Rooms $00-$33 are now a contiguous supported block; $30 remains off-grid and
+; is reached by the original completion path rather than normal edge traversal.
 world_room_supported:
-        cmp     #$20
+        cmp     #$34
         bcc     .yes
         clc
         rts
