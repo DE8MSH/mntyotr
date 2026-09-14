@@ -76,18 +76,24 @@ world_room_supported:
         jmp     .blocked
 .left:
         lda     <world_exit_col
-        beq     .blocked_left
+        bne     .left_have_col
+        jmp     .blocked_left
+.left_have_col:
         sec
         sbc     #1
         tax
         ldy     <world_map_row
         jsr     world_get_room_xy
         cmp     #$ff
-        beq     .blocked_left
+        bne     .left_have_room
+        jmp     .blocked_left
+.left_have_room:
         jsr     world_room_supported
-        bcc     .blocked_left
+        bcs     .left_valid
+        jmp     .blocked_left
+.left_valid:
         dec     <world_exit_col
-        bra     .valid
+        jmp     .valid
 .right:
         lda     <world_exit_col
         clc
@@ -96,25 +102,35 @@ world_room_supported:
         ldy     <world_map_row
         jsr     world_get_room_xy
         cmp     #$ff
-        beq     .blocked_right
+        bne     .right_have_room
+        jmp     .blocked_right
+.right_have_room:
         jsr     world_room_supported
-        bcc     .blocked_right
+        bcs     .right_valid
+        jmp     .blocked_right
+.right_valid:
         inc     <world_exit_col
-        bra     .valid
+        jmp     .valid
 .up:
         lda     <world_map_row
-        beq     .blocked_up
+        bne     .up_have_row
+        jmp     .blocked_up
+.up_have_row:
         sec
         sbc     #1
         tay
         ldx     <world_exit_col
         jsr     world_get_room_xy
         cmp     #$ff
-        beq     .blocked_up
+        bne     .up_have_room
+        jmp     .blocked_up
+.up_have_room:
         jsr     world_room_supported
-        bcc     .blocked_up
+        bcs     .up_valid
+        jmp     .blocked_up
+.up_valid:
         dec     <world_map_row
-        bra     .valid
+        jmp     .valid
 .down:
         lda     <world_map_row
         clc
@@ -123,9 +139,13 @@ world_room_supported:
         ldx     <world_exit_col
         jsr     world_get_room_xy
         cmp     #$ff
-        beq     .blocked_down
+        bne     .down_have_room
+        jmp     .blocked_down
+.down_have_room:
         jsr     world_room_supported
-        bcc     .blocked_down
+        bcs     .down_valid
+        jmp     .blocked_down
+.down_valid:
         inc     <world_map_row
 .valid:
         ; Commit the destination before touching A again. Then install the exact
