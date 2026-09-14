@@ -42,9 +42,9 @@ world_get_room_xy:
         rts
 
 ; A=room id. C=1 if this room currently has a real loader.
-; Rooms $00-$0F are now a contiguous supported block; $0F begins ESCAPE TUNNEL.
+; Rooms $00-$1F are now a contiguous supported block.
 world_room_supported:
-        cmp     #$10
+        cmp     #$20
         bcc     .yes
         clc
         rts
