@@ -115,7 +115,9 @@ enemy_room10_1f_last_room: ds 1
 .decode_next:
         lda [_bp],y
         cmp #$ff
-        beq .decode_done
+        bne .have_record
+        jmp .decode_done
+.have_record:
         sty enemy_tmp_record_y
         tax
         lda .colour_tbl,x
