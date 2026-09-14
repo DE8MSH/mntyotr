@@ -4,7 +4,7 @@
 ; collision and SAT engines can own these slots normally.
 
 .code
-enemy_room0b_seed:
+.proc enemy_room0b_seed
         ; slot 0: $07,$28,$7f,$03,$19,$01,$1f
         lda     #$30                    ; ($28>>1)+$1c
         sta     enemy_state_tbl+0
@@ -70,9 +70,10 @@ enemy_room0b_seed:
         lda     #>$4000
         sta     <_di+1
         call    enemy_room0b_upload_4k
-        rts
+        leave
+.endp
 
-enemy_room0b_upload_4k:
+.proc enemy_room0b_upload_4k
         php
         sei
         tma3
@@ -99,4 +100,5 @@ enemy_room0b_upload_4k:
         pla
         tam3
         plp
-        rts
+        leave
+.endp
