@@ -46,14 +46,15 @@ room_ext_index: ds 1
         call    room10_1f_upload_decor
         call    room20_33_upload_decor
 
-        ; Draw its exact 36x20 C64 playfield window.
+        ; Draw its exact 36x20 C64 playfield window. The generated BAT was
+        ; verified byte-for-byte first, then word-RLE packed before assembly.
         ldx     <room_ext_index
         lda     room_ext_bat_lo,x
         sta     <_bp
         lda     room_ext_bat_hi,x
         sta     <_bp+1
         ldy     room_ext_bat_bank,x
-        call    room_draw_native_36x20
+        call    room_draw_rle_36x20
 
         ; Cache 640 collision cells + 8 tile properties in shared RAM.
         ldx     <room_ext_index
@@ -108,6 +109,8 @@ room_ext_patterns_bank:
         db BANK(room2c_patterns),BANK(room2d_patterns),BANK(room2e_patterns),BANK(room2f_patterns),BANK(room30_patterns),BANK(room31_patterns),BANK(room32_patterns)
         db BANK(room33_patterns)
 
+; These symbols still have their historical names, but the files are RLE-packed
+; in-place by test_generated_whole_game_assets.py immediately before pceas.
 room_ext_bat_lo:
         db <room05_screen_bat,<room06_screen_bat,<room07_screen_bat,<room08_screen_bat,<room09_screen_bat,<room0c_screen_bat,<room0f_screen_bat
         db <room10_screen_bat,<room11_screen_bat,<room12_screen_bat,<room13_screen_bat,<room14_screen_bat,<room15_screen_bat,<room16_screen_bat
