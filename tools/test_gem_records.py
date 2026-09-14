@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the complete source-derived gem table and its placement formula."""
+"""Guard the complete source-derived gem table, placement and BG-VRAM slot."""
 from __future__ import annotations
 
 import re
@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ASSET = (ROOT / "src/gem_assets_tail.asm").read_text()
 RUNTIME = (ROOT / "src/gem_runtime.asm").read_text()
+PILE = (ROOT / "src/standard_piledriver.asm").read_text()
+PILE_STATIC = (ROOT / "src/standard_piledriver_static.asm").read_text()
 
 # Exact FreedomKit.Data.item_tbl records from the original C64 source.
 ITEMS = [
@@ -51,6 +53,15 @@ assert len(actual) == 64, len(actual)
 assert actual == expected, "gem_records must be an exact item_tbl -> PCE coordinate conversion"
 assert "GEM_RECORD_COUNT = 64" in RUNTIME
 
+# The old GEM_CHR=CHR_GAME+80 sat inside the standard piledriver's
+# CHR_GAME+64..+99 dynamic range, so its tile was eventually overwritten and
+# appeared as number-like garbage. Keep the gem above both piledriver pools.
+assert "GEM_CHR          = CHR_GAME + 132" in RUNTIME
+assert "PILE_CHR0 = CHR_GAME + 64" in PILE
+assert "PILE_CHR1 = PILE_CHR0 + 18" in PILE
+assert "PILE_STATIC_CHR0 = CHR_GAME + 96" in PILE_STATIC
+assert "PILE_STATIC_CHR1 = PILE_STATIC_CHR0 + 18" in PILE_STATIC
+
 # Explicit guards for newly exposed rooms and intentionally empty rooms.
 by_room: dict[int, list[tuple[int,int,int,int,int]]] = {}
 for r in actual:
@@ -62,4 +73,4 @@ assert by_room[0x2a] == [(0x2a,0x39,0x8c,0xcd,0x02),(0x2a,0x55,0x9c,0x54,0x03)]
 for room in (0x07,0x09,0x0b,0x0c,0x23,0x24,0x25,0x2b,0x2f,0x30,0x31,0x32,0x33):
     assert room not in by_room, f"R{room:02X} must not gain a normal gem"
 
-print("OK: 64 authentic gems; exact item_tbl col/row -> PCE X/Y/BAT placement through R2E")
+print("OK: 64 authentic gems; exact placement; gem BG slot clear of piledriver VRAM")
