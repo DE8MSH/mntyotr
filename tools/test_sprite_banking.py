@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 text = (ROOT / 'src' / 'monty_sprite.asm').read_text()
+life = (ROOT / 'src' / 'game_life.asm').read_text()
 
 # All sprite frame families can move across 8 KiB HuCard banks as room/decor
 # data grows. Never regress to direct TIA from any Monty frame label.
@@ -33,6 +34,19 @@ for proc in (
 ):
     assert f'.proc {proc}' in text
 
+# A life reload must restart the animation sequencer. In particular, a fatal
+# frame must not leave monty_anim_timer at a wrapped/stale value that makes the
+# next walking animation appear frozen after repeated deaths.
+reload_block = life.split('.proc game_life_reload', 1)[1].split('.endp', 1)[0]
+assert 'stz     <monty_anim_frame' in reload_block
+assert 'lda     #4' in reload_block and 'sta     <monty_anim_timer' in reload_block
+assert 'sta     <monty_sprite_last_facing' in reload_block
+assert 'sta     <monty_sprite_last_mode' in reload_block
+assert 'sta     <monty_sprite_dirty' in reload_block
+assert 'call    monty_upload_walk_frame' in reload_block
+restore_block = life.split('.restore:', 1)[1].split('.proc game_life_reload', 1)[0]
+assert 'stz     <monty_is_moving' in restore_block
+
 # Phase 28c PCE 16x32 addressing must stay intact.
 assert '(MONTY_SPR_VRAM+64)>>5' in text
 assert '(MONTY_SPR_VRAM+256)>>5' not in text
@@ -42,4 +56,4 @@ assert '(MONTY_SPR_VRAM+256)>>5' not in text
 assert 'dw $000,$16d,$000' in text.lower()
 assert 'dw $000,$1ff,$000' not in text.lower()
 
-print('OK: banked Monty sprite runtime + bank-safe assets + authentic light-grey palette')
+print('OK: banked Monty sprite runtime + death-safe animation reset + authentic light-grey palette')
