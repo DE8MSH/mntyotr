@@ -49,6 +49,8 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0a0b.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0d0e.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_room0f.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_rooms10_1f.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_rooms20_33.py"
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_gem_records.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_vertical_route.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_jump_edge_guard.py"
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/test_collision_banking.py"
@@ -102,6 +104,8 @@ PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0d.py" --map "$BUILD/room0d-ma
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0e.py" --map "$BUILD/room0e-map.dat" --screen-bat "$BUILD/room0e-screen-bat.dat" --patterns "$BUILD/room0e-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/room0f.py" --map "$BUILD/room0f-map.dat" --screen-bat "$BUILD/room0f-screen-bat.dat" --patterns "$BUILD/room0f-patterns.dat" >/dev/null
 PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms10_1f_decor.py" --out-dir "$BUILD" >/dev/null
+PYTHONPATH="$ROOT/tools" python3 "$ROOT/tools/rooms20_33.py" --out-dir "$BUILD" >/dev/null
 python3 "$ROOT/tools/monty_sprite.py" --left "$BUILD/monty-walk-l.dat" --right "$BUILD/monty-walk-r.dat" --climb "$BUILD/monty-climb.dat" >/dev/null
 python3 "$ROOT/tools/monty_somersault.py" --left "$BUILD/monty-sault-l.dat" --right "$BUILD/monty-sault-r.dat" >/dev/null
 python3 "$ROOT/tools/lift_sprite.py" --write "$BUILD/lift-sprites.dat" >/dev/null
