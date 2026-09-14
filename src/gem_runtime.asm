@@ -235,6 +235,14 @@ gem_palette_hi:      ds 1
 
 ; Per gameplay tick: animate/touch an active gem, remove it, remember it globally
 ; and award the exact original coin value (A=5,Y=3 => +50).
+;
+; The C64 does NOT use an arbitrary pixel-distance box here. CollectCoin scans
+; the four screen characters covered by the top two rows of Monty's 2x3 char
+; footprint (tile_2col_row_offsets[0..3]) for char $34. Recreate that geometry
+; directly: convert the source item col/row back from the stored target values,
+; convert Monty's internal coordinates to his top-left screen character, and
+; accept only a 2x2 character overlap. This keeps pickup collision aligned with
+; the visibly drawn gem and cannot drift several pixels into a wall.
 .proc gem_update
         call    gem_animate_room
 
@@ -265,32 +273,62 @@ gem_palette_hi:      ds 1
         cmp     <monty_room
         bne     .next
 
+        ; Stored target_x = $15 + 4*source_col. Recover the item's absolute
+        ; C64 screen column (source_col + 4).
         iny
         lda     [_bp],y
+        sec
+        sbc     #$15
+        lsr     a
+        lsr     a
+        clc
+        adc     #4
         sta     gem_target_x
-        sec
-        sbc     #5
-        cmp     <monty_x
-        bcs     .next
-        lda     gem_target_x
-        clc
-        adc     #5
-        cmp     <monty_x
-        bcc     .next
 
+        ; Monty screen-left column = (monty_x-$0c)/4. Original CollectCoin
+        ; examines that column and the next one.
+        lda     <monty_x
+        sec
+        sbc     #$0c
+        lsr     a
+        lsr     a
+        cmp     gem_target_x
+        beq     .x_hit
+        clc
+        adc     #1
+        cmp     gem_target_x
+        bne     .next
+.x_hit:
+        ; Stored target_y = $4c + 8*source_row. Recover absolute screen row
+        ; (source_row + 3), then compare against Monty's top two char rows.
+        ldy     gem_record_offset
+        iny
         iny
         lda     [_bp],y
-        sta     gem_target_y
         sec
-        sbc     #10
-        cmp     <monty_y
-        bcs     .next
-        lda     gem_target_y
+        sbc     #$4c
+        lsr     a
+        lsr     a
+        lsr     a
         clc
-        adc     #10
-        cmp     <monty_y
-        bcc     .next
+        adc     #3
+        sta     gem_target_y
 
+        lda     <monty_y
+        inc     a
+        sec
+        sbc     #$32
+        lsr     a
+        lsr     a
+        lsr     a
+        cmp     gem_target_y
+        beq     .collect
+        clc
+        adc     #1
+        cmp     gem_target_y
+        bne     .next
+
+.collect:
         ; Persist collection and award 50 points.
         ldx     gem_scan_index
         lda     #$ff
