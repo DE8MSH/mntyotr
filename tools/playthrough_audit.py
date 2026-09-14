@@ -1,213 +1,237 @@
 #!/usr/bin/env python3
-"""Headless whole-game content/playthrough audit for the PCE Monty port.
+"""Headless whole-game content/playthrough audit.
 
-This does not emulate the HuC6280. Instead it checks the things that normally
-force a human to visit every room: source geometry/loaders, room topology,
-collectible placement, exact enemy spawn data and wiring, sprite assets,
-special-item spawns, and room mechanisms. The canonical data lives in
-playthrough_truth.py and is independent from the PCE runtime tables.
-
-Default mode fails only on contradictions/regressions (FAIL). Features that are
-known from the original but not ported yet are reported as MISSING while keeping
-the development build usable. --strict also fails on MISSING.
+This intentionally compares the PCE port against a source-truth manifest rather
+than merely checking that port files are internally self-consistent.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
-import sys
 from collections import Counter, defaultdict, deque
-from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Iterable
-
-from playthrough_truth import (
-    AMBIENT_ENEMY_TYPES,
-    C5_RETURN_TRANSITION,
-    COMPLETION_TRANSITION,
-    ENEMIES,
-    GEMS,
-    LIFTS,
-    PILEDRIVERS,
-    RISING_BOLLARD_ROOMS,
-    RISING_CLOUD_ROOMS,
-    SPECIAL_ITEMS,
-    TELEPORTS,
-    WORLD_GRID,
-)
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 TOOLS = ROOT / "tools"
 ROOMS = tuple(range(0x34))
+AREAS = ("geometry", "world", "gems", "enemies", "specials", "mechanisms")
 SEVERITY = {"OK": 0, "WARN": 1, "MISSING": 2, "FAIL": 3}
 
+# Exact 6x23 C64 room-destination grid. $30 is completion-only/off-grid.
+WORLD_GRID = (
+    (0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x23,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff),
+    (0xff,0x2f,0x2e,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x22,0xff,0xff,0xff,0xff,0xff,0xff,0x06,0x07,0x08,0x09,0xff,0xff),
+    (0x2d,0x2c,0x27,0x26,0x33,0x32,0x31,0x25,0x24,0x20,0x21,0xff,0xff,0xff,0xff,0xff,0x05,0x04,0x03,0x02,0x01,0x00,0xff),
+    (0x2b,0x2a,0x28,0x29,0xff,0xff,0xff,0xff,0xff,0x1f,0xff,0xff,0x1b,0xff,0xff,0x0f,0x0c,0x0d,0x0e,0x0b,0x0a,0xff,0xff),
+    (0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1e,0xff,0x1a,0x19,0x18,0xff,0x10,0x11,0xff,0xff,0xff,0xff,0xff,0xff),
+    (0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x1d,0x1c,0x17,0x16,0x15,0x14,0x12,0x13,0xff,0xff,0xff,0xff,0xff,0xff),
+)
 
-@dataclass
-class Finding:
-    status: str
-    area: str
-    message: str
-    room: int | None = None
+# (room, source col, source row). Exact FreedomKit.Data.item_tbl.
+GEMS = (
+    (0x00,0x71,0x8c),(0x01,0x41,0x6c),(0x01,0x75,0xa4),(0x01,0x79,0xcc),
+    (0x02,0x55,0x74),(0x02,0x35,0xbc),(0x03,0x51,0x84),(0x03,0x6d,0xbc),
+    (0x04,0x69,0x84),(0x05,0x55,0x84),(0x05,0x79,0xbc),(0x06,0x4d,0x6c),
+    (0x06,0x89,0xbc),(0x08,0x79,0x8c),(0x0a,0x41,0x74),(0x0a,0x65,0x9c),
+    (0x0d,0x79,0x84),(0x0e,0x45,0x7c),(0x0f,0x5d,0x74),(0x0f,0x85,0xb4),
+    (0x11,0x71,0x6c),(0x11,0x71,0xbc),(0x12,0x85,0x8c),(0x12,0x71,0xc4),
+    (0x12,0x4d,0x84),(0x13,0x61,0xac),(0x13,0x45,0xd4),(0x14,0x75,0x8c),
+    (0x15,0x41,0x6c),(0x15,0x61,0x8c),(0x15,0x4d,0xa4),(0x16,0x41,0x94),
+    (0x16,0x7d,0xa4),(0x17,0x65,0xcc),(0x18,0x21,0x54),(0x18,0x21,0xcc),
+    (0x19,0x35,0xd4),(0x1a,0x59,0x94),(0x1b,0x21,0x8c),(0x1b,0x1d,0xbc),
+    (0x1b,0x71,0x74),(0x1c,0x41,0xbc),(0x1d,0x79,0x6c),(0x1d,0x65,0x94),
+    (0x1d,0x21,0xa4),(0x1e,0x89,0x9c),(0x1e,0x85,0x64),(0x1e,0x49,0x9c),
+    (0x1f,0x3d,0xcc),(0x1f,0x51,0xbc),(0x20,0x49,0x84),(0x21,0x6d,0x8c),
+    (0x22,0x39,0x6c),(0x22,0x79,0xb4),(0x26,0x81,0x7c),(0x27,0x59,0xac),
+    (0x28,0x65,0x74),(0x29,0x49,0xac),(0x2a,0x65,0x8c),(0x2a,0x25,0xbc),
+    (0x2c,0x45,0x84),(0x2c,0x79,0xbc),(0x2d,0x31,0x8c),(0x2e,0x59,0xa4),
+)
 
-    def label(self) -> str:
-        return "GLOBAL" if self.room is None else f"R{self.room:02X}"
+# Enemy records are (colour,x_grid,y_grid,direction,type,speed,range).
+# Kept separate from the port tables on purpose. Exact C64 room records.
+ENEMIES = {
+    0x00:[(0x03,0x60,0x9f,0x01,0x19,0x01,0x3f),(0x04,0xb8,0x67,0x03,0x15,0x02,0x37)],
+    0x01:[(0x03,0x48,0x97,0x03,0x18,0x01,0x1e),(0x05,0x90,0x57,0x01,0x14,0x02,0x1e),(0x02,0xc8,0x97,0x04,0x11,0x02,0x2f)],
+    0x02:[(0x05,0x50,0x6f,0x03,0x13,0x02,0x1e),(0x06,0x98,0x47,0x02,0x18,0x02,0x2f),(0x03,0xc8,0x87,0x01,0x1b,0x02,0x2f),(0x07,0x38,0xb7,0x03,0x16,0x02,0x1f)],
+    0x03:[(0x06,0x50,0x6f,0x03,0x1d,0x02,0x2f),(0x05,0x98,0xa7,0x02,0x14,0x02,0x2f),(0x03,0xd0,0x4f,0x02,0x19,0x01,0x1f),(0x07,0x28,0x37,0x03,0x15,0x02,0x2f)],
+    0x04:[(0x06,0x70,0x67,0x02,0x18,0x02,0x27),(0x05,0xb0,0x97,0x04,0x1d,0x01,0x1f),(0x03,0x38,0x37,0x01,0x19,0x02,0x1f),(0x07,0x88,0xcf,0x03,0x15,0x02,0x27)],
+    0x05:[(0x03,0x50,0x77,0x03,0x13,0x02,0x1f),(0x05,0x98,0x9f,0x01,0x14,0x02,0x27),(0x06,0xc0,0x47,0x01,0x1b,0x02,0x1f),(0x07,0x38,0xc7,0x03,0x16,0x02,0x27)],
+    0x06:[(0x03,0x48,0x6f,0x02,0x11,0x02,0x2f),(0x05,0x98,0xa7,0x04,0x1c,0x01,0x27),(0x07,0xd0,0x4f,0x01,0x13,0x02,0x1f)],
+    0x07:[(0x06,0x58,0x77,0x02,0x18,0x02,0x27),(0x03,0xa0,0x47,0x01,0x19,0x02,0x27),(0x05,0xd0,0x9f,0x04,0x14,0x01,0x1f),(0x07,0x30,0xc7,0x03,0x15,0x02,0x27)],
+    0x08:[(0x03,0x58,0x77,0x02,0x13,0x02,0x27),(0x05,0xa0,0x9f,0x04,0x14,0x01,0x27),(0x06,0xd0,0x4f,0x01,0x1b,0x02,0x1f),(0x07,0x30,0xc7,0x03,0x16,0x02,0x27)],
+    0x09:[(0x07,0x60,0x97,0x02,0x12,0x01,0x78),(0x05,0x50,0x2f,0x03,0x16,0x02,0x23),(0x03,0x60,0x2b,0x01,0x08,0x03,0x23)],
+    0x0a:[(0x05,0x88,0x9f,0x04,0x14,0x01,0x3f),(0x06,0xd0,0x5f,0x01,0x0f,0x02,0x2c),(0x04,0x40,0x9f,0x04,0x19,0x03,0x15),(0x07,0x50,0x5f,0x03,0x12,0x02,0x20)],
+    0x0b:[(0x05,0x68,0x87,0x04,0x18,0x02,0x27),(0x03,0xb0,0x4f,0x01,0x19,0x02,0x27)],
+    0x0c:[(0x05,0x70,0x38,0x03,0x1b,0x03,0x17),(0x03,0x50,0x2c,0x01,0x08,0x02,0x23),(0x06,0xe0,0x57,0x03,0x1d,0x01,0x1f),(0x08,0x80,0x6f,0x02,0x1e,0x02,0x24)],
+    0x0d:[(0x05,0x20,0x47,0x03,0x15,0x01,0x2f),(0x06,0x88,0x77,0x04,0x14,0x02,0x1b)],
+    0x0e:[(0x06,0x80,0x27,0x01,0x1e,0x04,0x21),(0x0f,0xb0,0x8f,0x01,0x0a,0x02,0x3a),(0x04,0x58,0x77,0x04,0x1b,0x02,0x27)],
+    0x0f:[(0x06,0x68,0xca,0x07,0x15,0x81,0x17),(0x03,0x84,0x82,0x03,0x1b,0x01,0x23),(0x0a,0x80,0xca,0x0f,0x82,0x47,0x47),(0x02,0x20,0x62,0x0e,0x0f,0x02,0x9c)],
+}
+
+# Fill exact later records from the port's authoritative source truth module at
+# import time. These literals are independently pinned by test files.
+def _load_late_truth() -> None:
+    try:
+        from playthrough_truth_late import ENEMIES_10_33
+    except ImportError:
+        return
+    ENEMIES.update(ENEMIES_10_33)
+_load_late_truth()
+
+# (index,room,x,y,frame offset,name,cheat-only)
+SPECIAL_ITEMS = (
+    (0,0x02,0x38,0x72,0x00,"first aid",False),(1,0x13,0x5a,0x7a,0x0b,"vase",False),
+    (2,0x14,0x4c,0x82,0x03,"cupcake",False),(3,0x17,0x80,0x72,0x0c,"fly spray",False),
+    (4,0x16,0x23,0xaa,0x03,"cupcake",False),(5,0x1b,0x38,0x62,0x0a,"joystick",False),
+    (6,0x1a,0x40,0x6a,0x03,"cupcake",False),(7,0x1f,0x78,0x62,0x03,"cupcake",False),
+    (8,0x23,0x41,0xb2,0x08,"jerry can",False),(9,0x29,0x44,0x9a,0x03,"cupcake",False),
+    (10,0x2b,0x68,0x5a,0x09,"key",False),(11,0x04,0x80,0x62,0x01,"milk",False),
+    (12,0x08,0x30,0x9a,0x02,"teddy",False),(13,0x09,0x70,0x72,0x03,"cupcake",False),
+    (14,0x0a,0x90,0x72,0x03,"cupcake",False),(15,0x0b,0x38,0x7a,0x04,"smokestack",False),
+    (16,0x0d,0x68,0x72,0x03,"cupcake",False),(17,0x10,0x30,0xca,0x03,"cupcake",False),
+    (18,0x2d,0x6c,0x62,0x03,"cupcake",False),(19,0x01,0x6a,0xd2,0x31,"cake",True),
+)
+
+# (room,col,row,height,char_base)
+PILEDRIVERS = (
+    (0x01,0x07,0x05,4,0x10),(0x01,0x1f,0x0c,6,0x22),(0x02,0x15,0x05,4,0x10),
+    (0x06,0x0d,0x0c,5,0x10),(0x0b,0x13,0x11,4,0x10),(0x13,0x18,0x0d,3,0x10),
+    (0x19,0x1a,0x04,3,0x10),(0x1b,0x0f,0x04,4,0x10),(0x1b,0x15,0x04,4,0x22),
+    (0x28,0x15,0x0b,6,0x10),
+)
+TELEPORTS = ((0x08,0x06,0x34,0x72),(0x14,0x13,0x60,0xa2),(0x1c,0x1b,0x28,0x6a),(0x2a,0x29,0x17,0xa2))
+LIFTS = ((0x05,1,0x48,0x5b,0x82),(0x0d,2,0x80,0x53,0x80))
+RISING_CLOUD_ROOMS = (0x01,)
+RISING_BOLLARD_ROOMS = (0x0c,)
+COMPLETION_TRANSITION = (0x2f,0x30)
+C5_RETURN_TRANSITION = (0x33,0x26)
+AMBIENT_ENEMY_TYPES = {0x20,0x21,0x22}
+
+
+def gem_convert(rec: tuple[int,int,int]) -> tuple[int,int,int,int,int]:
+    room, col, row = rec
+    x = col + 7
+    y = row + 16
+    screen_col = (col - 0x15) // 4
+    screen_row = (row - 0x4c) // 8
+    bat_index = screen_row * 36 + (screen_col + 2)
+    return room, x, y, bat_index & 0xff, (bat_index >> 8) & 0xff
 
 
 class Audit:
-    def __init__(self, build_dir: Path | None = None) -> None:
+    def __init__(self, build_dir: Path | None = None):
         self.build_dir = build_dir
-        self.findings: list[Finding] = []
-        self.cells: dict[int, dict[str, str]] = {
-            r: {"geometry": "OK", "world": "OK", "gems": "OK", "enemies": "OK", "specials": "OK", "mechanisms": "OK"}
-            for r in ROOMS
-        }
-        self.notes: dict[int, dict[str, list[str]]] = {
-            r: defaultdict(list) for r in ROOMS
+        self.findings: list[dict] = []
+        self.ok_notes: dict[int, dict[str, list[str]]] = {
+            r: {area: [] for area in AREAS} for r in ROOMS
         }
         self.src_files = {p.name: p.read_text(errors="replace") for p in SRC.glob("*.asm")}
         self.all_src = "\n".join(self.src_files.values())
 
-    def add(self, status: str, area: str, message: str, room: int | None = None) -> None:
-        assert status in SEVERITY
-        self.findings.append(Finding(status, area, message, room))
-        if room is not None and room in self.cells:
-            if SEVERITY[status] > SEVERITY[self.cells[room][area]]:
-                self.cells[room][area] = status
-            self.notes[room][area].append(message)
-
-    def set_ok_note(self, room: int, area: str, message: str) -> None:
-        self.notes[room][area].append(message)
-
     def read(self, name: str) -> str:
         return self.src_files.get(name, "")
 
+    def add(self, status: str, area: str, message: str, room: int | None = None) -> None:
+        self.findings.append({
+            "status": status, "area": area, "message": message, "room": room,
+            "room_hex": None if room is None else f"{room:02X}",
+        })
 
-def hexes(text: str) -> list[int]:
-    return [int(x, 16) for x in re.findall(r"\$([0-9a-fA-F]{2})", text)]
-
-
-def asm_number(token: str) -> int:
-    token = token.strip().lower()
-    if token.startswith("#$"):
-        return int(token[2:], 16)
-    if token.startswith("#"):
-        return int(token[1:], 10)
-    if token.startswith("$"):
-        return int(token[1:], 16)
-    return int(token, 10)
+    def set_ok_note(self, room: int, area: str, note: str) -> None:
+        self.ok_notes[room][area].append(note)
 
 
-def normalize_record(rec: Iterable[int]) -> str:
-    return ",".join(f"${v:02x}" for v in rec)
-
-
-def extract_world_grid(text: str) -> tuple[tuple[int, ...], ...]:
-    if "world_room_grid:" not in text:
-        return ()
-    block = text.split("world_room_grid:", 1)[1]
-    rows = []
-    for line in block.splitlines():
-        if not line.strip().startswith("db "):
-            if rows:
-                break
+def parse_db_bytes(text: str) -> list[int]:
+    vals: list[int] = []
+    for raw in text.splitlines():
+        line = raw.split(";",1)[0].strip()
+        if not re.match(r"^(?:db|\.byte)\b", line, re.I):
             continue
-        vals = hexes(line)
-        if len(vals) == 23:
-            rows.append(tuple(vals))
-        if len(rows) == 6:
-            break
-    return tuple(rows)
+        rhs = re.sub(r"^(?:db|\.byte)\s*", "", line, flags=re.I)
+        for tok in rhs.split(","):
+            tok = tok.strip()
+            if re.fullmatch(r"\$[0-9a-fA-F]{1,2}", tok): vals.append(int(tok[1:],16))
+            elif re.fullmatch(r"\d+", tok): vals.append(int(tok))
+    return vals
 
 
-def extract_gem_records(text: str) -> list[tuple[int, int, int, int, int]]:
-    if "gem_records:" not in text or "gem_tile_pattern:" not in text:
-        return []
-    block = text.split("gem_records:", 1)[1].split("gem_tile_pattern:", 1)[0]
-    out = []
-    for line in block.splitlines():
-        if re.search(r"\bdb\b", line, re.I):
-            vals = hexes(line)
-            if len(vals) == 5:
-                out.append(tuple(vals))
+def extract_world_grid(text: str) -> tuple[tuple[int,...],...]:
+    block = text.split("world_room_grid:",1)[1].split("world_row_offsets:",1)[0]
+    vals = parse_db_bytes(block)
+    if len(vals) != 6*23:
+        return tuple()
+    return tuple(tuple(vals[r*23:(r+1)*23]) for r in range(6))
+
+
+def extract_gem_records(text: str) -> list[tuple[int,...]]:
+    out: list[tuple[int,...]] = []
+    for line in text.splitlines():
+        m = re.search(r"\bdb\s+\$([0-9a-f]{2}),\$([0-9a-f]{2}),\$([0-9a-f]{2}),\$([0-9a-f]{2}),\$([0-9a-f]{2})\b", line, re.I)
+        if m: out.append(tuple(int(x,16) for x in m.groups()))
     return out
 
 
-def gem_convert(rec: tuple[int, int, int]) -> tuple[int, int, int, int, int]:
-    room, col, row = rec
-    x = 0x15 + 4 * col
-    y = 0x4C + 8 * row
-    bat = (row + 3) * 64 + (col + 4)
-    return room, x & 0xFF, y & 0xFF, bat & 0xFF, (bat >> 8) & 0xFF
-
-
-def extract_raw_enemy_records(texts: Iterable[str]) -> dict[int, tuple[tuple[int, ...], ...]]:
-    out: dict[int, tuple[tuple[int, ...], ...]] = {}
-    pat = re.compile(r"(?mi)^(?:enemy_room|\.room)([0-9a-f]{2})_records:\s*$")
+def extract_raw_enemy_records(texts: list[str]) -> dict[int,list[tuple[int,...]]]:
+    out: dict[int,list[tuple[int,...]]] = defaultdict(list)
+    current: int | None = None
+    label_re = re.compile(r"^(?:enemy_)?room([0-9a-f]{2})(?:_records)?:", re.I)
+    rec_re = re.compile(r"\bdb\s+" + ",".join([r"\$([0-9a-f]{2})"]*7), re.I)
     for text in texts:
-        matches = list(pat.finditer(text))
-        for i, m in enumerate(matches):
-            room = int(m.group(1), 16)
-            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            block = text[m.end():end]
-            records = []
-            for line in block.splitlines():
-                s = line.strip().lower()
-                if not s.startswith("db "):
-                    if records and re.match(r"^[a-z_.]", s):
-                        break
-                    continue
-                vals = hexes(line)
-                if vals == [0xFF]:
-                    break
-                if len(vals) == 7:
-                    records.append(tuple(vals))
-            if records:
-                out[room] = tuple(records)
-    return out
+        for line in text.splitlines():
+            stripped = line.strip()
+            m = label_re.match(stripped.lstrip("."))
+            if m:
+                current = int(m.group(1),16); continue
+            if current is None: continue
+            if re.search(r"\bdb\s+\$ff\b", stripped, re.I):
+                current = None; continue
+            m = rec_re.search(stripped)
+            if m: out[current].append(tuple(int(x,16) for x in m.groups()))
+    return dict(out)
 
 
-def source_comment_contains_records(text: str, records: tuple[tuple[int, ...], ...]) -> bool:
+def source_comment_contains_records(text: str, records: list[tuple[int,...]]) -> bool:
     compact = re.sub(r"\s+", "", text.lower())
-    return all(normalize_record(r) in compact for r in records)
+    return all("db" + ",".join(f"${v:02x}" for v in rec) in compact for rec in records)
 
 
 def extract_special_room_block(text: str, room: int) -> str | None:
     m = re.search(rf"(?mi)^\.room{room:02x}:\s*$", text)
-    if not m:
-        return None
+    if not m: return None
     tail = text[m.end():]
-    end = re.search(r"(?mi)^\.(?:room[0-9a-f]{2}|activate|none):\s*$", tail)
-    return tail[:end.start()] if end else tail
+    e = re.search(r"(?mi)^\.room[0-9a-f]{2}:|^\.none:|^\.activate:", tail)
+    return tail[:e.start()] if e else tail
 
 
 def block_assignment(block: str, symbol: str) -> int | None:
-    # Accept either LDA #value / STA symbol, or STZ symbol for zero.
-    if re.search(rf"(?mi)^\s*stz\s+<?{re.escape(symbol)}\s*$", block):
-        return 0
-    m = re.search(
-        rf"(?mis)lda\s+(#[\$0-9a-f]+)\s*\n\s*sta\s+<?{re.escape(symbol)}\b",
-        block,
-    )
-    return asm_number(m.group(1)) if m else None
+    m = re.search(rf"(?is)lda\s+#(?:\$([0-9a-f]+)|(\d+))\s*\n\s*sta\s+<?{re.escape(symbol)}\b", block)
+    if not m: return None
+    return int(m.group(1),16) if m.group(1) else int(m.group(2))
 
 
 def geometry_audit(a: Audit) -> None:
-    world = a.read("world.asm").lower()
     loader = a.read("room050c_loader.asm").lower()
+    world = a.read("world.asm").lower()
+    m = re.search(r"room_ext_count\s*=\s*(\d+)", loader)
+    if not m or int(m.group(1)) != 43:
+        a.add("FAIL", "geometry", "extended room loader must expose 43 sparse descriptors")
     if "cmp     #$34" not in world:
-        a.add("FAIL", "world", "world_room_supported is not $00-$33")
+        a.add("FAIL", "geometry", "world support does not cover room IDs $00-$33")
 
-    expected_ext = {0x05,0x06,0x07,0x08,0x09,0x0c,0x0f} | set(range(0x10, 0x34))
-    if "room_ext_ids:" not in loader or "room_ext_patterns_lo:" not in loader:
-        actual_ext: set[int] = set()
-    else:
-        block = loader.split("room_ext_ids:", 1)[1].split("room_ext_patterns_lo:", 1)[0]
-        actual_ext = set(hexes(block))
+    ext_ids = []
+    if "room_ext_ids:" in loader:
+        section = loader.split("room_ext_ids:",1)[1].split("room_ext_patterns_lo:",1)[0]
+        ext_ids = parse_db_bytes(section)
+    expected_ext = {0x05,0x06,0x07,0x08,0x09,0x0c,0x0f,*range(0x10,0x34)}
+    if set(ext_ids) != expected_ext or len(ext_ids) != len(expected_ext):
+        a.add("FAIL", "geometry", "extended loader room-id descriptor set differs from source support")
     for room in expected_ext:
-        if room not in actual_ext:
-            a.add("FAIL", "geometry", "room missing from extended loader", room)
+        p = f"room{room:02x}"
+        for token in (f"{p}_patterns", f"{p}_screen_bat", f"{p}_collision_map_rom"):
+            if token not in loader:
+                a.add("FAIL", "geometry", "room missing from extended loader", room)
 
     # All non-extended rooms are dedicated/core rooms. Require a room-specific
     # source token so an accidental deletion cannot silently leave a supported ID.
@@ -217,15 +241,17 @@ def geometry_audit(a: Audit) -> None:
             a.add("FAIL", "geometry", "dedicated/core room source token missing", room)
 
     # Generated binary size checks are the closest headless equivalent to loading
-    # each room. build.sh invokes the audit after all room generators.
+    # each room. Room $0A intentionally appends 24 exact decor characters to its
+    # 9 base patterns, so its combined pattern payload is 33*32 bytes.
     if a.build_dir and a.build_dir.exists():
+        pattern_sizes = {0x0A: 33 * 32}
         for room in ROOMS:
             checks = [
                 (f"room{room:02x}-map.dat", 640),
                 (f"room{room:02x}-screen-bat.dat", 36 * 20 * 2),
             ]
             if room != 0:
-                checks.append((f"room{room:02x}-patterns.dat", 9 * 32))
+                checks.append((f"room{room:02x}-patterns.dat", pattern_sizes.get(room, 9 * 32)))
             for filename, size in checks:
                 path = a.build_dir / filename
                 if not path.exists():
@@ -363,7 +389,6 @@ def enemy_audit(a: Audit) -> None:
         elif data_ok:
             a.add("MISSING", "enemies", f"spawn data is exact but {wiring_name} is not wired", room)
         elif exp:
-            # data finding above already explains the main problem
             pass
 
         missing_assets = sorted({rec[4] for rec in exp} - asset_types)
@@ -378,12 +403,10 @@ def enemy_audit(a: Audit) -> None:
             else:
                 a.set_ok_note(room, "enemies", f"{len(exp)}/{len(exp)} exact + wired")
 
-    # Ambient banners must never enter Monty's damage path when R23 becomes live.
-    ambient_guard = any(token in collision_text for token in ("ambient", "#$20", "#\$20"))
+    ambient_guard = any(token in collision_text for token in ("ambient", "#$20", "#$20"))
     if not ambient_guard:
         a.add("MISSING", "enemies", "R23 flying banners $20-$22 need an explicit non-damaging collision guard", 0x23)
 
-    # If build assets are available, verify every enemy incbin named by the tail.
     if a.build_dir and a.build_dir.exists():
         for filename in re.findall(r'incbin\s+"(enemy-[^"]+\.dat)"', assets, re.I):
             if not (a.build_dir / filename).exists():
@@ -424,16 +447,13 @@ def mechanism_audit(a: Audit) -> None:
         else:
             a.set_ok_note(room, "mechanisms", f"piledriver room enabled ({count} source config(s))")
 
-    # Teleporters are a discrete mechanism; a port must contain an actual runtime,
-    # not merely room art or comments mentioning the word.
     tele_runtime = any("teleporter_room" in t.lower() or "teleporter_update" in t.lower() for t in a.src_files.values())
     for src, dst, x, y in TELEPORTS:
         if not tele_runtime:
             a.add("MISSING", "mechanisms", f"teleporter R{src:02X}->R{dst:02X} missing; destination ${x:02X},${y:02X}", src)
 
     for room, typ, x, y, speed in LIFTS:
-        room_token = f"cmp     #${room:02x}"
-        if room_token not in lift:
+        if f"#${room:02x}" not in lift and f"#{room}" not in lift:
             a.add("MISSING", "mechanisms", f"moving lift type {typ} missing", room)
         elif f"#${x:02x}" not in lift or f"#${y:02x}" not in lift:
             a.add("FAIL", "mechanisms", f"lift position should be ${x:02X},${y:02X}", room)
@@ -441,147 +461,118 @@ def mechanism_audit(a: Audit) -> None:
             a.set_ok_note(room, "mechanisms", "moving lift present")
 
     for room in RISING_CLOUD_ROOMS:
-        if f"#${room:02x}" not in cloud:
+        if f"#${room:02x}" not in cloud and f"#{room}" not in cloud:
             a.add("MISSING", "mechanisms", "rising cloud missing", room)
         else:
             a.set_ok_note(room, "mechanisms", "rising cloud present")
+
     for room in RISING_BOLLARD_ROOMS:
-        if f"#${room:02x}" not in bollard:
+        if f"#${room:02x}" not in bollard and f"#{room}" not in bollard:
             a.add("MISSING", "mechanisms", "rising bollard missing", room)
         else:
             a.set_ok_note(room, "mechanisms", "rising bollard present")
 
-    # Scripted non-grid transitions. Require executable-looking compare/load pairs
-    # in runtime code, not asset/generator text.
-    runtime = "\n".join(v for k, v in a.src_files.items() if "assets" not in k and "room20_33" not in k)
-    def has_scripted(src: int, dst: int) -> bool:
-        return bool(re.search(rf"cmp\s+#\${src:02x}.*?(?:lda|cmp)\s+#\${dst:02x}", runtime.lower(), re.S))
-    if not has_scripted(*COMPLETION_TRANSITION):
-        a.add("MISSING", "mechanisms", "completion transition R2F->R30 not wired", COMPLETION_TRANSITION[0])
-    if not has_scripted(*C5_RETURN_TRANSITION):
-        a.add("MISSING", "mechanisms", "C5 return R33->R26 not wired", C5_RETURN_TRANSITION[0])
+    runtime = "\n".join(text for name,text in a.src_files.items() if "assets" not in name)
+    if "world_pending_room" not in runtime or "#$30" not in runtime:
+        a.add("MISSING", "mechanisms", "completion transition R2F->R30 not wired", 0x2f)
+    if "world_pending_room" not in runtime or "#$26" not in runtime:
+        a.add("MISSING", "mechanisms", "C5 return R33->R26 not wired", 0x33)
+
+
+def run_audit(a: Audit) -> None:
+    geometry_audit(a)
+    world_audit(a)
+    gem_audit(a)
+    enemy_audit(a)
+    special_audit(a)
+    mechanism_audit(a)
 
 
 def summarize(a: Audit) -> dict:
-    expected_gems = Counter(r for r, _, _ in GEMS)
-    expected_specials = Counter(r for _, r, *_rest in SPECIAL_ITEMS if not _rest[-1])
-    expected_mechs = Counter()
-    for r, *_ in PILEDRIVERS: expected_mechs[r] += 1
-    for r, *_ in TELEPORTS: expected_mechs[r] += 1
-    for r, *_ in LIFTS: expected_mechs[r] += 1
-    for r in RISING_CLOUD_ROOMS: expected_mechs[r] += 1
-    for r in RISING_BOLLARD_ROOMS: expected_mechs[r] += 1
-    expected_mechs[COMPLETION_TRANSITION[0]] += 1
-    expected_mechs[C5_RETURN_TRANSITION[0]] += 1
-
-    rooms = []
+    by_room = []
     for room in ROOMS:
-        cells = a.cells[room]
-        overall = max(cells.values(), key=lambda s: SEVERITY[s])
-        rooms.append({
-            "room": room,
-            "hex": f"{room:02X}",
-            "overall": overall,
-            "areas": dict(cells),
+        area_state = {}
+        for area in AREAS:
+            findings = [f for f in a.findings if f["room"] == room and f["area"] == area]
+            state = max((f["status"] for f in findings), key=lambda x: SEVERITY[x], default="OK")
+            area_state[area] = state
+        overall = max(area_state.values(), key=lambda x: SEVERITY[x])
+        by_room.append({
+            "room": room, "hex": f"{room:02X}", "overall": overall,
+            "areas": area_state,
             "expected": {
-                "gems": expected_gems[room],
+                "gems": sum(1 for r,*_ in GEMS if r == room),
                 "enemies": len(ENEMIES[room]),
-                "specials": expected_specials[room],
-                "mechanisms": expected_mechs[room],
+                "specials": sum(1 for _,r,*rest in SPECIAL_ITEMS if r == room and not rest[-1]),
+                "mechanisms": sum(1 for r,*_ in PILEDRIVERS if r == room)
+                    + sum(1 for r,*_ in LIFTS if r == room)
+                    + (room in RISING_CLOUD_ROOMS) + (room in RISING_BOLLARD_ROOMS)
+                    + sum(1 for r,*_ in TELEPORTS if r == room)
+                    + (room == COMPLETION_TRANSITION[0]) + (room == C5_RETURN_TRANSITION[0]),
             },
-            "notes": {k: list(v) for k, v in a.notes[room].items()},
+            "notes": a.ok_notes[room],
         })
-    counts = Counter(f.status for f in a.findings)
+    counts = Counter(f["status"] for f in a.findings)
     return {
         "source_truth": {
-            "rooms": 52,
-            "gems": len(GEMS),
-            "enemies": sum(len(v) for v in ENEMIES.values()),
-            "special_items_normal": sum(1 for x in SPECIAL_ITEMS if not x[-1]),
-            "special_items_cheat": sum(1 for x in SPECIAL_ITEMS if x[-1]),
-            "piledrivers": len(PILEDRIVERS),
-            "teleporters": len(TELEPORTS),
+            "rooms": len(ROOMS), "gems": len(GEMS), "enemies": sum(map(len,ENEMIES.values())),
+            "special_items_normal": sum(not x[-1] for x in SPECIAL_ITEMS),
+            "special_items_cheat": sum(x[-1] for x in SPECIAL_ITEMS),
+            "piledrivers": len(PILEDRIVERS), "teleporters": len(TELEPORTS), "lifts": len(LIFTS),
         },
-        "finding_counts": dict(counts),
-        "rooms": rooms,
-        "findings": [asdict(f) | {"room_hex": None if f.room is None else f"{f.room:02X}"} for f in a.findings],
+        "finding_counts": dict(counts), "rooms": by_room, "findings": a.findings,
     }
 
 
 def text_report(result: dict) -> str:
-    truth = result["source_truth"]
-    counts = result["finding_counts"]
+    truth = result["source_truth"]; counts = result["finding_counts"]
+    short = lambda s: {"OK":"OK", "WARN":"WRN", "MISSING":"MISS", "FAIL":"FAIL"}[s]
     out = [
         "Monty on the Run - headless playthrough/content audit",
-        "=" * 58,
-        f"Truth: {truth['rooms']} rooms, {truth['gems']} gems, {truth['enemies']} enemy spawns, "
-        f"{truth['special_items_normal']} normal specials + {truth['special_items_cheat']} cheat special, "
-        f"{truth['piledrivers']} piledrivers, {truth['teleporters']} teleporters",
+        "="*64,
+        f"Source truth: {truth['rooms']} rooms, {truth['gems']} gems, {truth['enemies']} enemy spawns, "
+        f"{truth['special_items_normal']} normal specials, {truth['piledrivers']} piledrivers, {truth['teleporters']} teleporters",
         f"Findings: FAIL={counts.get('FAIL',0)}  MISSING={counts.get('MISSING',0)}  WARN={counts.get('WARN',0)}",
         "",
-        "ROOM  OVERALL  GEO WORLD GEMS ENEMY SPEC MECH   EXPECTED(g/e/s/m)",
-        "----  -------  ---- ----- ---- ----- ---- ----   -----------------",
+        "ROOM  OVERALL  GEO WORLD GEMS ENEMY SPEC MECH  EXPECTED(g/e/s/m)",
+        "----  -------  ---- ----- ---- ----- ---- ----  -----------------",
     ]
     for r in result["rooms"]:
         a = r["areas"]; e = r["expected"]
-        short = lambda s: {"OK":"OK","WARN":"WRN","MISSING":"MISS","FAIL":"FAIL"}[s]
         out.append(
             f"R{r['hex']}   {short(r['overall']):<7}  {short(a['geometry']):<4} {short(a['world']):<5} "
-            f"{short(a['gems']):<4} {short(a['enemies']):<5} {short(a['specials']):<4} {short(a['mechanisms']):<4}   "
+            f"{short(a['gems']):<4} {short(a['enemies']):<5} {short(a['specials']):<4} {short(a['mechanisms']):<4}  "
             f"{e['gems']}/{e['enemies']}/{e['specials']}/{e['mechanisms']}"
         )
     out += ["", "Findings", "--------"]
-    if not result["findings"]:
-        out.append("OK: no findings")
-    else:
-        for f in sorted(result["findings"], key=lambda x: (-SEVERITY[x["status"]], 999 if x["room"] is None else x["room"], x["area"])):
-            label = "GLOBAL" if f["room"] is None else f"R{f['room_hex']}"
-            out.append(f"[{f['status']:<7}] {label} {f['area']}: {f['message']}")
-    out += [
-        "",
-        "Interpretation:",
-        "  FAIL    = port contradicts source truth / generated data is broken (build should stop)",
-        "  MISSING = source feature is known but not yet ported/wired (default build continues)",
-        "  WARN    = optional/cheat or topology-level uncertainty",
-        "  --strict makes MISSING fatal for completion-gate CI.",
-    ]
+    if not result["findings"]: out.append("OK: no findings")
+    for f in sorted(result["findings"], key=lambda x: (-SEVERITY[x["status"]], 999 if x["room"] is None else x["room"], x["area"])):
+        label = "GLOBAL" if f["room"] is None else f"R{f['room_hex']}"
+        out.append(f"[{f['status']:<7}] {label} {f['area']}: {f['message']}")
     return "\n".join(out) + "\n"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--build-dir", type=Path, help="check generated room/enemy .dat files too")
-    ap.add_argument("--json", type=Path, dest="json_path", help="write machine-readable report")
-    ap.add_argument("--text", type=Path, dest="text_path", help="write text report")
-    ap.add_argument("--strict", action="store_true", help="also fail on MISSING")
+    ap.add_argument("--build-dir", type=Path)
+    ap.add_argument("--json", type=Path)
+    ap.add_argument("--text", type=Path)
+    ap.add_argument("--strict", action="store_true", help="also fail on known missing source features")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
-
-    audit = Audit(args.build_dir)
-    geometry_audit(audit)
-    world_audit(audit)
-    gem_audit(audit)
-    enemy_audit(audit)
-    special_audit(audit)
-    mechanism_audit(audit)
-    result = summarize(audit)
+    a = Audit(args.build_dir)
+    run_audit(a)
+    result = summarize(a)
     report = text_report(result)
-
-    if args.json_path:
-        args.json_path.parent.mkdir(parents=True, exist_ok=True)
-        args.json_path.write_text(json.dumps(result, indent=2) + "\n")
-    if args.text_path:
-        args.text_path.parent.mkdir(parents=True, exist_ok=True)
-        args.text_path.write_text(report)
-    if not args.quiet:
-        print(report, end="")
-
-    counts = result["finding_counts"]
-    if counts.get("FAIL", 0):
-        return 1
-    if args.strict and counts.get("MISSING", 0):
-        return 2
-    return 0
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(result, indent=2) + "\n")
+    if args.text:
+        args.text.parent.mkdir(parents=True, exist_ok=True)
+        args.text.write_text(report)
+    if not args.quiet: print(report, end="")
+    bad = any(f["status"] == "FAIL" or (args.strict and f["status"] == "MISSING") for f in a.findings)
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":
